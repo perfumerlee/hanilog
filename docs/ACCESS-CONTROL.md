@@ -46,6 +46,11 @@ Household 생성자는 초기 `PRIMARY_CAREGIVER`가 되고, Household당 활성
 | Plan version 작성/승인 | 사용자 입력 초안 작성 가능; clinician 승인 표기 불가 | MVP 금지(기본) | 금지 | MVP 포털 미제공; 직접 승인 금지 |
 | Safety Evaluation 조회 | grant된 Pet | grant된 Pet | grant된 Pet | 승인된 기록 scope 범위 |
 | Safety Evaluation 직접 생성/수정 | 금지. 서버 명령만 | 금지 | 금지 | 금지 |
+| Notification preference 읽기/변경 | 본인 + grant된 Pet | 본인 + grant된 Pet | 본인 + 읽기 grant Pet | 기본 금지 |
+| 본인 in-app notification 읽기/확인 | 본인 + 현재 Pet grant; 확인 RPC만 | 동일 | 동일 | 기본 금지 |
+| Push endpoint 등록/철회 | 본인 인증 Edge Function/RPC | 동일 | 동일 | 동일 |
+| Outbox/delivery attempts 조회·변경 | 금지 | 금지 | 금지 | 금지 |
+| Worker 전달 및 attempt 기록 | 지정된 Edge Function service role만 | 금지 | 금지 | 금지 |
 | Audit log 열람 | 기본 금지; 본인 활동 내보내기는 후속 | 기본 금지 | 금지 | 금지 |
 | 데이터 내보내기 | 별도 기능/권한 결정 전 금지 | 금지 | 금지 | 금지 |
 | 개인정보 삭제 요청 | 인증된 요청 생성/상태 조회 | 본인 요청 생성 | 본인 요청 생성 | 본인 계정 요청만 |
@@ -84,6 +89,7 @@ Household 생성자는 초기 `PRIMARY_CAREGIVER`가 되고, Household당 활성
 - Realtime은 `realtime.messages` RLS가 적용된 private Broadcast만 허용합니다. Pet topic은 현재 Household membership과 Pet grant를 확인하고, Household topic은 활성 membership, 사용자 topic은 `auth.uid()` 일치만 허용합니다. 클라이언트 메시지 발송 권한은 부여하지 않습니다.
 - 실시간 payload는 `{kind: "invalidate"}` 또는 사용자 본인 topic의 `{kind: "access_changed"}`만 담습니다. 건강 이벤트 행, Pet/event ID, 기록값, 메모, 의료진 소견은 절대 payload에 포함하지 않습니다. 임상 테이블을 Postgres Changes publication에 두지 않습니다.
 - grant/membership 변경은 독립된 본인 전용 `hanilog.user.<auth.uid>` 토픽으로 전달합니다. Pet topic만을 철회 알림 경로로 사용하지 않습니다. 클라이언트는 권한 변경 신호를 받으면 즉시 비공개 화면 상태를 비우고 기존 구독을 제거하며, 토큰 갱신 후 RLS/API로 Pet 접근을 재검증합니다.
+- Notification preferences는 사용자가 본인 수신 설정만 바꾸도록 제한합니다. in-app 목록은 본인 recipient와 현재 Pet grant만 읽을 수 있고 읽음 상태는 전용 RPC로만 기록합니다. Push endpoint 및 암호화 키, outbox와 provider attempt는 클라이언트에서 직접 조회할 수 없습니다. 서비스 worker와 service-role Worker는 좁은 endpoint/RPC만 사용합니다.
 - Supabase Realtime은 연결 중 RLS 권한 결정을 캐시할 수 있으므로 이미 열린 Pet 채널이 토큰 만료/갱신 전까지 남을 수 있습니다. 안전 경계는 payload 무정보성, 매 API/RPC의 현재 DB 권한검증, 별도 user-topic 철회 신호, 캐시 정리입니다. 오프라인 상태에서 철회를 즉시 전달하는 것은 보장하지 않으며, 재연결 시 서버 재검증 전에는 최신 기록으로 표시하지 않습니다.
 - Storage는 MVP 미포함. 후속 추가 시 비공개 bucket과 Pet grant 기반 RLS를 적용합니다.
 - Pages 정적 asset은 공개로 취급합니다. 인증 후 화면에서만 숨기는 것으로 보호되는 파일을 배포하지 않습니다. Supabase Auth redirect allowlist와 Edge Function CORS는 정확한 Pages origin/base에 제한하고, 미리보기 origin을 무분별하게 허용하지 않습니다.

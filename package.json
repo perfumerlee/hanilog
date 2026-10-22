@@ -13,7 +13,8 @@
     "test:watch": "vitest",
     "test:db": "supabase test db",
     "test:db:concurrency": "node scripts/run-concurrency-test.mjs",
-    "test:db:realtime": "node scripts/test-realtime.mjs"
+    "test:db:realtime": "node scripts/test-realtime.mjs",
+    "test:db:notifications": "node scripts/test-notification-worker.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",

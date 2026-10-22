@@ -21,6 +21,12 @@ erDiagram
     PETS ||--o{ HEALTH_EVENTS : records
     ROUTINE_OCCURRENCES o|--o{ HEALTH_EVENTS : optionally_links
     HEALTH_EVENTS ||--o{ HEALTH_EVENT_REVISIONS : corrected_by
+    PETS ||--o{ NOTIFICATION_PREFERENCES : configured_for
+    APP_USERS ||--o{ NOTIFICATION_PREFERENCES : owns
+    APP_USERS ||--o{ IN_APP_NOTIFICATIONS : receives
+    IN_APP_NOTIFICATIONS ||--o{ NOTIFICATION_OUTBOX : dispatched_by
+    NOTIFICATION_OUTBOX ||--o{ NOTIFICATION_DELIVERY_ATTEMPTS : attempted
+    APP_USERS ||--o{ PUSH_SUBSCRIPTIONS : registers
 ```
 
 - 한 Household는 여러 Pet을 포함합니다. 각 Pet은 한 시점에 정확히 하나의 활성 Household에 속합니다.
@@ -51,8 +57,15 @@ erDiagram
 | `safety_evaluations` | Pet/occurrence, evaluation status, result codes, relevant version/event/revision IDs, `evaluated_at`, evaluator version | 특정 입력 상태의 비의료 데이터 평가 |
 | `audit_log` | actor, action, target, UTC time, request/correlation ID, minimal metadata | 권한·기록·계획 주요 행위 추적 |
 | `idempotency_records` | actor, operation, key, normalized request hash, response/event ref, created_at; actor/operation/key 유일 | 동일 요청 재전송 보호 |
+| `notification_preferences` | Pet/user/type unique, per-channel flags, lead/unconfirmed/repeat interval, quiet hours, timezone | 사용자별 알림 선호; 의료 기준이 아님 |
+| `in_app_notifications` | recipient, Pet, type, optional occurrence/event refs, unique dedupe key, generic copy, available/expiry/read/invalidation times | 알림 생성·노출·확인 상태. 읽음은 돌봄 수행이 아님 |
+| `notification_outbox` | notification, recipient/Pet, channel, unique idempotency key, status, attempt count, lease, availability/expiry | 서버 전송 대기·claim·완료 상태 |
+| `notification_delivery_attempts` | outbox, monotonic attempt number, provider result/error code/message ID, UTC time | 전송 시도 이력; 성공은 사용자 수신/열람 보증이 아님 |
+| `push_subscriptions` | user/device endpoint, endpoint hash unique, browser keys, expiry/revocation/success times | 서비스 worker Push endpoint. 본인 전용 RPC와 서버 worker만 읽음 |
 
-후속 단계에서 필요한 notification preference/outbox, provider delivery, push subscription, attachment, clinician notes 테이블은 Phase 1 최소 스키마에서 제외할 수 있습니다.
+Notification 테이블은 Phase 4의 별도 추가 migration으로 관리합니다. attachment와 clinician notes는 현재 범위에서 제외합니다.
+
+알림/outbox는 일정과 실제 event를 대체하지 않습니다. event 생성 후 일정 알림은 무효화되며, 늦은 schedule은 설정된 지연 이후 `RECORD_UNCONFIRMED` 알림만 만들 수 있습니다. 미확인 알림은 실제 미수행을 뜻하지 않습니다. 알림 전송 attempt는 provider ACK에 한정되며 최종 사용자 수신·열람 기록이 아닙니다. 각 Pet/user preference는 채널별로 분리되고, 사용자가 설정을 끄거나 Pet grant가 철회되면 대기 작업은 억제됩니다.
 
 ## 3. Care Plan, Care Routine, Occurrence, Event
 

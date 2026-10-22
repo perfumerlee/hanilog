@@ -14,12 +14,13 @@ PostgreSQL (source of truth)
   ├─ household membership + pet-specific grants
   ├─ plan/routine versions + occurrences + health events/revisions
   ├─ idempotency + audit + safety evaluations
-  └─ future notification outbox (not first-MVP delivery feature)
+  └─ user/Pet notification preferences + in-app notices + transactional outbox
           │
-          └── Supabase Auth / Realtime refresh hints
+          ├─ Supabase Auth / Realtime refresh hints
+          └─ Edge Functions Worker → Web Push / Resend (mock by default)
 ```
 
-**기본 스택 제안:** React + TypeScript + Vite PWA, Supabase Auth, PostgreSQL. DB migration, 권한, event 명령을 재현 가능하게 관리합니다. Realtime은 화면 갱신 신호일 뿐 정합성 보장 수단이 아닙니다. Storage, external notification provider, clinician portal은 초기 MVP에서 사용하지 않습니다.
+**기본 스택:** React + TypeScript + Vite PWA, Supabase Auth, PostgreSQL, RLS, Edge Functions. DB migration, 권한, event 명령을 재현 가능하게 관리합니다. Realtime은 화면 갱신 신호일 뿐 정합성 보장 수단이 아닙니다. Notifications Worker/provider 연동은 구현되어 있으나 외부 전달은 별도 자격증명·스케줄러가 없으면 수행하지 않습니다. Storage와 clinician portal은 현재 범위에 없습니다.
 
 ## 2. 클라이언트와 서버 책임
 
@@ -87,15 +88,16 @@ Membership 또는 Pet grant revoke는 권한 행 변경과 audit를 같은 trans
 
 ## 6. Notifications Worker 정책
 
-첫 MVP에는 email/Web Push worker를 포함하지 않습니다. 인앱 타임라인이 현재 서버 상태를 표시합니다. 후속 outbox 설계는 다음 계약을 사용합니다.
+알림은 돌봄 수행의 증거가 아니며 `in_app_notifications`, `notification_outbox`, `notification_delivery_attempts`, `push_subscriptions`, `notification_preferences`로 기록·전달 상태를 분리합니다. 알림 확인은 별도의 read marker이며 Health Event를 만들지 않습니다.
 
-- 업무 트랜잭션과 같은 transaction에서 outbox enqueue.
-- key는 source event/revision + recipient + channel + notification type + template version의 안정된 조합.
-- worker claim은 lease/attempt로 원자화하고 공급자 네트워크 호출은 DB transaction 밖에서 수행.
-- 전송 전에 현재 recipient membership/Pet grant와 notification preference를 재검증. 철회된 수신자의 대기 알림은 suppress.
-- transient 429/5xx/timeout 재시도는 제한·지수 backoff/jitter, 영구 오류는 failed 및 endpoint 조치.
-- provider timeout은 수신 여부 불명일 수 있으므로 end-to-end exactly-once를 보장하지 않음. 앱 내부 enqueue/delivery ID는 멱등하게 관리하고 재시도 결과를 추적.
-- 알림 payload는 민감 의료 상세를 최소화. queued/sent/delivered(if known)/read/action은 각각 다른 상태.
+- 일정, event 입력, grant/settings 변경 트랜잭션에서 알림과 outbox enqueue를 원자적으로 처리합니다. schedule horizon 생성과 미확인 안내 materialization은 worker가 서버에서 수행합니다.
+- dedupe key는 source occurrence/event/revision + recipient + type/channel의 안정된 ID 조합입니다. 같은 알림의 outbox row는 채널별 유일합니다.
+- Worker claim은 `FOR UPDATE SKIP LOCKED`와 lease/attempt로 원자화하고 공급자 네트워크 호출은 DB transaction 밖에서 수행합니다.
+- 외부 발송 직전 현재 Pet grant와 사용자별 channel preference를 재확인합니다. 권한 철회, 설정 off, 일정 취소·대체, 만료 시 대기 작업을 suppress/expire합니다.
+- 재시도는 제한된 지수 backoff+jitter를 사용합니다. Web Push 404/410 구독은 폐기하고 Resend 요청에는 idempotency key를 사용합니다.
+- 외부 provider 승인 후 DB 응답을 잃는 경우 Push 중복 가능성을 완전히 제거할 수 없으므로 at-least-once 성격을 명시하고 attempt 기록으로 추적합니다. 사용자 수신/열람은 provider 응답으로 보장하지 않습니다.
+- 기본 PWA worker는 정적 asset만 precache하며 API/Auth/건강기록은 캐시하지 않습니다. Push body는 고정된 일반 문구이고 payload는 알림/Pet ID만 담습니다.
+- 현재 구현의 provider 기본 모드는 `mock`; 실제 채널은 서버 secret과 운영 cron 설정이 필요합니다. 운영 설정은 별도 검증 전까지 하지 않습니다.
 
 ## 7. 시간 처리
 

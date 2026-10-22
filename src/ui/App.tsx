@@ -15,6 +15,8 @@ import { isSupabaseConfigured, supabase, userFacingError } from '../lib/supabase
 import { petInvalidationChannel, userAccessChannel } from '../lib/realtime';
 import { CareRoutinePage } from './CareRoutinePage';
 import { InvitationAcceptPage, SharedCarePage } from './SharedCarePage';
+import { NotificationsPage } from './NotificationsPage';
+import { PwaExperience } from './PwaExperience';
 
 type Pet = { id: string; household_id: string; name: string; timezone: string };
 type HealthEvent = {
@@ -156,6 +158,7 @@ export function App() {
         </span>
         {session && <button className="quiet-button" onClick={() => void supabase?.auth.signOut()}>로그아웃</button>}
       </header>
+      <PwaExperience />
       {!online && <div role="alert" className="offline-banner">서버 최신 상태를 확인할 수 없습니다. 기록은 서버 응답 전까지 확정되지 않습니다.</div>}
       <Routes>
         <Route path="/login" element={session ? <Navigate to={postLoginPath} replace /> : <Login />} />
@@ -575,6 +578,7 @@ function Workspace({ userId, online }: { userId: string; online: boolean }) {
             dateFilter={dateFilter} setDateFilter={setDateFilter} loading={loadingEvents} />} />
         <Route path="/care" element={!selectedPet ? <SetupPrompt loading={loadingPets} /> : <CareRoutinePage key={selectedPet.id} pet={selectedPet} online={online} userId={userId} />} />
         <Route path="/shared" element={<SharedCarePage key={households.map((item) => item.id).join(':')} households={households} pets={pets} userId={userId} />} />
+        <Route path="/notifications" element={<NotificationsPage key={`${userId}:${selectedPetId}:${pets.map((pet) => pet.id).join(':')}`} pets={pets} userId={userId} online={online} />} />
         <Route path="/record" element={!selectedPet
           ? <SetupPrompt loading={loadingPets} />
           : <QuickRecordPage key={`${selectedPet.id}:${location.search}`} pet={selectedPet} userId={userId} occurrences={dataReady ? occurrences : []}
@@ -596,6 +600,7 @@ function sessionNav(pathname: string) {
     { to: '/timeline', label: '기록 모아보기', icon: '◷' },
     { to: '/care', label: '돌봄 루틴', icon: '✓' },
     { to: '/shared', label: '함께 돌봄', icon: '♡' },
+    { to: '/notifications', label: '알림', icon: '♧' },
   ];
   return <nav className="bottom-nav" aria-label="주요 메뉴">
     {navItems.map((item) => {

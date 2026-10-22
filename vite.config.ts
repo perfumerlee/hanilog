@@ -19,7 +19,7 @@ export default defineConfig(({ command, mode }) => {
       VitePWA({
         registerType: 'prompt',
         injectRegister: 'auto',
-        includeAssets: ['paw.svg'],
+        includeAssets: ['paw.svg', 'push-handler.js'],
         manifest: {
           name: 'HaniLog',
           short_name: 'HaniLog',
@@ -35,6 +35,7 @@ export default defineConfig(({ command, mode }) => {
           ],
         },
         workbox: {
+          importScripts: [`${base}push-handler.js`],
           globPatterns: ['**/*.{js,css,html,svg,ico,png,webmanifest}'],
           navigateFallback: 'index.html',
           runtimeCaching: [],

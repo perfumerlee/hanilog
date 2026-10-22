@@ -99,3 +99,39 @@ jobs:
           HANILOG_LOCAL_SUPABASE_URL: ${{ steps.local-supabase.outputs.api_url }}
           HANILOG_LOCAL_SUPABASE_PUBLISHABLE_KEY: ${{ steps.local-supabase.outputs.publishable_key }}
         run: npm run test:db:realtime
+
+      - name: Run notification Worker with local mock provider
+        env:
+          HANILOG_LOCAL_SUPABASE_URL: ${{ steps.local-supabase.outputs.api_url }}
+          HANILOG_LOCAL_SUPABASE_PUBLISHABLE_KEY: ${{ steps.local-supabase.outputs.publishable_key }}
+        shell: bash
+        run: |
+          worker_secret="$(openssl rand -hex 32)"
+          echo "::add-mask::$worker_secret"
+          env_file="$RUNNER_TEMP/hanilog-notification.env"
+          function_log="$RUNNER_TEMP/hanilog-functions.log"
+          printf 'NOTIFICATION_WORKER_SECRET=%s\nNOTIFICATION_DELIVERY_MODE=mock\n' "$worker_secret" > "$env_file"
+          cleanup() {
+            if [[ -n "${functions_pid:-}" ]]; then kill "$functions_pid" 2>/dev/null || true; fi
+            rm -f "$env_file"
+          }
+          trap cleanup EXIT
+          npx --no-install supabase functions serve --no-verify-jwt --env-file "$env_file" notification-worker manage-push-subscription > "$function_log" 2>&1 &
+          functions_pid=$!
+          ready=false
+          for attempt in $(seq 1 45); do
+            if ! kill -0 "$functions_pid" 2>/dev/null; then
+              echo "Local Edge Functions runtime failed to start; output withheld to avoid accidental credential disclosure."
+              exit 1
+            fi
+            status="$(curl --silent --output /dev/null --write-out '%{http_code}' -X POST \
+              -H "apikey: $HANILOG_LOCAL_SUPABASE_PUBLISHABLE_KEY" \
+              http://127.0.0.1:54321/functions/v1/notification-worker || true)"
+            if [[ "$status" == "401" ]]; then ready=true; break; fi
+            sleep 2
+          done
+          if [[ "$ready" != true ]]; then
+            echo "Local Edge Functions runtime did not become ready."
+            exit 1
+          fi
+          NOTIFICATION_WORKER_SECRET="$worker_secret" npm run test:db:notifications

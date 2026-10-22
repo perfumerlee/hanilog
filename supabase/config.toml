@@ -19,3 +19,9 @@ enable_signup = true
 enable_signup = true
 double_confirm_changes = true
 enable_confirmations = false
+
+[functions.manage-push-subscription]
+verify_jwt = true
+
+[functions.notification-worker]
+verify_jwt = false
