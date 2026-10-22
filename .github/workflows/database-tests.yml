@@ -1,0 +1,61 @@
+name: Local database verification
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  database:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Verify pinned Supabase CLI
+        run: test "$(npx --no-install supabase --version)" = "2.121.0"
+
+      # A fresh, job-local database is created from migrations. No remote project is linked.
+      - name: Start local Supabase stack
+        shell: bash
+        run: |
+          if ! npx --no-install supabase start --exclude vector,logflare > "$RUNNER_TEMP/supabase-start.log" 2>&1; then
+            echo "Supabase startup failed. CLI output was suppressed to avoid logging generated local credentials."
+            exit 1
+          fi
+
+      - name: Expose local Realtime test connection
+        id: local-supabase
+        shell: bash
+        run: |
+          status_env="$(npx --no-install supabase status --output env)"
+          api_url="$(printf '%s\n' "$status_env" | sed -n 's/^API_URL=//p')"
+          publishable_key="$(printf '%s\n' "$status_env" | sed -n 's/^PUBLISHABLE_KEY=//p')"
+          test -n "$api_url"
+          test -n "$publishable_key"
+          printf 'api_url=%s\n' "$api_url" >> "$GITHUB_OUTPUT"
+          printf 'publishable_key=%s\n' "$publishable_key" >> "$GITHUB_OUTPUT"
+
+      - name: Run pgTAP and RLS tests
+        run: npx --no-install supabase test db
+
+      - name: Run two-session concurrency regression
+        run: npm run test:db:concurrency
+
+      - name: Run two-user Realtime permission regression
+        env:
+          HANILOG_LOCAL_SUPABASE_URL: ${{ steps.local-supabase.outputs.api_url }}
+          HANILOG_LOCAL_SUPABASE_PUBLISHABLE_KEY: ${{ steps.local-supabase.outputs.publishable_key }}
+        run: npm run test:db:realtime

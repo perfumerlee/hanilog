@@ -1,0 +1,31 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
+supabase/.temp/
+.supabase-cli-home/
+
+# Local databases, container/WSL images, diagnostic and test output
+*.db
+*.sqlite
+*.sqlite3
+*.vhdx
+*.log
+test-results/
+playwright-report/
+supabase/.branches/
+
+# Local TLS material and private credentials
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Hani-specific health context; sanitize before adding these local product notes to source control
+docs/PRD.md
+docs/SAFETY-CONTRACT.md
+docs/IMPLEMENTATION-ROADMAP.md
+docs/PHASE-0.5-AUDIT.md
