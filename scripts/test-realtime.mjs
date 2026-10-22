@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { URL } from 'node:url';
 import process from 'node:process';
 import { clearTimeout, setTimeout as scheduleTimeout } from 'node:timers';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -8,7 +9,23 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.HANILOG_LOCAL_SUPABASE_URL;
 const publishableKey = process.env.HANILOG_LOCAL_SUPABASE_PUBLISHABLE_KEY;
 if (!supabaseUrl || !publishableKey) {
-  process.stderr.write('Set the local Supabase URL and publishable key before running this test.\n');
+  process.stderr.write('Realtime test configuration is incomplete: set the local Supabase URL and publishable key.\n');
+  process.exit(1);
+}
+
+let parsedSupabaseUrl;
+try {
+  parsedSupabaseUrl = new URL(supabaseUrl);
+} catch {
+  process.stderr.write('Realtime test configuration is invalid: HANILOG_LOCAL_SUPABASE_URL must be a valid HTTP or HTTPS URL.\n');
+  process.exit(1);
+}
+if (!['http:', 'https:'].includes(parsedSupabaseUrl.protocol) || !parsedSupabaseUrl.hostname) {
+  process.stderr.write('Realtime test configuration is invalid: HANILOG_LOCAL_SUPABASE_URL must be a valid HTTP or HTTPS URL.\n');
+  process.exit(1);
+}
+if (publishableKey !== publishableKey.trim() || /[\r\n]/.test(publishableKey)) {
+  process.stderr.write('Realtime test configuration is invalid: HANILOG_LOCAL_SUPABASE_PUBLISHABLE_KEY must be a single non-empty value.\n');
   process.exit(1);
 }
 

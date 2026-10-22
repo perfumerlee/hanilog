@@ -40,11 +40,51 @@ jobs:
         id: local-supabase
         shell: bash
         run: |
-          status_env="$(npx --no-install supabase status --output env)"
-          api_url="$(printf '%s\n' "$status_env" | sed -n 's/^API_URL=//p')"
-          publishable_key="$(printf '%s\n' "$status_env" | sed -n 's/^PUBLISHABLE_KEY=//p')"
-          test -n "$api_url"
-          test -n "$publishable_key"
+          if ! status_env="$(npx --no-install supabase status --output env 2>"$RUNNER_TEMP/supabase-status.log")"; then
+            echo "Could not read the local Supabase environment. CLI output was suppressed to avoid logging generated credentials."
+            exit 1
+          fi
+
+          read_env_value() {
+            local name="$1" line value
+            line="$(printf '%s\n' "$status_env" | grep -m1 "^${name}=")" || return 1
+            value="${line#*=}"
+            value="${value%$'\r'}"
+            if [[ ${#value} -ge 2 && ${value:0:1} == '"' && ${value: -1} == '"' ]]; then
+              value="${value:1:${#value}-2}"
+            elif [[ ${#value} -ge 2 && ${value:0:1} == "'" && ${value: -1} == "'" ]]; then
+              value="${value:1:${#value}-2}"
+            fi
+            printf '%s' "$value"
+          }
+
+          api_url="$(read_env_value API_URL)" || {
+            echo "Supabase status did not contain API_URL."
+            exit 1
+          }
+          publishable_key="$(read_env_value PUBLISHABLE_KEY)" || {
+            echo "Supabase status did not contain PUBLISHABLE_KEY."
+            exit 1
+          }
+
+          if ! API_URL_TO_VALIDATE="$api_url" node --input-type=module -e '
+            try {
+              const url = new URL(process.env.API_URL_TO_VALIDATE);
+              if (!["http:", "https:"].includes(url.protocol) || !url.hostname) process.exit(1);
+            } catch {
+              process.exit(1);
+            }
+          '; then
+            echo "Supabase API_URL is not a valid HTTP or HTTPS URL."
+            exit 1
+          fi
+
+          if [[ -z "$publishable_key" || "$publishable_key" == *$'\n'* || "$publishable_key" == *$'\r'* ]]; then
+            echo "Supabase PUBLISHABLE_KEY is missing or malformed."
+            exit 1
+          fi
+
+          printf '::add-mask::%s\n' "$publishable_key"
           printf 'api_url=%s\n' "$api_url" >> "$GITHUB_OUTPUT"
           printf 'publishable_key=%s\n' "$publishable_key" >> "$GITHUB_OUTPUT"
 
