@@ -24,3 +24,7 @@ The GitHub Actions workflow validates source changes only. It does not deploy Gi
 ## GitHub Pages path
 
 For a repository Pages site, set `PAGES_BASE_PATH` to the repository slug at build time (for example, `hanilog`). Root or custom-domain builds omit it. Hash routing keeps direct routes compatible with static hosting. Supabase Auth redirect URLs and Edge Function CORS origins must be explicitly configured for the chosen origin before a hosted auth flow is enabled.
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
