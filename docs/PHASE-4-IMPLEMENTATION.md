@@ -70,7 +70,8 @@
 
 - `.github/workflows/database-tests.yml`에 mock-only local Edge Functions 실행 단계를 추가했습니다. CI는 임시 worker token을 job 안에서 생성·마스킹하고, 로컬 Supabase DB·synthetic fixture만 사용합니다. 운영 Supabase, 서비스 secret, Pages deploy 단계가 없습니다.
 - Commit `be294f6ab14da64df7502638b2b53f2c0a5457e7`을 `main`에 일반 push했습니다. [Build validation run 3](https://github.com/perfumerlee/hanilog/actions/runs/39731116048)은 Typecheck, Lint, Vitest, Build 모두 PASS입니다. [Local database verification run 3](https://github.com/perfumerlee/hanilog/actions/runs/39731116134)은 Supabase startup, pgTAP, 두 세션 동시성, Realtime 권한 회귀, local Mock Worker 전 단계 PASS입니다.
-- **Pages 배포 사고 기록:** push 당시 저장소에 기존 GitHub Pages 자동 게시 설정이 남아 있어 [Pages build and deployment run](https://github.com/perfumerlee/hanilog/actions/runs/39731115757)의 `deploy` job이 성공했습니다. 이 단계 요청의 Pages 금지 조건과 충돌한 실제 배포입니다. 이를 확인한 뒤 기존 GitHub Pages 게시 설정 삭제를 요청해 HTTP 204를 받았고, 후속 조회는 HTTP 404로 Pages 설정 비활성 상태를 확인했습니다. 이후 보고서 반영 commit에서 Pages 자동화가 다시 실행되지 않는지도 확인합니다.
+- **Pages 배포 사고 기록:** push 당시 저장소에 기존 GitHub Pages 자동 게시 설정이 남아 있어 [Pages build and deployment run](https://github.com/perfumerlee/hanilog/actions/runs/39731115757)의 `deploy` job이 성공했습니다. 이 단계 요청의 Pages 금지 조건과 충돌한 실제 배포입니다. 이를 확인한 뒤 기존 GitHub Pages 게시 설정 삭제를 요청해 HTTP 204를 받았고, 후속 조회는 HTTP 404로 Pages 설정 비활성 상태를 확인했습니다. 후속 보고서 commit `5ba555c`에서는 Pages run이 새로 생성되지 않았습니다.
+- 보고서 반영 commit `5ba555c0f45b78013f36598dc410829e739aa187`의 [Build validation run 4](https://github.com/perfumerlee/hanilog/actions/runs/39731516395)와 [Local database verification run 4](https://github.com/perfumerlee/hanilog/actions/runs/39731516359)도 모두 PASS입니다.
 - 실제 브라우저·모바일 기기 Push, Web Push endpoint 생존/브라우저별 지원, 사용자 잠금 화면, Resend 외부 이메일, 운영 Vault/Cron, 외부 provider rate-limit/webhook/bounce는 미검증.
 
 ## 10. 남은 보안·운영 위험
