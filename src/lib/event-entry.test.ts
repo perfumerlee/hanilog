@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validateEventEntry, type EventEntryFields } from './event-entry';
+import { formatGlucoseValue, GLUCOSE_UNIT, validateEventEntry, type EventEntryFields } from './event-entry';
 
 const base: EventEntryFields = {
   eventType: 'insulin',
@@ -27,11 +27,23 @@ describe('health event form validation', () => {
     expect(JSON.stringify(result.value)).not.toMatch(/dose|용량/i);
   });
 
-  it('requires a numeric glucose observation and a user entered unit without applying thresholds', () => {
-    expect(validateEventEntry({ ...base, eventType: 'glucose', numericValue: 'NaN', unit: 'synthetic-unit' }).error).toContain('측정값');
+  it('requires a numeric glucose observation and fixes new measurements to mg/dL without thresholds', () => {
+    expect(validateEventEntry({ ...base, eventType: 'glucose', numericValue: 'NaN' }).error).toContain('측정값');
     const result = validateEventEntry({ ...base, eventType: 'glucose', numericValue: '0', unit: 'synthetic-unit' });
     expect(result.value?.value.observed_value).toBe(0);
-    expect(result.value?.unit).toBe('synthetic-unit');
+    expect(result.value?.unit).toBe(GLUCOSE_UNIT);
+  });
+
+  it('stores optional synthetic measurement source and condition as descriptive metadata', () => {
+    const result = validateEventEntry({ ...base, eventType: 'glucose', numericValue: '150',
+      measurementSource: '합성 기기', measurementCondition: 'BEFORE_MEAL' });
+    expect(result.value?.value).toMatchObject({ observed_value: 150, measurement_source: '합성 기기', measurement_condition: 'BEFORE_MEAL' });
+  });
+
+  it('does not relabel legacy glucose values stored in another unit', () => {
+    expect(formatGlucoseValue(8.2, 'mmol/L')).toContain('mmol/L');
+    expect(formatGlucoseValue(8.2, 'mmol/L')).toContain('변환 안 됨');
+    expect(formatGlucoseValue(164, 'mg/dL')).toBe('164 mg/dL');
   });
 
   it('requires a reported meal observation and keeps intake amount optional', () => {

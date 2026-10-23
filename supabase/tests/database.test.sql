@@ -1,5 +1,5 @@
 begin;
-select plan(12);
+select plan(15);
 
 insert into auth.users(id,aud,role,email,encrypted_password,email_confirmed_at,raw_app_meta_data,raw_user_meta_data,created_at,updated_at)
 values
@@ -72,6 +72,18 @@ select is(public.record_health_event(
   (current_setting('test.second_response')::jsonb)->>'event_id', 'same idempotency key returns the original event');
 select is((select count(*)::integer from public.health_events where occurrence_id=current_setting('test.occurrence_id')::uuid),2,
   'idempotent retry does not create another event');
+select set_config('test.glucose_response',public.record_health_event(
+  current_setting('test.pet_id')::uuid,'glucose',clock_timestamp(),null,'{"observed_value":164}'::jsonb,'mg/dL',
+  '10000000-0000-4000-8000-000000000003'::uuid,'Asia/Seoul')::text,true);
+select is((select unit from public.health_events where id=(current_setting('test.glucose_response')::jsonb->>'event_id')::uuid),
+  'mg/dL','new glucose events persist the fixed mg/dL unit');
+select is((select value->>'observed_value' from public.health_events
+  where id=(current_setting('test.glucose_response')::jsonb->>'event_id')::uuid),'164',
+  'fixed-unit glucose event preserves the submitted numeric value');
+select throws_ok(
+  $$select public.record_health_event(current_setting('test.pet_id')::uuid,'glucose',clock_timestamp(),null,'{"observed_value":8.2}'::jsonb,'mmol/L','10000000-0000-4000-8000-000000000004'::uuid,'Asia/Seoul')$$,
+  '22023','GLUCOSE_UNIT_MUST_BE_MG_DL','new glucose events using another unit are rejected without conversion'
+);
 select throws_ok(
   $$select public.record_health_event(current_setting('test.pet_id')::uuid,'insulin','2026-01-01T00:01:00Z',current_setting('test.occurrence_id')::uuid,'{"note":"different request"}'::jsonb,null::text,'10000000-0000-4000-8000-000000000002'::uuid,'Asia/Seoul')$$,
   '23505', 'IDEMPOTENCY_KEY_REUSED', 'same key with a changed payload is rejected'

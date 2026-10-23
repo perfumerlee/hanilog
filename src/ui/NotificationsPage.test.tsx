@@ -25,9 +25,10 @@ import { NotificationsPage } from './NotificationsPage';
 describe('NotificationsPage', () => {
   afterEach(() => cleanup());
   beforeEach(() => {
+    const now = Date.now();
     mockState.rows = [{ id: 'notice-1', pet_id: 'pet-1', notification_type: 'CARE_DUE', title: '돌봄 일정 안내',
-      body: '예정된 돌봄 일정을 확인해 주세요.', action_path: '/notifications', created_at: '2026-10-22T02:00:00Z',
-      expires_at: '2026-10-23T02:00:00Z', read_at: null, invalidated_at: null }];
+      body: '예정된 돌봄 일정을 확인해 주세요.', action_path: '/notifications', created_at: new Date(now).toISOString(),
+      expires_at: new Date(now + 86_400_000).toISOString(), read_at: null, invalidated_at: null }];
     mockState.calls = [];
     mockState.rpc.mockReset().mockResolvedValue({ data: true, error: null });
   });

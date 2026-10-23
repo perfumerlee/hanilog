@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { safetyResultLabel, safetyStatusLabel, type EventType } from '../lib/event-command';
+import { routineDisplayStatus } from '../lib/routine-status';
 import { supabase } from '../lib/supabase';
 import { petInvalidationChannel } from '../lib/realtime';
 
@@ -9,7 +10,7 @@ type Step = { key: string; event_type: string; predecessor_step_keys: string[] }
 type Routine = { id: string; name: string; timezone: string; care_plan_id: string };
 type Version = { id: string; routine_id: string; care_plan_version_id: string; version_no: number; recurrence: { days?: number[]; times?: string[] }; steps: Step[] };
 type Occurrence = { id: string; routine_version_id: string; occurrence_key: string; step_key: string; event_type: string; scheduled_local_date: string; scheduled_local_time: string; timezone: string; scheduled_at: string | null; status: string; care_plan_version_id: string };
-type EventRow = { id: string; occurrence_id: string | null; event_type: string; actor_id: string; occurred_at: string; recorded_at: string; value: Record<string, unknown> };
+type EventRow = { id: string; occurrence_id: string | null; event_type: string; actor_id: string; performer_id: string | null; occurred_at: string; recorded_at: string; value: Record<string, unknown> };
 type Evaluation = { id: string; occurrence_id: string | null; evaluation_status: string; result_codes: string[]; evaluated_at: string };
 type Revision = { event_id: string; revision_no: number; revision_kind: string };
 
@@ -36,6 +37,7 @@ export function CareRoutinePage({ pet, online, userId }: { pet: Pet; online: boo
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState('');
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
   const [realtimeState, setRealtimeState] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
   const [canWrite, setCanWrite] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -45,6 +47,11 @@ export function CareRoutinePage({ pet, online, userId }: { pet: Pet; online: boo
   const [days, setDays] = useState<number[]>([]);
   const [times, setTimes] = useState('');
   const [steps, setSteps] = useState<Step[]>(defaultSteps);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setCurrentTime(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const today = useMemo(() => localDateFor(pet.timezone), [pet.timezone]);
   const refresh = useCallback(async () => {
@@ -56,7 +63,7 @@ export function CareRoutinePage({ pet, online, userId }: { pet: Pet; online: boo
     const [routineResult, occurrenceResult, eventResult, membershipResult, grantResult] = await Promise.all([
       client.from('care_routines').select('id,name,timezone,care_plan_id').eq('pet_id', pet.id).order('created_at'),
       client.from('routine_occurrences').select('id,routine_version_id,occurrence_key,step_key,event_type,scheduled_local_date,scheduled_local_time,timezone,scheduled_at,status,care_plan_version_id').eq('pet_id', pet.id).eq('scheduled_local_date', today).order('scheduled_local_time').order('step_key'),
-      client.from('health_events').select('id,occurrence_id,event_type,actor_id,occurred_at,recorded_at,value').eq('pet_id', pet.id).not('occurrence_id', 'is', null).order('recorded_at', { ascending: false }).limit(200),
+      client.from('health_events').select('id,occurrence_id,event_type,actor_id,performer_id,occurred_at,recorded_at,value').eq('pet_id', pet.id).not('occurrence_id', 'is', null).order('recorded_at', { ascending: false }).limit(200),
       client.from('household_memberships').select('role').eq('household_id', pet.household_id).eq('user_id', userId).eq('status', 'ACTIVE').maybeSingle(),
       client.from('pet_access_grants').select('access_role').eq('pet_id', pet.id).eq('user_id', userId).eq('status', 'ACTIVE').maybeSingle(),
     ]);
@@ -194,13 +201,17 @@ export function CareRoutinePage({ pet, online, userId }: { pet: Pet; online: boo
         const version = versions.find((item) => item.id === occurrence.routine_version_id);
         const exception = eventRows.some((row) => ['PARTIAL','REFUSED'].includes(String(row.value.meal_status ?? '')));
         const record = eventRows[0];
+        const displayStatus = routineDisplayStatus({ hasRecord: Boolean(record), exceptionReported: exception,
+          occurrenceStatus: occurrence.status, scheduledAt: occurrence.scheduled_at, now: currentTime });
+        const isUpcoming = displayStatus === 'scheduled';
+        const isDue = displayStatus === 'unconfirmed';
         const routine = routineById.get(version?.routine_id ?? '');
         const canAcknowledge = canWrite && evaluation?.result_codes.length && !acknowledged.includes(evaluation.id);
-        return <li key={occurrence.id} className="care-occurrence">
+        return <li key={occurrence.id} className={`care-occurrence${isDue ? ' routine-current' : isUpcoming ? ' routine-upcoming' : ''}`}>
           <div className="care-occurrence-head"><strong>{eventLabels[occurrence.event_type] ?? occurrence.event_type}</strong><time>{occurrence.scheduled_local_time.slice(0, 5)}</time>
-            <span className={`routine-state ${record ? 'recorded' : 'unknown'}`}>{record ? exception ? '예외 보고' : '기록됨' : occurrence.status === 'CANCELLED' ? '일정 취소' : occurrence.status === 'SUPERSEDED' ? '이전 버전 일정' : occurrence.status === 'SCHEDULE_TIME_UNRESOLVED' ? '시각 확인 필요' : '기록 미확인'}</span>
+            <span className={`routine-state ${displayStatus === 'recorded' || displayStatus === 'exception' ? 'recorded' : isUpcoming ? 'scheduled' : 'unknown'}`}>{({ recorded: '기록 완료', exception: '예외 보고', scheduled: '예정', unconfirmed: '기록 미확인', cancelled: '일정 취소', superseded: '이전 버전 일정', time_unresolved: '시각 확인 필요' } as const)[displayStatus]}</span>
           </div>
-          <p>{routine?.name ?? 'Care Routine'} · 일정은 {occurrence.timezone} 기준 · {record ? `기록자 ${record.actor_id.slice(0, 8)} · 실제 발생 ${dateTimeFor(record.occurred_at, pet.timezone)} · 서버 기록 ${dateTimeFor(record.recorded_at, pet.timezone)}` : '실제 수행 여부는 확인되지 않음'}</p>
+          <p>{routine?.name ?? 'Care Routine'} · 일정은 {occurrence.timezone} 기준 · {record ? `수행자 ${record.performer_id?.slice(0, 8) ?? '미지정'} · 기록자 ${record.actor_id.slice(0, 8)} · 실제 발생 ${dateTimeFor(record.occurred_at, pet.timezone)} · 서버 기록 ${dateTimeFor(record.recorded_at, pet.timezone)}` : isUpcoming ? '예정된 일정 · 수행 사실은 아직 확인되지 않음' : '기록 미확인 · 실제 수행 여부는 확인되지 않음'}</p>
           {exception && <div className="guard-warning"><strong>예외 보고</strong><span>식사 상태에 일부 섭취 또는 거부 보고가 있습니다. 임상 기준에 따른 판정은 제공하지 않습니다.</span></div>}
           {evaluation && <div className="guard-warning"><strong>{evaluation.evaluation_status === 'CURRENT' ? 'CURRENT · 서버 데이터 신선도' : safetyStatusLabel(evaluation.evaluation_status)}</strong>
             {evaluation.result_codes.map((code) => <span key={code}>{safetyResultLabel(code)}</span>)}

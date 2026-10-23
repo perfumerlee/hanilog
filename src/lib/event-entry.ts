@@ -1,5 +1,7 @@
 import type { EventType } from './event-command';
 
+export const GLUCOSE_UNIT = 'mg/dL';
+
 export interface EventEntryFields {
   eventType: EventType;
   occurredLocal: string;
@@ -10,6 +12,8 @@ export interface EventEntryFields {
   eliminationType: string;
   description: string;
   confirmedAlreadyOccurred: boolean;
+  measurementSource?: string;
+  measurementCondition?: string;
 }
 
 export interface ValidatedEventEntry {
@@ -41,8 +45,15 @@ export function validateEventEntry(fields: EventEntryFields): { value?: Validate
   if (fields.eventType === 'glucose' || fields.eventType === 'weight') {
     const measurement = parseOptionalNumber(fields.numericValue);
     if (measurement === null || measurement === undefined) return { error: '측정값을 숫자로 입력해 주세요.' };
-    if (!unit) return { error: '측정 단위를 입력해 주세요.' };
+    if (fields.eventType === 'glucose') unit = GLUCOSE_UNIT;
+    else if (!unit) return { error: '측정 단위를 입력해 주세요.' };
     value.observed_value = measurement;
+    if (fields.eventType === 'glucose') {
+      const source = fields.measurementSource?.trim();
+      const condition = fields.measurementCondition?.trim();
+      if (source) value.measurement_source = source.slice(0, 120);
+      if (condition) value.measurement_condition = condition;
+    }
   }
 
   if (fields.eventType === 'meal') {
@@ -78,4 +89,10 @@ export function validateEventEntry(fields: EventEntryFields): { value?: Validate
   return {
     value: { occurredAt: occurred.toISOString(), value, unit },
   };
+}
+
+export function formatGlucoseValue(value: number | string, storedUnit: string | null): string {
+  if (storedUnit === GLUCOSE_UNIT) return `${value} ${GLUCOSE_UNIT}`;
+  if (!storedUnit) return `${value} · 저장 단위 확인 필요`;
+  return `${value} ${storedUnit} · 기존 단위 보존 (mg/dL 변환 안 됨)`;
 }

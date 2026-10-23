@@ -10,13 +10,16 @@ import {
   type EventType,
   type HealthEventCommand,
 } from '../lib/event-command';
-import { validateEventEntry, type EventEntryFields } from '../lib/event-entry';
+import { formatGlucoseValue, GLUCOSE_UNIT, validateEventEntry, type EventEntryFields } from '../lib/event-entry';
+import { routineDisplayStatus } from '../lib/routine-status';
 import { isSupabaseConfigured, supabase, userFacingError } from '../lib/supabase';
 import { petInvalidationChannel, userAccessChannel } from '../lib/realtime';
 import { CareRoutinePage } from './CareRoutinePage';
 import { InvitationAcceptPage, SharedCarePage } from './SharedCarePage';
 import { NotificationsPage } from './NotificationsPage';
 import { PwaExperience } from './PwaExperience';
+import { HealthTrendsPage } from './HealthTrendsPage';
+import { effectiveGlucoseValue } from '../lib/health-trends';
 
 type Pet = { id: string; household_id: string; name: string; timezone: string };
 type HealthEvent = {
@@ -113,12 +116,13 @@ function errorCode(error: unknown): string | undefined {
 
 export function App() {
   const location = useLocation();
+  const demoMode = import.meta.env.VITE_DEMO_MODE === 'true';
   const [session, setSession] = useState<Session | null>(null);
-  const [sessionReady, setSessionReady] = useState(!isSupabaseConfigured);
+  const [sessionReady, setSessionReady] = useState(demoMode || !isSupabaseConfigured);
   const [online, setOnline] = useState(typeof navigator === 'undefined' ? true : navigator.onLine);
 
   useEffect(() => {
-    if (!supabase) return;
+    if (demoMode || !supabase) return;
     const client = supabase;
     void client.auth.getSession().then(({ data, error }) => {
       if (!error) {
@@ -132,7 +136,7 @@ export function App() {
       if (next?.access_token) void client.realtime.setAuth(next.access_token);
     });
     return () => data.subscription.unsubscribe();
-  }, []);
+  }, [demoMode]);
 
   useEffect(() => {
     const update = () => setOnline(navigator.onLine);
@@ -153,20 +157,168 @@ export function App() {
     <div className="app-shell">
       <header className="topbar">
         <Link to="/" className="brand"><img src={`${import.meta.env.BASE_URL}paw.svg`} alt="" /> HaniLog</Link>
-        <span className={`connection ${online ? 'online' : 'offline'}`} role="status">
-          {online ? '연결됨 · 서버 최신 상태는 새로고침으로 확인' : '오프라인 · 최신 상태 확인 불가'}
+        <span className={`connection ${demoMode ? 'offline' : online ? 'online' : 'offline'}`} role="status">
+          {demoMode ? 'DEMO · 서버 연결 및 저장 없음' : online ? '연결됨 · 서버 최신 상태는 새로고침으로 확인' : '오프라인 · 최신 상태 확인 불가'}
         </span>
         {session && <button className="quiet-button" onClick={() => void supabase?.auth.signOut()}>로그아웃</button>}
       </header>
       <PwaExperience />
       {!online && <div role="alert" className="offline-banner">서버 최신 상태를 확인할 수 없습니다. 기록은 서버 응답 전까지 확정되지 않습니다.</div>}
       <Routes>
+        {demoMode && <Route path="/*" element={<DemoWorkspace />} />}
         <Route path="/login" element={session ? <Navigate to={postLoginPath} replace /> : <Login />} />
         <Route path="/*" element={session ? <Workspace userId={session.user.id} online={online} /> : <Navigate to="/login" replace state={{ from: `${location.pathname}${location.search}` }} />} />
       </Routes>
       <footer>HaniLog는 실제 돌봄을 기록합니다. 치료·투여의 적정성을 승인하거나 처방을 바꾸지 않습니다.</footer>
     </div>
   );
+}
+
+const demoPetList: Pet[] = [
+  { id: 'demo-pet-a', household_id: 'demo-household', name: '예시 반려견 A', timezone: 'Asia/Seoul' },
+  { id: 'demo-pet-momo', household_id: 'demo-household', name: '모모 (합성 예시)', timezone: 'Asia/Seoul' },
+];
+const demoUserId = 'demo-caregiver-a';
+const demoHouseholds = [{ id: 'demo-household', name: '데모 공동 돌봄 가정' }];
+
+function DemoWorkspace() {
+  const location = useLocation();
+  const [selectedPetId, setSelectedPetId] = useState(demoPetList[0].id);
+  const [events, setEvents] = useState<HealthEvent[]>(() => createDemoEvents());
+  const [timelineSelection, setTimelineSelection] = useState({ petId: demoPetList[0].id, date: todayForTimezone('Asia/Seoul') });
+  const pet = demoPetList.find((item) => item.id === selectedPetId) ?? demoPetList[0];
+  const occurrences = useMemo(() => createDemoOccurrences(pet), [pet]);
+  const petEvents = events.filter((event) => event.pet_id === pet.id);
+  const demoRevisions: EventRevision[] = [];
+  const demoApproval: Record<string, string> = {};
+  const date = todayForTimezone(pet.timezone);
+  const timelineDate = timelineSelection.petId === pet.id ? timelineSelection.date : date;
+
+  async function addDemoEvent(fields: EventEntryFields, occurrenceId: string | null, performed: boolean) {
+    const validated = validateEventEntry(fields);
+    if (!validated.value) return false;
+    const event: HealthEvent = {
+      id: crypto.randomUUID(), pet_id: pet.id, actor_id: demoUserId,
+      performer_id: performed ? demoUserId : null, event_type: fields.eventType,
+      occurred_at: validated.value.occurredAt, recorded_at: new Date().toISOString(),
+      occurrence_id: occurrenceId, plan_version_id: null,
+      value: validated.value.value, unit: validated.value.unit,
+    };
+    setEvents((current) => [event, ...current]);
+    return true;
+  }
+
+  const noOpForm = (event: FormEvent<HTMLFormElement>) => event.preventDefault();
+  return <>
+    <div className="notice notice-warning demo-banner" role="status">
+      <strong>DEMO 모드 · 합성 정보만 사용</strong>
+      <span>화면 흐름 확인용입니다. 기록 변경은 이 탭의 메모리에만 남고 새로고침하면 사라집니다. 서버·이메일·Push 전송은 연결되지 않습니다.</span>
+    </div>
+    <div className="workspace-bar">
+      <div className="pet-switcher"><label htmlFor="demo-pet-switch">예시 반려동물</label>
+        <select id="demo-pet-switch" value={pet.id} onChange={(event) => setSelectedPetId(event.target.value)}>
+          {demoPetList.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+        </select>
+      </div>
+      <span className="small-note">인증·접근권한 검증은 수행하지 않음</span>
+    </div>
+    <Routes>
+      <Route path="/login" element={<DemoLogin />} />
+      <Route path="/" element={<DashboardPage pet={pet} petsCount={demoPetList.length} households={demoHouseholds}
+        events={petEvents.filter((event) => localDateKey(event.occurred_at, pet.timezone) === date)} allEvents={petEvents}
+        revisions={demoRevisions} occurrences={occurrences} planApproval={demoApproval} userId={demoUserId}
+        loading={false} dataMessage="DEMO 데이터 · 서버 조회 결과가 아닙니다." onCreateHousehold={noOpForm} onCreatePet={noOpForm}
+        householdName="" setHouseholdName={() => undefined} petName="" setPetName={() => undefined}
+        petTimezone={pet.timezone} setPetTimezone={() => undefined} creating={false} />} />
+      <Route path="/record" element={<QuickRecordPage key={pet.id} pet={pet} userId={demoUserId} occurrences={occurrences}
+        planApproval={demoApproval} online demoOnly onSubmit={addDemoEvent} />} />
+      <Route path="/timeline" element={<TimelinePage pet={pet} events={petEvents} revisions={demoRevisions} userId={demoUserId}
+        dateFilter={timelineDate} setDateFilter={(value) => setTimelineSelection({ petId: pet.id, date: value })} loading={false} />} />
+      <Route path="/trends" element={<HealthTrendsPage pet={pet} userId={demoUserId} online demoEvents={petEvents} />} />
+      <Route path="/care" element={<DemoCarePage pet={pet} occurrences={occurrences} events={petEvents} />} />
+      <Route path="/shared" element={<DemoSharedCarePage />} />
+      <Route path="/notifications" element={<DemoNotificationsPage />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+    {sessionNav(location.pathname)}
+  </>;
+}
+
+function DemoLogin() {
+  return <main className="center-card login-card">
+    <p className="eyebrow">로컬 화면 미리보기</p><h1>HaniLog Demo</h1>
+    <p>계정 인증 없이 합성 데이터로 화면을 둘러봅니다. 로그인, 서버 권한 및 저장 기능은 작동하지 않습니다.</p>
+    <Link className="button-link" to="/">데모 화면 열기</Link>
+  </main>;
+}
+
+function createDemoEvents(): HealthEvent[] {
+  const now = Date.now();
+  return demoPetList.flatMap((pet, index) => {
+    const offset = index * 11;
+    const entries: { id: string; type: EventType; minutes: number; value: Record<string, unknown>; unit: string | null; occurrence?: string }[] = [
+      { id: `demo-glucose-${index}`, type: 'glucose', minutes: 90 + offset, value: { observed_value: 164 }, unit: 'mg/dL' },
+      { id: `demo-meal-${index}`, type: 'meal', minutes: 125 + offset, value: { meal_status: 'ATE' }, unit: null, occurrence: `demo-${pet.id}-am-meal` },
+      { id: `demo-insulin-${index}`, type: 'insulin', minutes: 118 + offset, value: {}, unit: null, occurrence: `demo-${pet.id}-am-insulin` },
+      { id: `demo-elimination-${index}`, type: 'elimination', minutes: 210 + offset, value: { observation_type: 'URINATION' }, unit: null },
+    ];
+    const history: { id: string; type: EventType; minutes: number; value: Record<string, unknown>; unit: string | null; occurrence?: string }[] = Array.from({ length: 90 }, (_, day) => ({
+      id: `demo-glucose-history-${index}-${day}`, type: 'glucose' as EventType,
+      minutes: (89 - day) * 1440 + 9 * 60 + offset,
+      value: { observed_value: 130 + ((day * 7 + index * 11) % 55),
+        measurement_source: '합성 예시 계측기', measurement_condition: day % 2 ? '식사 전 · 합성 설명용' : '미기록' },
+      unit: 'mg/dL',
+    }));
+    return [...entries, ...history].map((item) => {
+      const timestamp = new Date(now - item.minutes * 60_000).toISOString();
+      return { id: item.id, pet_id: pet.id, actor_id: index ? 'demo-caregiver-b' : demoUserId,
+        performer_id: index ? 'demo-caregiver-b' : demoUserId, event_type: item.type, occurred_at: timestamp,
+        recorded_at: timestamp, occurrence_id: item.occurrence ?? null,
+        plan_version_id: null, value: item.value, unit: item.unit };
+    });
+  });
+}
+
+function createDemoOccurrences(pet: Pet): RoutineOccurrence[] {
+  const localDate = todayForTimezone(pet.timezone);
+  const entries: { key: string; type: EventType; time: string }[] = [
+    { key: 'am-meal', type: 'meal', time: '08:00' }, { key: 'am-insulin', type: 'insulin', time: '08:15' },
+    { key: 'am-exercise', type: 'exercise', time: '09:00' }, { key: 'pm-meal', type: 'meal', time: '18:00' },
+    { key: 'pm-insulin', type: 'insulin', time: '18:15' }, { key: 'pm-exercise', type: 'exercise', time: '19:00' },
+  ];
+  return entries.map((entry) => ({ id: `demo-${pet.id}-${entry.key}`, event_type: entry.type,
+    occurrence_key: entry.key, step_key: entry.key, scheduled_local_date: localDate,
+    scheduled_local_time: entry.time, timezone: pet.timezone,
+    scheduled_at: new Date(`${localDate}T${entry.time}:00+09:00`).toISOString(), status: 'SCHEDULED',
+    care_plan_version_id: `demo-plan-${pet.id}` }));
+}
+
+function DemoCarePage({ pet, occurrences, events }: { pet: Pet; occurrences: RoutineOccurrence[]; events: HealthEvent[] }) {
+  return <main className="page-container"><section className="page-heading"><p className="eyebrow">관리 루틴 · DEMO</p><h1>{pet.name}의 오늘 일정</h1>
+    <p>합성 예시 루틴입니다. 치료계획 승인이나 투여 판단을 뜻하지 않습니다.</p></section>
+    <section className="panel"><ul className="care-occurrence-list">{occurrences.map((item) => {
+      const hasEvent = events.some((event) => event.occurrence_id === item.id);
+      return <li className="care-occurrence-row" key={item.id}><div><strong>{item.scheduled_local_time} · {eventLabels[item.event_type]}</strong>
+        <small>{hasEvent ? '기록됨 (데모 메모리)' : '기록 미확인 · 실제 미실시 여부는 알 수 없음'}</small></div>
+        <span className={`routine-state ${hasEvent ? 'recorded' : 'unknown'}`}>{hasEvent ? '기록됨' : '미확인'}</span></li>;
+    })}</ul><p className="small-note">서버 Safety Evaluation을 수행하지 않습니다.</p></section></main>;
+}
+
+function DemoSharedCarePage() {
+  return <main className="page-container"><section className="page-heading"><p className="eyebrow">함께 돌봄 · DEMO</p><h1>공동 보호자</h1>
+    <p>합성 계정 예시입니다. 초대나 실제 권한 변경은 실행되지 않습니다.</p></section><section className="panel"><h2>데모 공동 돌봄 가정</h2>
+      <ul className="member-list"><li><div className="member-heading"><strong>보호자 A · 주 보호자</strong><span>예시 사용자</span></div></li>
+        <li><div className="member-heading"><strong>보호자 B · 공동 보호자</strong><span>예시 사용자</span></div></li></ul>
+      <button type="button" disabled>초대 링크 발급 (데모 비활성)</button><p className="small-note">실제 Household 접근은 서버에서 검증되어야 합니다.</p></section></main>;
+}
+
+function DemoNotificationsPage() {
+  const [enabled, setEnabled] = useState(false);
+  return <main className="page-container"><section className="page-heading"><p className="eyebrow">알림 설정 · DEMO</p><h1>알림 전달 미연결</h1>
+    <p>외부 Push와 이메일은 발송되지 않습니다.</p></section><section className="panel stack"><div className="notice notice-warning" role="status">공급자 연결 없음 · 알림 확인은 실제 수행을 뜻하지 않습니다.</div>
+      <label className="check-row"><input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} />화면 예시 설정 {enabled ? 'ON' : 'OFF'} (저장되지 않음)</label>
+      <ul className="glance-list"><li className="glance-row"><div><strong>일정 안내</strong><small>일반 케어 안내 문구 예시</small></div></li>
+        <li className="glance-row"><div><strong>기록 미확인 안내</strong><small>기록 없음은 실제 미수행을 뜻하지 않습니다.</small></div></li></ul></section></main>;
 }
 
 function Login() {
@@ -215,6 +367,7 @@ function Login() {
 }
 
 function Workspace({ userId, online }: { userId: string; online: boolean }) {
+  const location = useLocation();
   const [pets, setPets] = useState<Pet[]>([]);
   const [households, setHouseholds] = useState<{ id: string; name: string }[]>([]);
   const [selectedPetId, setSelectedPetId] = useState('');
@@ -238,14 +391,16 @@ function Workspace({ userId, online }: { userId: string; online: boolean }) {
   const pendingCommand = useRef<HealthEventCommand | null>(null);
   const selectedPetIdRef = useRef('');
   const selectedPet = pets.find((pet) => pet.id === selectedPetId) ?? null;
+  const requestedTimelineDate = new URLSearchParams(location.search).get('date');
   const dateFilter = selectedPet
-    ? dateSelection.petId === selectedPet.id ? dateSelection.value : todayForTimezone(selectedPet.timezone)
+    ? dateSelection.petId === selectedPet.id ? dateSelection.value
+      : location.pathname === '/timeline' && requestedTimelineDate && /^\d{4}-\d{2}-\d{2}$/.test(requestedTimelineDate)
+        ? requestedTimelineDate : todayForTimezone(selectedPet.timezone)
     : '';
   const setDateFilter = (value: string) => {
     if (selectedPet) setDateSelection({ petId: selectedPet.id, value });
   };
   const dataReady = Boolean(selectedPetId && loadedPetId === selectedPetId && !loadingEvents);
-  const location = useLocation();
 
   useEffect(() => { selectedPetIdRef.current = selectedPetId; }, [selectedPetId]);
 
@@ -576,6 +731,8 @@ function Workspace({ userId, online }: { userId: string; online: boolean }) {
           ? <SetupPrompt loading={loadingPets} />
           : <TimelinePage pet={selectedPet} events={dataReady ? events : []} revisions={dataReady ? revisions : []} userId={userId}
             dateFilter={dateFilter} setDateFilter={setDateFilter} loading={loadingEvents} />} />
+        <Route path="/trends" element={!selectedPet ? <SetupPrompt loading={loadingPets} />
+          : <HealthTrendsPage key={`${selectedPet.id}:${online}:${dataReady}`} pet={selectedPet} userId={userId} online={online && dataReady} />} />
         <Route path="/care" element={!selectedPet ? <SetupPrompt loading={loadingPets} /> : <CareRoutinePage key={selectedPet.id} pet={selectedPet} online={online} userId={userId} />} />
         <Route path="/shared" element={<SharedCarePage key={households.map((item) => item.id).join(':')} households={households} pets={pets} userId={userId} />} />
         <Route path="/notifications" element={<NotificationsPage key={`${userId}:${selectedPetId}:${pets.map((pet) => pet.id).join(':')}`} pets={pets} userId={userId} online={online} />} />
@@ -598,6 +755,7 @@ function sessionNav(pathname: string) {
     { to: '/', label: '오늘', icon: '⌂' },
     { to: '/record', label: '빠른 기록', icon: '+' },
     { to: '/timeline', label: '기록 모아보기', icon: '◷' },
+    { to: '/trends', label: '건강 추세', icon: '⌁' },
     { to: '/care', label: '돌봄 루틴', icon: '✓' },
     { to: '/shared', label: '함께 돌봄', icon: '♡' },
     { to: '/notifications', label: '알림', icon: '♧' },
@@ -633,6 +791,11 @@ function DashboardPage(props: {
   petName: string; setPetName: (value: string) => void;
   petTimezone: string; setPetTimezone: (value: string) => void; creating: boolean;
 }) {
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setCurrentTime(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
   const {
     pet, petsCount, households, events, allEvents, revisions, occurrences, planApproval, userId,
     loading, onCreateHousehold, onCreatePet, householdName, setHouseholdName,
@@ -664,53 +827,99 @@ function DashboardPage(props: {
   const daily = events.filter((event) => localDateKey(event.occurred_at, pet.timezone) === localToday
     && latestRevision(revisions.filter((revision) => revision.event_id === event.id))?.revision_kind !== 'VOID');
   const todayOccurrences = occurrences.filter((occurrence) => occurrence.scheduled_local_date === localToday);
-  const recentGlucose = allEvents.find((event) => event.event_type === 'glucose');
+  const recentGlucoseSeries = allEvents.filter((event) => event.event_type === 'glucose' && event.unit === GLUCOSE_UNIT
+    && latestRevision(revisions.filter((revision) => revision.event_id === event.id))?.revision_kind !== 'VOID')
+    .sort((a, b) => Date.parse(a.occurred_at) - Date.parse(b.occurred_at));
+  const recentGlucose = recentGlucoseSeries.at(-1);
   const recentMeal = allEvents.find((event) => event.event_type === 'meal');
   const recentInsulin = allEvents.find((event) => event.event_type === 'insulin');
-  const currentOccurrenceEventIds = new Set(daily.map((event) => event.occurrence_id).filter(Boolean));
 
-  return <main className="page-container">
+  const recentGlucoseRevision = recentGlucose ? latestRevision(revisions.filter((item) => item.event_id === recentGlucose.id)) : undefined;
+  const recentGlucoseObserved = recentGlucose ? effectiveGlucoseValue(recentGlucose.value, recentGlucoseRevision?.patch) : null;
+  const recentGlucoseValue = recentGlucose && (typeof recentGlucoseObserved === 'number' || typeof recentGlucoseObserved === 'string')
+    ? formatGlucoseValue(recentGlucoseObserved, typeof recentGlucoseRevision?.patch.unit === 'string' ? recentGlucoseRevision.patch.unit : recentGlucose.unit) : null;
+
+  return <main className="page-container dashboard-page">
     <section className="hero-card pet-profile">
       <div className="pet-avatar" aria-hidden="true">🐕</div>
       <div className="pet-intro"><p className="eyebrow">오늘의 돌봄</p><h1>{pet.name}</h1>
         <p>{dateInTimezone(new Date().toISOString(), pet.timezone)} · 기록을 함께 확인해요</p></div>
-      <Link to="/record" className="hero-add" aria-label="빠른 기록 추가">+</Link>
+      <Link to="/record" className="hero-add"><span aria-hidden="true">＋</span><span>기록 추가</span></Link>
     </section>
 
-    <section className="summary-grid" aria-label="오늘 건강 기록 요약">
-      <SummaryCard title="오늘 기록" value={String(daily.length)} detail={daily.length ? '서버에 저장된 기록' : '기록 없음은 미실시가 아니에요'} icon="◷" />
-      <SummaryCard title="루틴 확인" value={todayOccurrences.length ? `${todayOccurrences.filter((item) => currentOccurrenceEventIds.has(item.id)).length}/${todayOccurrences.length}` : '일정 없음'}
-        detail={todayOccurrences.length ? '기록 미확인 상태를 포함해요' : '등록된 일정이 없습니다'} icon="✓" />
-    </section>
+    <div className="dashboard-grid">
+      <div className="dashboard-primary">
+        <section className="panel glucose-highlight" aria-label="최근 혈당 기록">
+          <div className="section-heading"><div><p className="eyebrow">최근 혈당 기록</p><h2>측정 결과</h2></div><span className="unit-tag">mg/dL</span></div>
+          {recentGlucose && recentGlucoseValue ? <><strong className="glucose-value">{recentGlucoseValue}</strong>
+            <p className="glucose-meta">{dateTimeInTimezone(recentGlucose.occurred_at, pet.timezone)} · {actorLabel(recentGlucose.actor_id, userId)}</p>
+          </> : <p className="empty glucose-empty">mg/dL로 확인 가능한 최근 혈당 기록이 없습니다.</p>}
+          {recentGlucoseSeries.length > 1 && <MiniGlucoseTrend events={recentGlucoseSeries.slice(-8)} revisions={revisions} />}
+          <Link className="text-link" to="/trends">건강 추세 전체 보기</Link>
+        </section>
 
-    <section className="panel routine-panel">
-      <div className="section-heading"><div><p className="eyebrow">관리 루틴</p><h2>예정 일정 확인</h2></div><span className="section-date">{localToday}</span></div>
-      {!todayOccurrences.length ? <p className="empty">오늘 등록된 routine occurrence가 없습니다. 일정이 없다는 사실을 실제 돌봄 미실시로 판단하지 않습니다.</p> :
-        <ul className="routine-list">{todayOccurrences.map((occurrence) => {
-          const matched = daily.some((event) => event.occurrence_id === occurrence.id
-            && latestRevision(revisions.filter((revision) => revision.event_id === event.id))?.revision_kind !== 'VOID');
-          const approval = planApproval[occurrence.care_plan_version_id];
-          return <li key={occurrence.id}>
-            <span className="routine-time">{occurrence.scheduled_local_time.slice(0, 5)}</span>
-            <span className="routine-label"><strong>{eventLabels[occurrence.event_type] ?? occurrence.event_type}</strong>
-              <small>{approval === 'CLINICIAN_CONFIRMED' ? '계획 상태 확인됨' : '계획 승인 확인 안 됨'}</small></span>
-            <span className={matched ? 'routine-state recorded' : 'routine-state unknown'}>{matched ? '기록 확인' : '기록 미확인'}</span>
-          </li>;
-        })}</ul>}
-      <p className="small-note">일정 기록이 없으면 미확인으로 표시합니다. 실제 미실시로 자동 판단하지 않습니다.</p>
-    </section>
+        <section className="summary-grid" aria-label="오늘 건강 기록 요약">
+          <SummaryCard title="오늘 등록된 기록" value={String(daily.length)} detail={daily.length ? '화면에 표시된 기록 수' : '기록 없음은 미실시가 아니에요'} icon="◷" />
+        </section>
 
-    <section className="panel quick-glance">
-      <div className="section-heading"><div><p className="eyebrow">최근 기록</p><h2>혈당·식사·인슐린</h2></div><Link to="/timeline">모두 보기</Link></div>
-      <div className="glance-list">
-        <GlanceRow title="최근 혈당" event={recentGlucose} pet={pet} revisions={revisions} userId={userId} />
-        <GlanceRow title="최근 식사" event={recentMeal} pet={pet} revisions={revisions} userId={userId} />
-        <GlanceRow title="최근 인슐린" event={recentInsulin} pet={pet} revisions={revisions} userId={userId} />
+        <section className="panel routine-panel">
+          <div className="section-heading"><div><p className="eyebrow">관리 루틴</p><h2>오늘의 케어 일정</h2></div><span className="section-date">{localToday}</span></div>
+          {!todayOccurrences.length ? <p className="empty">오늘 등록된 routine occurrence가 없습니다. 일정이 없다는 사실을 실제 돌봄 미실시로 판단하지 않습니다.</p> :
+            <ul className="routine-list">{todayOccurrences.map((occurrence) => {
+              const matchedEvent = daily.find((event) => event.occurrence_id === occurrence.id
+                && latestRevision(revisions.filter((revision) => revision.event_id === event.id))?.revision_kind !== 'VOID');
+              const approval = planApproval[occurrence.care_plan_version_id];
+              const mealException = matchedEvent?.event_type === 'meal' && ['PARTIAL', 'REFUSED'].includes(String(matchedEvent.value.meal_status ?? ''));
+              const displayStatus = routineDisplayStatus({ hasRecord: Boolean(matchedEvent), exceptionReported: mealException,
+                occurrenceStatus: occurrence.status, scheduledAt: occurrence.scheduled_at, now: currentTime });
+              const isUpcoming = displayStatus === 'scheduled';
+              const isDue = displayStatus === 'unconfirmed';
+              const status = ({ recorded: '기록 완료', exception: '예외 보고', scheduled: '예정', unconfirmed: '기록 미확인',
+                cancelled: '일정 취소', superseded: '이전 일정', time_unresolved: '시각 확인 필요' } as const)[displayStatus];
+              const actor = matchedEvent
+                ? `${matchedEvent.performer_id ? `수행자 ${matchedEvent.performer_id === userId ? '나' : actorLabel(matchedEvent.performer_id, userId)}` : '수행자 미지정'} · 기록자 ${matchedEvent.actor_id === userId ? '나' : actorLabel(matchedEvent.actor_id, userId)}`
+                : approval === 'CLINICIAN_CONFIRMED' ? '의료진 확인 상태로 표시된 계획' : '계획 승인 확인 안 됨';
+              return <li key={occurrence.id} className={isDue ? 'routine-current' : isUpcoming ? 'routine-upcoming' : ''}>
+                <span className="routine-time">{occurrence.scheduled_local_time.slice(0, 5)}</span>
+                <span className="routine-label"><strong>{eventLabels[occurrence.event_type] ?? occurrence.event_type}</strong>
+                  <small>{actor}{matchedEvent ? ` · 실제 ${timeInTimezone(matchedEvent.occurred_at, pet.timezone)} · 기록 ${timeInTimezone(matchedEvent.recorded_at, pet.timezone)}` : ''}</small></span>
+                <span className={`routine-state ${displayStatus === 'recorded' || displayStatus === 'exception' ? 'recorded' : isUpcoming ? 'scheduled' : 'unknown'}`}>{status}</span>
+              </li>;
+            })}</ul>}
+          <p className="small-note">기록 미확인은 실제 미실시 판정이 아닙니다. 일정은 투약 가능 여부를 판단하지 않습니다.</p>
+        </section>
       </div>
-      {loading && <p className="small-note" role="status">서버 기록을 확인하고 있습니다…</p>}
-    </section>
-    <p className="medical-note">Safety Guard는 일정·기록 간 데이터 상태만 표시합니다. 인슐린 투여를 승인하지 않습니다.</p>
+
+      <div className="dashboard-secondary">
+        <section className="panel quick-glance">
+          <div className="section-heading"><div><p className="eyebrow">최근 건강 기록</p><h2>식사·인슐린 등</h2></div><Link to="/timeline">모두 보기</Link></div>
+          <div className="glance-list">
+            <GlanceRow title="최근 식사" event={recentMeal} pet={pet} revisions={revisions} userId={userId} />
+            <GlanceRow title="최근 인슐린" event={recentInsulin} pet={pet} revisions={revisions} userId={userId} />
+          </div>
+          {loading && <p className="small-note" role="status">서버 기록을 확인하고 있습니다…</p>}
+        </section>
+        <p className="medical-note">Safety Guard는 일정·기록 간 데이터 상태만 표시합니다. 인슐린 투여를 승인하지 않습니다.</p>
+      </div>
+    </div>
   </main>;
+}
+
+function MiniGlucoseTrend({ events, revisions }: { events: HealthEvent[]; revisions: EventRevision[] }) {
+  const valueFor = (event: HealthEvent) => Number(effectiveGlucoseValue(event.value,
+    latestRevision(revisions.filter((revision) => revision.event_id === event.id))?.patch));
+  const values = events.map(valueFor).filter(Number.isFinite);
+  const times = events.map((event) => Date.parse(event.occurred_at));
+  if (values.length < 2 || times.some((time) => !Number.isFinite(time))) return null;
+  const min = Math.min(...values); const max = Math.max(...values);
+  const firstTime = Math.min(...times); const lastTime = Math.max(...times);
+  const y = (value: number) => max === min ? 25 : 42 - ((value - min) / (max - min)) * 34;
+  const x = (time: number) => lastTime === firstTime ? 50 : 4 + ((time - firstTime) / (lastTime - firstTime)) * 92;
+  return <div className="mini-trend" role="img" aria-label={`최근 ${events.length}개의 mg/dL 혈당 측정 점 미리보기. 점은 실제 측정값이며 선형 예측은 없습니다.`}>
+    <svg viewBox="0 0 100 50" aria-hidden="true">{events.map((event) => <circle key={event.id}
+      cx={x(Date.parse(event.occurred_at))} cy={y(valueFor(event))} r="2.5" />)}</svg>
+    <span>최근 {events.length}회 실제 기록 · 미리보기</span>
+  </div>;
 }
 
 function SummaryCard({ title, value, detail, icon }: { title: string; value: string; detail: string; icon: string }) {
@@ -725,7 +934,7 @@ function GlanceRow({ title, event, pet, revisions, userId }: {
   if (!event) return <div className="glance-row"><span className="glance-symbol" aria-hidden="true">·</span><div><strong>{title}</strong><small>기록 미확인 · 실제 미실시 여부는 알 수 없습니다</small></div></div>;
   const revision = latestRevision(revisions.filter((item) => item.event_id === event.id));
   const value = typeof event.value.observed_value === 'number' || typeof event.value.observed_value === 'string'
-    ? `${event.value.observed_value}${event.unit ? ` ${event.unit}` : ''}`
+    ? event.event_type === 'glucose' ? formatGlucoseValue(event.value.observed_value, event.unit) : `${event.value.observed_value}${event.unit ? ` ${event.unit}` : ''}`
     : typeof event.value.meal_status === 'string' ? mealStatusLabel(event.value.meal_status) : '상세 기록 보기';
   return <div className="glance-row"><span className="glance-symbol" aria-hidden="true">{eventOptions.find((item) => item.type === event.event_type)?.icon}</span>
     <div><strong>{title} · {value}</strong><small>{dateTimeInTimezone(event.occurred_at, pet.timezone)} · {actorLabel(event.actor_id, userId)}
@@ -743,7 +952,7 @@ function mealStatusLabel(status: string) {
 
 export function QuickRecordPage(props: {
   pet: Pet; userId: string; occurrences: RoutineOccurrence[]; presetEventType?: string; presetOccurrenceId?: string;
-  planApproval: Record<string, string>; online: boolean;
+  planApproval: Record<string, string>; online: boolean; demoOnly?: boolean;
   onSubmit: (fields: EventEntryFields, occurrenceId: string | null, confirmedPerformed: boolean) => Promise<boolean>;
 }) {
   const { pet, userId, occurrences, planApproval, online, onSubmit } = props;
@@ -756,6 +965,8 @@ export function QuickRecordPage(props: {
   const [mealStatus, setMealStatus] = useState('');
   const [eliminationType, setEliminationType] = useState('');
   const [description, setDescription] = useState('');
+  const [measurementSource, setMeasurementSource] = useState('');
+  const [measurementCondition, setMeasurementCondition] = useState('');
   const [occurrenceId, setOccurrenceId] = useState(props.presetOccurrenceId ?? '');
   const [confirmedAlreadyOccurred, setConfirmedAlreadyOccurred] = useState(false);
   const [performedByMe, setPerformedByMe] = useState(false);
@@ -823,6 +1034,7 @@ export function QuickRecordPage(props: {
     setFormError('');
     const fields: EventEntryFields = {
       eventType, occurredLocal, note, numericValue, unit, mealStatus, eliminationType, description, confirmedAlreadyOccurred,
+      measurementSource, measurementCondition,
     };
     const validation = validateEventEntry(fields);
     if (validation.error) {
@@ -837,6 +1049,8 @@ export function QuickRecordPage(props: {
       setUnit('');
       setNote('');
       setDescription('');
+      setMeasurementSource('');
+      setMeasurementCondition('');
       setMealStatus('');
       setEliminationType('');
       setConfirmedAlreadyOccurred(false);
@@ -848,6 +1062,7 @@ export function QuickRecordPage(props: {
   return <main className="page-container record-page">
     <section className="page-heading"><p className="eyebrow">빠른 기록</p><h1>{pet.name}의 실제 돌봄을 기록해요</h1>
       <p>발생한 사실을 기록합니다. 기록 입력은 투여 지시나 임상적 승인으로 사용되지 않습니다.</p></section>
+    {props.demoOnly && <div className="notice notice-warning" role="status">DEMO · 제출한 내용은 이 탭의 메모리에만 표시되며 서버에 저장되지 않습니다.</div>}
     <form className="record-form" onSubmit={(event) => void handleSubmit(event)} noValidate>
       <fieldset className="event-type-fieldset">
         <legend>무엇을 기록할까요?</legend>
@@ -861,6 +1076,8 @@ export function QuickRecordPage(props: {
                 setMealStatus('');
                 setEliminationType('');
                 setDescription('');
+                setMeasurementSource('');
+                setMeasurementCondition('');
                 setConfirmedAlreadyOccurred(false);
                 setFormError('');
               }} />
@@ -889,7 +1106,11 @@ export function QuickRecordPage(props: {
           </label>}
           {eventType === 'glucose' && <>
             <label className="field-label">측정값<input type="number" inputMode="decimal" step="any" value={numericValue} onChange={(event) => setNumericValue(event.target.value)} required /></label>
-            <label className="field-label">측정 단위<input value={unit} onChange={(event) => setUnit(event.target.value)} placeholder="측정기 표시 단위" required /></label>
+            <div className="field-label glucose-unit-field"><span>측정 단위</span><span className="unit-fixed">{GLUCOSE_UNIT}</span><small>신규 혈당 기록은 mg/dL로 저장됩니다.</small></div>
+            <label className="field-label">측정 출처 (선택)<input maxLength={120} value={measurementSource} onChange={(event) => setMeasurementSource(event.target.value)} placeholder="예: 혈당계, 병원 검사" /></label>
+            <label className="field-label">측정 조건 (선택)<select value={measurementCondition} onChange={(event) => setMeasurementCondition(event.target.value)}>
+              <option value="">미기록</option><option value="BEFORE_MEAL">식사 전</option><option value="AFTER_MEAL">식사 후</option><option value="UNRELATED_TO_MEAL">식사와 무관</option>
+            </select></label>
           </>}
           {eventType === 'weight' && <>
             <label className="field-label">측정값<input type="number" inputMode="decimal" step="any" value={numericValue} onChange={(event) => setNumericValue(event.target.value)} required /></label>
@@ -956,7 +1177,7 @@ export function QuickRecordPage(props: {
         {formError && <p role="alert" className="inline-error">{formError}</p>}
         <button className={eventType === 'insulin' ? 'submit-button insulin-submit' : 'submit-button'}
           type="submit" disabled={saving || !online}>
-          {saving ? '서버 확인 중…' : eventType === 'insulin' ? '이미 발생한 투여 사실 저장' : '기록 저장'}
+          {saving ? (props.demoOnly ? '데모 화면 반영 중…' : '서버 확인 중…') : props.demoOnly ? '데모 화면에만 추가 (저장 안 됨)' : eventType === 'insulin' ? '이미 발생한 투여 사실 저장' : '기록 저장'}
         </button>
         {!online && <p className="small-note">오프라인에서는 서버 저장을 시도하지 않습니다. 입력은 확정 기록이 아닙니다.</p>}
       </section>
@@ -1005,7 +1226,9 @@ function TimelinePage(props: {
               <div><dt>기록자 ID</dt><dd>{event.actor_id}</dd></div>
               <div><dt>실제 수행자</dt><dd>{event.performer_id ? actorLabel(event.performer_id, userId) : '지정되지 않음'}</dd></div>
               <div><dt>Occurrence</dt><dd>{event.occurrence_id ?? '연결 없음'}</dd></div>
-              <div><dt>단위</dt><dd>{event.unit ?? '없음'}</dd></div>
+              <div><dt>단위</dt><dd>{event.event_type === 'glucose'
+                ? event.unit === GLUCOSE_UNIT ? GLUCOSE_UNIT : event.unit ? `${event.unit} · 기존 단위 보존, mg/dL로 변환하지 않음` : '기존 기록 · 저장 단위 확인 필요'
+                : event.unit ?? '없음'}</dd></div>
             </dl>
             {itemRevisions.length > 0 ? <div className="revision-list"><h3>정정·무효화 이력</h3>
               {itemRevisions.map((revision) => <div className="revision-row" key={revision.id}>
@@ -1024,7 +1247,9 @@ function TimelinePage(props: {
 function formatEventValue(event: HealthEvent) {
   const value = event.value ?? {};
   const pieces: string[] = [];
-  if (typeof value.observed_value === 'number' || typeof value.observed_value === 'string') pieces.push(`${value.observed_value}${event.unit ? ` ${event.unit}` : ''}`);
+  if (typeof value.observed_value === 'number' || typeof value.observed_value === 'string') pieces.push(
+    event.event_type === 'glucose' ? formatGlucoseValue(value.observed_value, event.unit) : `${value.observed_value}${event.unit ? ` ${event.unit}` : ''}`,
+  );
   if (typeof value.meal_status === 'string') pieces.push(mealStatusLabel(value.meal_status));
   if (typeof value.observed_value === 'number' && value.meal_status) pieces.push(`섭취량 ${value.observed_value}${event.unit ? ` ${event.unit}` : ''}`);
   if (typeof value.observation_type === 'string') pieces.push(value.observation_type);
