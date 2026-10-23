@@ -1,5 +1,5 @@
 begin;
-select plan(41);
+select plan(42);
 
 insert into auth.users(id,aud,role,email,encrypted_password,email_confirmed_at,raw_app_meta_data,raw_user_meta_data,created_at,updated_at)
 values ('00000000-0000-4000-8000-000000000071','authenticated','authenticated','notice-owner@example.test','',now(),'{}','{}',now(),now());
@@ -72,6 +72,8 @@ values('00000000-0000-4000-8000-000000000071','https://fcm.googleapis.com/fcm/se
 select set_config('test.multi_notice',public.enqueue_notification(current_setting('test.pet')::uuid,'00000000-0000-4000-8000-000000000071',
   'CARE_DUE',null,null,'synthetic-multi-device-dedupe-71','돌봄 일정 안내','예정된 돌봄 일정을 확인해 주세요.',now(),now()+interval '1 day')::text,true);
 select set_config('test.multi_outbox',(select id::text from public.notification_outbox where notification_id=current_setting('test.multi_notice')::uuid and channel='PUSH'),true);
+select is((select count(*)::integer from public.claim_notification_outbox(10) where id=current_setting('test.multi_outbox')::uuid),1,
+  'logical Push job is leased before per-device preparation');
 select is((select relrowsecurity from pg_class where oid='public.notification_push_deliveries'::regclass),true,
   'per-device delivery state has RLS enabled');
 select is(public.prepare_notification_push_deliveries(current_setting('test.multi_outbox')::uuid),2,
