@@ -141,7 +141,7 @@ try {
     (select duplicate_possible from public.notification_delivery_attempts a where a.outbox_id=o.id order by attempt_no desc limit 1)||'|'||
     (extract(epoch from (o.available_at-o.updated_at))::integer>=89)
     from public.notification_outbox o where o.notification_id='${ids.notification}' and o.channel='EMAIL';`);
-  assert(emailState==='PENDING|1|1|f|t','Resend 429 is retryable, honors Retry-After, and records no duplicate-risk claim');
+  assert(emailState==='PENDING|1|1|f|t',`Resend 429 is retryable, honors Retry-After, and records no duplicate-risk claim (state=${emailState})`);
   psql(`update public.notification_outbox set available_at=now() where notification_id='${ids.notification}' and channel in ('PUSH','EMAIL');
 update public.notification_push_deliveries set available_at=now() where outbox_id=(select id from public.notification_outbox where notification_id='${ids.notification}' and channel='PUSH') and status='RETRYABLE_FAILURE';`);
   const [secondA,secondB]=await Promise.all([invokeWorker(),invokeWorker()]);

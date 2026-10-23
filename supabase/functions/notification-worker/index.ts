@@ -50,6 +50,7 @@ Deno.serve(async (request) => {
   const { data: rows, error } = await db.rpc('claim_notification_outbox', { p_limit: 50 });
   if (error) return new Response('Outbox claim failed', { status: 500 });
   let processed = 0;
+  let statusPersistenceFailed = false;
   for (const row of (rows ?? []) as Outbox[]) {
     let providerMessageId: string | null = null;
     try {
@@ -164,10 +165,11 @@ Deno.serve(async (request) => {
       const info=errInfo(error);
       const delay=info.permanent?null:retryDelaySeconds(row.attempt_count,info.retryAfterSeconds);
       await db.rpc('finish_notification_delivery',{
-        p_outbox_id:row.id,p_result:info.permanent?'PERMANENT_FAILURE':'RETRYABLE_FAILURE',p_error_code:info.code,
+        p_outbox_id:row.id,p_result:info.permanent?'PERMANENT_FAILURE':'RETRYABLE_FAILURE',p_error_code:info.code,p_provider_message_id:null,
         p_retry_seconds:delay,p_duplicate_possible:info.duplicatePossible,
-      });
+      }).then(({error:statusError})=>{ if (statusError) statusPersistenceFailed=true; });
     }
   }
+  if (statusPersistenceFailed) return new Response('Notification delivery state could not be saved', { status: 503 });
   return Response.json({ processed, claimed:(rows??[]).length, preparation:{created_occurrences:horizon.data,unconfirmed:unconfirmed.data,suppressed:reconciled.data}, mode });
 });
