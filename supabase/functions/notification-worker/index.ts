@@ -156,7 +156,7 @@ Deno.serve(async (request) => {
       const result = await response.json().catch(() => ({}));
       if (typeof result.id === 'string') providerMessageId = result.id;
       const { error: finishError } = await db.rpc('finish_notification_delivery',{
-        p_outbox_id:row.id,p_result:'ACCEPTED',p_provider_message_id:providerMessageId,p_duplicate_possible:false,
+        p_outbox_id:row.id,p_result:'ACCEPTED',p_error_code:null,p_provider_message_id:providerMessageId,p_retry_seconds:null,p_duplicate_possible:false,
       });
       if (finishError) throw codedError('DELIVERY_STATUS_PERSIST_FAILED',false,null,true);
       processed++;

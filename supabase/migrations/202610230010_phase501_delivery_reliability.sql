@@ -59,7 +59,7 @@ begin
   update public.push_subscriptions set revoked_at=now()
     where user_id=v_row.recipient_user_id and revoked_at is null and expiration_time is not null and expiration_time<=now();
   if v_row.push_targets_initialized_at is null then
-    insert into public.notification_push_deliveries(outbox_id,subscription_id)
+    insert into public.notification_push_deliveries(outbox_id,subscription_id,subscription_key)
       select v_row.id,s.id,s.endpoint_hash from public.push_subscriptions s
       where s.user_id=v_row.recipient_user_id and s.revoked_at is null
         and (s.expiration_time is null or s.expiration_time>now())
