@@ -49,6 +49,7 @@
 - `docker info` — FAIL: Docker Desktop Linux Engine named pipe가 없습니다.
 - `npx supabase status` — 미실행 완료: CLI가 사용자 프로필의 telemetry 임시 파일을 만들지 못해 `EPERM`으로 중단했습니다. 이를 우회하거나 사용자 프로필 파일을 변경하지 않았습니다.
 - migration 적용, pgTAP, RLS/Pet 격리, 동시성·멱등성, Realtime 권한 회귀, Notifications Worker DB 검증 — 미검증. DB reset이나 데이터 삭제는 하지 않았습니다.
+- 로컬에서는 DB 검증이 불가능했지만, GitHub Actions 격리형 Ubuntu runner가 새 로컬 Supabase 스택으로 migration과 아래 DB 검증을 성공적으로 실행했습니다. CI 결과를 로컬 DB 검증으로 간주하지 않습니다.
 - C 여유 공간은 약 1.41 GB, E 여유 공간은 약 653.11 GB로 확인했습니다. Docker 저장 위치나 데이터 디스크 사용량은 Engine이 중지되어 확인하지 못했습니다.
 
 ## 5. 자동화 검증
@@ -60,8 +61,8 @@
 | `npm.cmd test` | PASS — 9 files, 38/38 tests |
 | `npm.cmd run build` | PASS — Vite/PWA 산출물 생성 |
 | `git diff --check` | PASS |
-| pgTAP / RLS / 동시성 / Realtime | 미검증 — Docker Engine 접근 불가 |
-| GitHub Actions | 미실행 — 검토 시점에는 검증 commit/push 전 |
+| GitHub Actions Build validation | PASS — [Run 39989146995](https://github.com/perfumerlee/hanilog/actions/runs/39989146995); typecheck, lint, Vitest, build, Pages 하위 경로 build 성공 |
+| GitHub Actions Local database verification | PASS — [Run 39989146971](https://github.com/perfumerlee/hanilog/actions/runs/39989146971); Supabase startup, pgTAP/RLS, 두 세션 동시성, 2-user Realtime 권한 회귀, Mock Notifications Worker 성공 |
 
 ## 6. 공개 파일 점검 및 최소 수정
 
@@ -78,13 +79,13 @@
 남은 항목:
 
 1. 실제 브라우저 localhost/TLS 접속 실패로 5개 뷰포트 시각 테스트 및 스크린샷 미확보.
-2. Docker/Supabase 중지로 migration, pgTAP, RLS, 동시성, Realtime 및 알림 worker 검증 불가.
-3. GitHub Actions는 push 후 실제 run 결과를 확인해야 합니다.
+2. Docker/Supabase 중지로 로컬 migration 및 DB 검증 불가. CI의 독립적인 로컬 Supabase DB 검증은 통과했으나 로컬 데이터/환경 상태를 대체하지 않습니다.
+3. GitHub Actions 검증은 완료되어 두 workflow 모두 PASS입니다.
 4. 점 터치 타깃, 같은 시각 점의 개별 선택, offset 기반 다중 페이지 조회의 동시 변경 시 누락 가능성을 브라우저·DB에서 확인해야 합니다.
 5. 과거 공개 Git 이력 전체의 개인정보·비밀값 검사는 미완료.
 
 ## 8. Git 및 Phase 5.1 판정
 
-검토한 로컬 기준 HEAD는 `c03aee9474dd3dba36460adb7e157f65e8a0debd`이며 브랜치는 `main`입니다. 검증 변경분은 보고서·관련 구현과 최소 개인정보 제외 수정만 일반 commit으로 준비할 수 있습니다. `.env.demo`, `docs/PHASE-5.0-READINESS.md`, 기타 개인 건강 문서는 포함하지 않습니다. force push와 Pages 배포는 하지 않습니다.
+일반 commit `e2147ffab7600a8235768ffcc4c5b6b0b6562cf9`을 `main`에 push했고 원격 최신 SHA가 같은지 확인했습니다. `.env.demo`, `docs/PHASE-5.0-READINESS.md`, 기존 개인 건강 관련 문서는 포함하지 않았습니다. Build validation 및 Local database verification 모두 실제 GitHub Actions에서 성공했습니다. 이 보고서의 최종 CI 상태를 반영하는 후속 일반 문서 commit이 추가되며, force push와 Pages 배포는 하지 않습니다.
 
-**Phase 5.1 착수 판정: CONDITIONAL GO.** 타입·린트·단위·빌드 검증은 통과했지만 실제 브라우저 시각 검증, PostgreSQL/RLS 검증, CI 결과가 남아 있습니다. 실제 사용자 데이터 또는 운영 환경으로 진행하지 말고, 위 검증을 통과한 뒤 다음 단계 진입을 판단해야 합니다.
+**Phase 5.1 착수 판정: CONDITIONAL GO.** 로컬 및 GitHub Actions의 코드 검증과 CI DB/RLS·동시성·Realtime 검증은 통과했습니다. 실제 브라우저의 5개 뷰포트 시각 검증과 로컬 DB 검증, 공개 Git 전체 이력의 민감정보 전수 검사는 남아 있으므로 화면 사용성이나 실제 사용자 데이터 준비가 완료된 것으로 간주하지 않습니다.
