@@ -1,5 +1,5 @@
 begin;
-select plan(32);
+select plan(41);
 
 insert into auth.users(id,aud,role,email,encrypted_password,email_confirmed_at,raw_app_meta_data,raw_user_meta_data,created_at,updated_at)
 values ('00000000-0000-4000-8000-000000000071','authenticated','authenticated','notice-owner@example.test','',now(),'{}','{}',now(),now());
@@ -65,6 +65,40 @@ select is((select status from public.notification_outbox where id=current_settin
 select is((select count(*)::integer from public.notification_delivery_attempts where outbox_id=current_setting('test.outbox')::uuid),2,'each retry attempt has an append-only delivery row');
 select ok((select count(*)=2 from public.audit_log where target_id=current_setting('test.outbox')::uuid and action='NOTIFICATION_DELIVERY_ATTEMPT'),
   'delivery attempts have minimal audit records');
+
+insert into public.push_subscriptions(user_id,endpoint,endpoint_hash,p256dh,auth_secret)
+values('00000000-0000-4000-8000-000000000071','https://fcm.googleapis.com/fcm/send/synthetic-device-one',repeat('1',64),repeat('A',87),repeat('B',22)),
+  ('00000000-0000-4000-8000-000000000071','https://fcm.googleapis.com/fcm/send/synthetic-device-two',repeat('2',64),repeat('C',87),repeat('D',22));
+select set_config('test.multi_notice',public.enqueue_notification(current_setting('test.pet')::uuid,'00000000-0000-4000-8000-000000000071',
+  'CARE_DUE',null,null,'synthetic-multi-device-dedupe-71','돌봄 일정 안내','예정된 돌봄 일정을 확인해 주세요.',now(),now()+interval '1 day')::text,true);
+select set_config('test.multi_outbox',(select id::text from public.notification_outbox where notification_id=current_setting('test.multi_notice')::uuid and channel='PUSH'),true);
+select is((select relrowsecurity from pg_class where oid='public.notification_push_deliveries'::regclass),true,
+  'per-device delivery state has RLS enabled');
+select is(public.prepare_notification_push_deliveries(current_setting('test.multi_outbox')::uuid),2,
+  'initial Push target set snapshots each currently active device once');
+select is((select count(*)::integer from public.claim_notification_push_deliveries(current_setting('test.multi_outbox')::uuid,10)),2,
+  'independent device work items can be claimed for one notification');
+select public.finish_notification_push_delivery((select id from public.notification_push_deliveries where outbox_id=current_setting('test.multi_outbox')::uuid and subscription_key=repeat('1',64)),
+  'MOCK_ACCEPTED',null,'mock-device-one',null,false);
+select public.finish_notification_push_delivery((select id from public.notification_push_deliveries where outbox_id=current_setting('test.multi_outbox')::uuid and subscription_key=repeat('2',64)),
+  'RETRYABLE_FAILURE','MOCK_TRANSIENT_FAILURE',null,30,true);
+select is((select count(*)::integer from public.notification_push_deliveries where outbox_id=current_setting('test.multi_outbox')::uuid and status='ACCEPTED'),1,
+  'successful device remains accepted after another device fails');
+select is((select count(*)::integer from public.notification_push_delivery_attempts a join public.notification_push_deliveries d on d.id=a.delivery_id
+  where d.outbox_id=current_setting('test.multi_outbox')::uuid and d.subscription_key=repeat('2',64) and a.duplicate_possible),1,
+  'device attempt ledger explicitly records possible duplicate delivery on uncertain retry');
+update public.notification_push_deliveries set available_at=now() where outbox_id=current_setting('test.multi_outbox')::uuid and status='RETRYABLE_FAILURE';
+select is((select count(*)::integer from public.claim_notification_push_deliveries(current_setting('test.multi_outbox')::uuid,10)),1,
+  'retry claims only the device that previously failed');
+select public.finish_notification_push_delivery((select id from public.notification_push_deliveries where outbox_id=current_setting('test.multi_outbox')::uuid and subscription_key=repeat('2',64)),
+  'MOCK_ACCEPTED',null,'mock-device-two',null,false);
+select is((select string_agg(subscription_key||':'||attempt_count,',' order by subscription_key) from public.notification_push_deliveries
+  where outbox_id=current_setting('test.multi_outbox')::uuid),'1111111111111111111111111111111111111111111111111111111111111111:1,2222222222222222222222222222222222222222222222222222222222222222:2',
+  'retry does not increment or resend the already accepted device');
+select is((select count(*)::integer from public.notification_push_delivery_attempts a join public.notification_push_deliveries d on d.id=a.delivery_id
+  where d.outbox_id=current_setting('test.multi_outbox')::uuid and d.subscription_key=repeat('1',64)),1,
+  'accepted device has exactly one append-only provider attempt');
+
 select set_config('test.suppressed_notice',public.enqueue_notification(current_setting('test.pet')::uuid,'00000000-0000-4000-8000-000000000071',
   'CARE_DUE',null,null,'synthetic-suppression-dedupe-71','돌봄 일정 안내','예정된 돌봄 일정을 확인해 주세요.',now(),now()+interval '1 day')::text,true);
 update public.notification_preferences set push_enabled=false where pet_id=current_setting('test.pet')::uuid and user_id='00000000-0000-4000-8000-000000000071' and notification_type='CARE_DUE';
@@ -90,6 +124,8 @@ reset role;
 set local role authenticated;
 select set_config('request.jwt.claims','{"sub":"00000000-0000-4000-8000-000000000071","role":"authenticated"}',true);
 select ok(public.mark_notification_read(current_setting('test.notice')::uuid),'recipient can acknowledge a notification');
+select throws_ok($$select count(*) from public.notification_push_deliveries$$,'42501',null,
+  'authenticated users cannot read server-only per-device delivery state');
 select ok((select read_at is not null from public.in_app_notifications where id=current_setting('test.notice')::uuid),
   'acknowledgement is stored only as notification read state');
 select is((select count(*)::integer from public.health_events where pet_id=current_setting('test.pet')::uuid),0,

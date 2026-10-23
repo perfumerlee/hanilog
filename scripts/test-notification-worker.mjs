@@ -19,7 +19,7 @@ if (!['http:', 'https:'].includes(parsedUrl.protocol) || !parsedUrl.hostname || 
   process.stderr.write('Local Supabase connection configuration is invalid.\n'); process.exit(1);
 }
 
-const ids = { user: null, household: null, pet: null, routine: null, notification: null };
+const ids = { user: null, household: null, pet: null, routine: null, notification: null, endpointHashes: [] };
 const client = createClient(url, publishableKey, { auth: { autoRefreshToken: false, persistSession: false } });
 const assert = (condition, message) => {
   if (!condition) throw new Error(`ASSERTION FAILED: ${message}`);
@@ -83,6 +83,7 @@ try {
   const register=await client.functions.invoke('manage-push-subscription',{body:{endpoint:fakeEndpoint,endpoint_hash:endpointHash,
     p256dh:'A'.repeat(87),auth:'A'.repeat(22),expiration_time:null}});
   if (register.error || !register.data?.registered) throw new Error('Synthetic device subscription was not registered through the authenticated Edge Function.');
+  ids.endpointHashes.push(endpointHash);
   assert(true,'authenticated Edge Function registers a per-device push subscription without exposing server credentials');
   const listed=await client.functions.invoke('manage-push-subscription',{body:{action:'list'}});
   if (listed.error || !listed.data?.subscriptions?.some((item)=>item.endpoint_hash===endpointHash)) throw new Error('Current user could not list the registered device status.');
@@ -90,6 +91,13 @@ try {
   const revoked=await client.functions.invoke('manage-push-subscription',{body:{action:'revoke',endpoint_hash:endpointHash}});
   if (revoked.error || !revoked.data?.revoked) throw new Error('Synthetic device subscription was not revoked.');
   assert(true,'authenticated Edge Function revokes a selected device subscription');
+  for (let index=0;index<2;index++) {
+    const endpoint=`https://fcm.googleapis.com/fcm/send/${randomUUID()}`;
+    const hash=createHash('sha256').update(endpoint).digest('hex');
+    const added=await client.functions.invoke('manage-push-subscription',{body:{endpoint,endpoint_hash:hash,p256dh:'B'.repeat(87),auth:'C'.repeat(22),expiration_time:null}});
+    if (added.error || !added.data?.registered) throw new Error('Synthetic multi-device subscription could not be registered.');
+    ids.endpointHashes.push(hash);
+  }
   const { error: preferenceError } = await client.from('notification_preferences').insert({
     pet_id:ids.pet,user_id:ids.user,notification_type:'CARE_DUE',in_app_enabled:true,push_enabled:true,email_enabled:true,
     lead_minutes:10080,timezone:'Asia/Seoul',
@@ -108,25 +116,48 @@ try {
   ids.notification = notifications[0].id;
   assert(true,'scheduled synthetic routine creates a due in-app notice and push outbox job');
 
-  async function invokeWorker() {
+  async function invokeWorker(mockFailures = [], mockEmail = {}) {
+    const requestStartedAt=Date.now();
     const response = await fetch(new URL('/functions/v1/notification-worker',url),{
-      method:'POST',headers:{'Content-Type':'application/json','apikey':publishableKey,'x-hanilog-worker-secret':workerSecret},body:'{}',
+      method:'POST',headers:{'Content-Type':'application/json','apikey':publishableKey,'x-hanilog-worker-secret':workerSecret},
+      body:JSON.stringify({mock_push_fail_endpoint_hashes:mockFailures,...mockEmail}),
     });
     const body = await response.json().catch(()=>({}));
     if (!response.ok || body.mode!=='mock') throw new Error(`Mock Worker returned HTTP ${response.status}.`);
-    return body;
+    return {...body,requestStartedAt,requestEndedAt:Date.now()};
   }
-  const first = await invokeWorker();
-  assert(first.processed>=2 && first.claimed>=2,'mock Worker claims and processes both channel jobs without external delivery');
+  const retryHash=ids.endpointHashes[2];
+  const acceptedHash=ids.endpointHashes[1];
+  const first = await invokeWorker([retryHash],{mock_email_status:429,mock_email_retry_after:'90'});
+  assert(first.claimed>=2,'mock Worker claims both channel jobs without external delivery');
   const jobState = psql(`select o.status||'|'||o.attempt_count||'|'||(select count(*) from public.notification_delivery_attempts a where a.outbox_id=o.id) from public.notification_outbox o where o.notification_id='${ids.notification}' and o.channel='PUSH';`);
-  assert(jobState==='ACCEPTED|1|1','mock transport acceptance persists one idempotent delivery attempt');
-  const emailState=psql(`select o.status||'|'||o.attempt_count||'|'||(select count(*) from public.notification_delivery_attempts a where a.outbox_id=o.id) from public.notification_outbox o where o.notification_id='${ids.notification}' and o.channel='EMAIL';`);
-  assert(emailState==='ACCEPTED|1|1','email mock provider records acceptance without contacting Resend');
-  await invokeWorker();
+  assert(jobState==='PENDING|1|1','partial device failure leaves the logical Push job retryable');
+  const partialState=psql(`select (select status from public.notification_push_deliveries d join public.push_subscriptions s on s.id=d.subscription_id where d.outbox_id=o.id and s.endpoint_hash='${acceptedHash}')||'|'||
+    (select attempt_count from public.notification_push_deliveries d join public.push_subscriptions s on s.id=d.subscription_id where d.outbox_id=o.id and s.endpoint_hash='${acceptedHash}')||'|'||
+    (select status from public.notification_push_deliveries d join public.push_subscriptions s on s.id=d.subscription_id where d.outbox_id=o.id and s.endpoint_hash='${retryHash}')
+    from public.notification_outbox o where o.notification_id='${ids.notification}' and o.channel='PUSH';`);
+  assert(partialState==='ACCEPTED|1|RETRYABLE_FAILURE','per-device ledger records one success and one independently retryable failure');
+  const emailState=psql(`select o.status||'|'||o.attempt_count||'|'||(select count(*) from public.notification_delivery_attempts a where a.outbox_id=o.id)||'|'||
+    (select duplicate_possible from public.notification_delivery_attempts a where a.outbox_id=o.id order by attempt_no desc limit 1)||'|'||
+    (extract(epoch from (o.available_at-o.updated_at))::integer>=89)
+    from public.notification_outbox o where o.notification_id='${ids.notification}' and o.channel='EMAIL';`);
+  assert(emailState==='PENDING|1|1|false|true','Resend 429 is retryable, honors Retry-After, and records no duplicate-risk claim');
+  psql(`update public.notification_outbox set available_at=now() where notification_id='${ids.notification}' and channel in ('PUSH','EMAIL');
+update public.notification_push_deliveries set available_at=now() where outbox_id=(select id from public.notification_outbox where notification_id='${ids.notification}' and channel='PUSH') and status='RETRYABLE_FAILURE';`);
+  const [secondA,secondB]=await Promise.all([invokeWorker(),invokeWorker()]);
+  const requestsOverlapped=secondA.requestStartedAt<secondB.requestEndedAt&&secondB.requestStartedAt<secondA.requestEndedAt;
+  assert(requestsOverlapped,'two independent Worker HTTP requests overlapped during the same retry window');
+  process.stdout.write(`CONCURRENT_WORKER_REQUESTS=2 overlap=${requestsOverlapped} claimed=${secondA.claimed+secondB.claimed}\n`);
   const secondState = psql(`select o.status||'|'||o.attempt_count||'|'||(select count(*) from public.notification_delivery_attempts a where a.outbox_id=o.id) from public.notification_outbox o where o.notification_id='${ids.notification}' and o.channel='PUSH';`);
-  assert(secondState==='ACCEPTED|1|1','repeated Worker invocation does not claim or deliver the accepted outbox item again');
+  assert(secondState==='ACCEPTED|2|2','retry completes the logical Push job with one parent attempt per Worker run');
+  const deviceAttempts=psql(`select
+    (select attempt_count from public.notification_push_deliveries d join public.push_subscriptions s on s.id=d.subscription_id where d.outbox_id=o.id and s.endpoint_hash='${acceptedHash}')||'|'||
+    (select attempt_count from public.notification_push_deliveries d join public.push_subscriptions s on s.id=d.subscription_id where d.outbox_id=o.id and s.endpoint_hash='${retryHash}')||'|'||
+    (select count(*) from public.notification_push_delivery_attempts a join public.notification_push_deliveries d on d.id=a.delivery_id join public.push_subscriptions s on s.id=d.subscription_id where d.outbox_id=o.id and s.endpoint_hash='${acceptedHash}')
+    from public.notification_outbox o where o.notification_id='${ids.notification}' and o.channel='PUSH';`);
+  assert(deviceAttempts==='1|2|1','retry sends only to failed device; previously accepted device has exactly one provider attempt');
   const secondEmailState=psql(`select o.status||'|'||o.attempt_count||'|'||(select count(*) from public.notification_delivery_attempts a where a.outbox_id=o.id) from public.notification_outbox o where o.notification_id='${ids.notification}' and o.channel='EMAIL';`);
-  assert(secondEmailState==='ACCEPTED|1|1','repeated Worker invocation does not repeat the email mock job');
+  assert(secondEmailState==='ACCEPTED|2|2','429-retried email becomes transport-accepted only after a later mock attempt');
 } catch (error) { failure = error; }
 finally {
   await client.auth.signOut().catch(()=>{});
