@@ -82,7 +82,11 @@ try {
   const endpointHash=createHash('sha256').update(fakeEndpoint).digest('hex');
   const register=await client.functions.invoke('manage-push-subscription',{body:{endpoint:fakeEndpoint,endpoint_hash:endpointHash,
     p256dh:'A'.repeat(87),auth:'A'.repeat(22),expiration_time:null}});
-  if (register.error || !register.data?.registered) throw new Error('Synthetic device subscription was not registered through the authenticated Edge Function.');
+  if (register.error || !register.data?.registered) {
+    const status=register.error?.context?.status??register.error?.status??'unavailable';
+    const code=typeof register.data?.error==='string'?register.data.error:'unavailable';
+    throw new Error(`Synthetic device subscription registration failed (status=${status}, code=${code}).`);
+  }
   ids.endpointHashes.push(endpointHash);
   assert(true,'authenticated Edge Function registers a per-device push subscription without exposing server credentials');
   const listed=await client.functions.invoke('manage-push-subscription',{body:{action:'list'}});
