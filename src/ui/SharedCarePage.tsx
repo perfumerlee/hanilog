@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { householdInvalidationChannel } from '../lib/realtime';
 
-type Household = { id: string; name: string };
+type Household = { id: string; name: string; role?: string };
 type Pet = { id: string; household_id: string; name: string };
 type Membership = { id: string; user_id: string; role: string; status: string; created_at: string };
 type Grant = { id: string; pet_id: string; user_id: string; access_role: 'CAREGIVER' | 'READ_ONLY'; status: string };
@@ -16,9 +16,15 @@ const messageFor = (error: { code?: string } | null, fallback: string) => {
   return fallback;
 };
 
-export function SharedCarePage({ households, pets, userId }: { households: Household[]; pets: Pet[]; userId: string }) {
+export function SharedCarePage({ households, pets, userId, onRenameHousehold }: {
+  households: Household[]; pets: Pet[]; userId: string;
+  onRenameHousehold: (householdId: string, name: string) => Promise<boolean>;
+}) {
   const [selectedHouseholdId, setSelectedHouseholdId] = useState(households[0]?.id ?? '');
   const householdId = households.some((item) => item.id === selectedHouseholdId) ? selectedHouseholdId : households[0]?.id ?? '';
+  const selectedHousehold = households.find((item) => item.id === householdId);
+  const [householdNameDraft, setHouseholdNameDraft] = useState<{ householdId: string; name: string } | null>(null);
+  const householdName = householdNameDraft?.householdId === householdId ? householdNameDraft.name : selectedHousehold?.name ?? '';
   const [members, setMembers] = useState<Membership[]>([]);
   const [grants, setGrants] = useState<Grant[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
@@ -133,16 +139,33 @@ export function SharedCarePage({ households, pets, userId }: { households: House
     await refresh(); setBusy(false);
   }
 
+  async function renameSelectedHousehold(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!householdId || !householdName.trim() || !canManage) return;
+    setBusy(true); setNotice('');
+    const renamed = await onRenameHousehold(householdId, householdName.trim());
+    setNotice(renamed ? '가족 공간 이름을 변경했습니다. 함께 사용하는 보호자에게도 반영됩니다.'
+      : '가족 공간 이름을 저장하지 못했습니다. 권한과 연결 상태를 확인한 뒤 다시 시도해 주세요.');
+    setBusy(false);
+  }
+
   return <main className="page-container">
-    <section className="page-heading"><p className="eyebrow">Shared Care</p><h1>함께 돌보는 사람</h1>
-      <p>초대 수락 전에는 Household나 건강기록 접근권한이 없습니다. 초대에는 선택한 Pet 접근 범위만 포함됩니다.</p></section>
+    <section className="page-heading"><p className="eyebrow">함께 돌봄 관리</p><h1>가족 공간과 보호자</h1>
+      <p>가족 공간 이름과 반려동물별 공동 보호자 접근을 관리합니다.</p></section>
     {notice && <div role="status" className="notice notice-warning">{notice}</div>}
     {inviteUrl && <section className="panel"><h2>초대 링크</h2><label className="field-label">한 번 표시되는 링크<input readOnly value={inviteUrl} onFocus={(event) => event.currentTarget.select()} /></label>
       <p className="small-note">이 링크는 초대 대상 이메일로 로그인한 사용자만 수락할 수 있고, 만료 또는 사용 후 재사용할 수 없습니다. 링크 전달 채널의 안전성은 보호자가 확인하세요.</p></section>}
-    {!households.length ? <section className="panel empty-panel"><h2>Household가 없습니다</h2><p>먼저 Dashboard에서 공동 돌봄 Household와 Pet을 등록해 주세요.</p><Link className="button-link" to="/">Dashboard로 이동</Link></section> : <>
+    {!households.length ? <section className="panel empty-panel"><h2>가족 공간이 없습니다</h2><p>먼저 오늘 화면에서 가족 공간과 반려동물을 등록해 주세요.</p><Link className="button-link" to="/">오늘 화면으로 이동</Link></section> : <>
       <section className="panel"><label className="field-label">관리 Household<select value={householdId} onChange={(event) => { setSelectedHouseholdId(event.target.value); setPetIds([]); setInviteUrl(''); }}>
         {households.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}
       </select></label></section>
+      <section className="panel" id="household-settings"><div className="section-heading"><h2>가족 공간 이름</h2></div>
+        {canManage ? <form className="stack" onSubmit={(event) => void renameSelectedHousehold(event)}>
+          <label className="field-label">현재 이름<input required maxLength={120} value={householdName} onChange={(event) => setHouseholdNameDraft({ householdId, name: event.target.value })} /></label>
+          <p className="small-note">이름 변경은 이 가족 공간을 사용하는 모든 보호자에게 표시됩니다.</p>
+          <button type="submit" disabled={busy || !householdName.trim() || householdName.trim() === selectedHousehold?.name}>{busy ? '저장 중…' : '가족 공간 이름 저장'}</button>
+        </form> : <p className="small-note">현재 가족 공간 이름: {selectedHousehold?.name ?? '확인 중'} · 이름 변경은 주 보호자만 할 수 있습니다.</p>}
+      </section>
       <section className="panel"><div className="section-heading"><h2>보호자 초대</h2><span className="small-note">Primary caregiver가 발급</span></div>
         <form className="stack" onSubmit={(event) => void createInvite(event)}>
           <label className="field-label">초대받을 이메일<input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></label>

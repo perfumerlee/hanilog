@@ -1,5 +1,5 @@
 begin;
-select plan(15);
+select plan(20);
 
 insert into auth.users(id,aud,role,email,encrypted_password,email_confirmed_at,raw_app_meta_data,raw_user_meta_data,created_at,updated_at)
 values
@@ -10,6 +10,19 @@ set local role authenticated;
 select set_config('request.jwt.claims','{"sub":"00000000-0000-4000-8000-000000000001","role":"authenticated"}',true);
 select set_config('test.household_id',public.create_household('Synthetic household')::text,true);
 select ok(current_setting('test.household_id') <> '', 'primary caregiver can create a household');
+select is(public.rename_household(current_setting('test.household_id')::uuid,'Updated synthetic household'),
+  'Updated synthetic household','primary caregiver can update the household name');
+select is((select name from public.households where id=current_setting('test.household_id')::uuid),
+  'Updated synthetic household','household name update is persisted');
+select throws_ok(
+  $$select count(*)::integer from public.audit_log where action='HOUSEHOLD_RENAMED' and target_id=current_setting('test.household_id')::uuid$$,
+  '42501','permission denied for table audit_log','caregivers cannot directly read the internal audit log'
+);
+reset role;
+select is((select count(*)::integer from public.audit_log where action='HOUSEHOLD_RENAMED' and target_id=current_setting('test.household_id')::uuid),
+  1,'household name update has an audit entry');
+set local role authenticated;
+select set_config('request.jwt.claims','{"sub":"00000000-0000-4000-8000-000000000001","role":"authenticated"}',true);
 select set_config('test.pet_id',public.create_pet(current_setting('test.household_id')::uuid,'Synthetic pet','Asia/Seoul')::text,true);
 select ok(current_setting('test.pet_id') <> '', 'primary caregiver can create a pet and receives a pet grant');
 select is((select count(*)::integer from public.pets),1,'owner can read the granted pet');
@@ -19,6 +32,10 @@ select is((select count(*)::integer from public.pets),0,'unrelated user cannot r
 select throws_ok(
   $$select public.create_pet(current_setting('test.household_id')::uuid,'Unauthorized pet','Asia/Seoul')$$,
   '42501', 'FORBIDDEN', 'unrelated user cannot create a pet in another household'
+);
+select throws_ok(
+  $$select public.rename_household(current_setting('test.household_id')::uuid,'Unauthorized rename')$$,
+  '42501', 'FORBIDDEN', 'non-member cannot rename another household'
 );
 
 reset role;

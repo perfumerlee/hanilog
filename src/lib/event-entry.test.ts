@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { formatGlucoseValue, GLUCOSE_UNIT, validateEventEntry, type EventEntryFields } from './event-entry';
+import { formatGlucoseValue, GLUCOSE_MEASUREMENT_CONDITIONS, GLUCOSE_UNIT, glucoseMeasurementConditionLabel,
+  validateEventEntry, type EventEntryFields } from './event-entry';
 
 const base: EventEntryFields = {
   eventType: 'insulin',
@@ -27,6 +28,24 @@ describe('health event form validation', () => {
     expect(JSON.stringify(result.value)).not.toMatch(/dose|용량/i);
   });
 
+  it('stores the actually reported insulin amount in mL without conversion', () => {
+    const result = validateEventEntry({ ...base, confirmedAlreadyOccurred: true, doseAmount: '0.05', doseUnit: 'mL',
+      insulinProductLabel: '합성 라벨 표기' });
+    expect(result.value?.value).toMatchObject({
+      administered_dose_value: 0.05, administered_dose_unit: 'mL', insulin_product_label: '합성 라벨 표기',
+    });
+    expect(validateEventEntry({ ...base, confirmedAlreadyOccurred: true, doseAmount: '5.5',
+      doseUnit: 'U' as never }).error).toContain('확인한 mL');
+  });
+
+  it('requires both an amount and unit when the optional dose is started', () => {
+    const confirmed = { ...base, confirmedAlreadyOccurred: true };
+    expect(validateEventEntry({ ...confirmed, doseUnit: 'mL' }).error).toContain('0보다 큰 숫자');
+    expect(validateEventEntry({ ...confirmed, doseAmount: '2' }).error).toContain('확인한 mL');
+    expect(validateEventEntry({ ...confirmed, doseAmount: '0', doseUnit: 'mL' }).error).toContain('0보다 큰 숫자');
+    expect(validateEventEntry({ ...confirmed, doseAmount: '-2', doseUnit: 'mL' }).error).toContain('0보다 큰 숫자');
+  });
+
   it('requires a numeric glucose observation and fixes new measurements to mg/dL without thresholds', () => {
     expect(validateEventEntry({ ...base, eventType: 'glucose', numericValue: 'NaN' }).error).toContain('측정값');
     const result = validateEventEntry({ ...base, eventType: 'glucose', numericValue: '0', unit: 'synthetic-unit' });
@@ -38,6 +57,15 @@ describe('health event form validation', () => {
     const result = validateEventEntry({ ...base, eventType: 'glucose', numericValue: '150',
       measurementSource: '합성 기기', measurementCondition: 'BEFORE_MEAL' });
     expect(result.value?.value).toMatchObject({ observed_value: 150, measurement_source: '합성 기기', measurement_condition: 'BEFORE_MEAL' });
+  });
+
+  it('supports exercise context without translating or interpreting it as a clinical rule', () => {
+    for (const condition of GLUCOSE_MEASUREMENT_CONDITIONS.filter((item) => item.value.includes('EXERCISE'))) {
+      const result = validateEventEntry({ ...base, eventType: 'glucose', numericValue: '150', measurementCondition: condition.value });
+      expect(result.value?.value.measurement_condition).toBe(condition.value);
+      expect(glucoseMeasurementConditionLabel(condition.value)).toBe(condition.label);
+    }
+    expect(glucoseMeasurementConditionLabel(undefined)).toBe('미기록');
   });
 
   it('does not relabel legacy glucose values stored in another unit', () => {

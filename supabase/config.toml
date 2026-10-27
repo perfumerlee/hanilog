@@ -9,6 +9,11 @@ max_rows = 1000
 [db]
 major_version = 15
 
+[storage.buckets.pet-profile-images]
+public = false
+file_size_limit = "1MB"
+allowed_mime_types = ["image/jpeg"]
+
 [auth]
 enabled = true
 site_url = "http://localhost:5173"
@@ -25,3 +30,7 @@ verify_jwt = true
 
 [functions.notification-worker]
 verify_jwt = false
+
+[functions.pet-profile-media]
+verify_jwt = true
+static_files = ["./functions/pet-profile-media/magick.wasm"]

@@ -14,6 +14,76 @@ export type GlucoseSample = {
 
 export type TrendPeriod = '7d' | '30d' | '90d' | '1y' | 'all';
 export type NumericGlucoseSample = Omit<GlucoseSample, 'value'> & { value: number };
+export type TrendPoint = { occurredAt: string; value: number; count: number };
+
+const DAY_MS = 86_400_000;
+const WEEK_MS = 7 * DAY_MS;
+
+/** Connect only observed values no more than seven elapsed days apart. */
+export function measuredLineSegments<T extends GlucoseSample>(samples: T[], maximumGapDays = 7): T[][] {
+  const sorted = sortSamples(samples);
+  const segments: T[][] = [];
+  let segment: T[] = [];
+  for (const sample of sorted) {
+    const previous = segment.at(-1);
+    if (previous && (Date.parse(sample.occurredAt) - Date.parse(previous.occurredAt)) / DAY_MS > maximumGapDays) {
+      if (segment.length) segments.push(segment);
+      segment = [];
+    }
+    segment.push(sample);
+  }
+  if (segment.length) segments.push(segment);
+  return segments;
+}
+
+function median(values: number[]): number {
+  const ordered = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(ordered.length / 2);
+  return ordered.length % 2 ? ordered[middle] : (ordered[middle - 1] + ordered[middle]) / 2;
+}
+
+/**
+ * Build time-based median summaries. Short views use elapsed seven-day buckets;
+ * year/all views use the Pet-local calendar month. Empty buckets stay absent.
+ */
+export function trendPoints<T extends GlucoseSample>(samples: T[], period: TrendPeriod, timezone: string): TrendPoint[] {
+  const sorted = sortSamples(samples).filter((sample) => Number.isFinite(Number(sample.value)));
+  if (sorted.length < 3) return [];
+  const monthly = period === '1y' || period === 'all';
+  const anchor = Date.parse(sorted[0].occurredAt);
+  const buckets = new Map<string, T[]>();
+  for (const sample of sorted) {
+    const key = monthly
+      ? localDateKey(sample.occurredAt, timezone).slice(0, 7)
+      : String(Math.floor((Date.parse(sample.occurredAt) - anchor) / WEEK_MS));
+    const bucket = buckets.get(key) ?? [];
+    bucket.push(sample);
+    buckets.set(key, bucket);
+  }
+  const points = [...buckets.values()].map((bucket) => {
+    const value = median(bucket.map((sample) => Number(sample.value)));
+    const occurredAt = median(bucket.map((sample) => Date.parse(sample.occurredAt)));
+    return { occurredAt: new Date(occurredAt).toISOString(), value, count: bucket.length };
+  }).sort((a, b) => Date.parse(a.occurredAt) - Date.parse(b.occurredAt));
+  return points.length >= 3 ? points : [];
+}
+
+/** Split derived summaries at missing time intervals; never bridge long gaps. */
+export function trendLineSegments(points: TrendPoint[], period: TrendPeriod): TrendPoint[][] {
+  const maximumGapDays = period === '1y' || period === 'all' ? 45 : 10;
+  const segments: TrendPoint[][] = [];
+  let segment: TrendPoint[] = [];
+  for (const point of points) {
+    const previous = segment.at(-1);
+    if (previous && (Date.parse(point.occurredAt) - Date.parse(previous.occurredAt)) / DAY_MS > maximumGapDays) {
+      if (segment.length >= 2) segments.push(segment);
+      segment = [];
+    }
+    segment.push(point);
+  }
+  if (segment.length >= 2) segments.push(segment);
+  return segments;
+}
 
 export function effectiveGlucoseValue(value: Record<string, unknown>, patch?: Record<string, unknown>): unknown {
   if (patch && Object.prototype.hasOwnProperty.call(patch, 'observed_value')) return patch.observed_value;

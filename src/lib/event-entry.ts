@@ -1,6 +1,17 @@
 import type { EventType } from './event-command';
 
 export const GLUCOSE_UNIT = 'mg/dL';
+export const GLUCOSE_MEASUREMENT_CONDITIONS = [
+  { value: 'BEFORE_MEAL', label: '식사 전' },
+  { value: 'AFTER_MEAL', label: '식사 후' },
+  { value: 'UNRELATED_TO_MEAL', label: '식사와 무관' },
+  { value: 'BEFORE_EXERCISE', label: '운동 전' },
+  { value: 'AFTER_EXERCISE', label: '운동 후' },
+] as const;
+
+export function glucoseMeasurementConditionLabel(value: string | undefined): string {
+  return GLUCOSE_MEASUREMENT_CONDITIONS.find((condition) => condition.value === value)?.label ?? value ?? '미기록';
+}
 
 export interface EventEntryFields {
   eventType: EventType;
@@ -14,6 +25,12 @@ export interface EventEntryFields {
   confirmedAlreadyOccurred: boolean;
   measurementSource?: string;
   measurementCondition?: string;
+  doseAmount?: string;
+  doseUnit?: 'mL' | '';
+  insulinProductLabel?: string;
+  activityStartedLocal?: string;
+  activityEndedLocal?: string;
+  activityState?: 'STARTED' | 'COMPLETED';
 }
 
 export interface ValidatedEventEntry {
@@ -40,6 +57,20 @@ export function validateEventEntry(fields: EventEntryFields): { value?: Validate
 
   if (fields.eventType === 'insulin' && !fields.confirmedAlreadyOccurred) {
     return { error: '이미 실제로 발생한 투여 사실임을 확인해 주세요.' };
+  }
+
+  if (fields.eventType === 'insulin') {
+    const amountText = fields.doseAmount?.trim() ?? '';
+    const doseUnit = fields.doseUnit ?? '';
+    if (amountText || doseUnit) {
+      const amount = parseOptionalNumber(amountText);
+      if (amount === null || amount === undefined || amount <= 0) return { error: '실제 투여량을 0보다 큰 숫자로 입력해 주세요.' };
+      if (doseUnit !== 'mL') return { error: '실제 투여량은 수의사가 확인한 mL 값으로 입력해 주세요.' };
+      value.administered_dose_value = amount;
+      value.administered_dose_unit = doseUnit;
+    }
+    const productLabel = fields.insulinProductLabel?.trim();
+    if (productLabel) value.insulin_product_label = productLabel.slice(0, 120);
   }
 
   if (fields.eventType === 'glucose' || fields.eventType === 'weight') {
@@ -77,8 +108,19 @@ export function validateEventEntry(fields: EventEntryFields): { value?: Validate
   }
 
   if (fields.eventType === 'exercise') {
+    const started = new Date(fields.activityStartedLocal || fields.occurredLocal);
+    if (Number.isNaN(started.getTime())) return { error: '운동 및 산책 시작 시각을 확인해 주세요.' };
+    value.activity_started_at = started.toISOString();
+    if (fields.activityState) value.activity_state = fields.activityState;
+    const endedLocal = fields.activityEndedLocal?.trim();
+    if (endedLocal) {
+      const ended = new Date(endedLocal);
+      if (Number.isNaN(ended.getTime())) return { error: '종료 시각을 확인해 주세요.' };
+      if (ended.getTime() <= started.getTime()) return { error: '종료 시각은 시작 시각보다 늦어야 합니다.' };
+      value.activity_ended_at = ended.toISOString();
+    }
     const minutes = parseOptionalNumber(fields.numericValue);
-    if (minutes === undefined) return { error: '운동 시간을 숫자로 입력해 주세요.' };
+    if (minutes === undefined) return { error: '운동 및 산책 시간을 숫자로 입력해 주세요.' };
     if (minutes !== null) {
       value.observed_value = minutes;
       unit = '분';

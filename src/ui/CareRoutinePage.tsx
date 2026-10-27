@@ -12,9 +12,9 @@ type Version = { id: string; routine_id: string; care_plan_version_id: string; v
 type Occurrence = { id: string; routine_version_id: string; occurrence_key: string; step_key: string; event_type: string; scheduled_local_date: string; scheduled_local_time: string; timezone: string; scheduled_at: string | null; status: string; care_plan_version_id: string };
 type EventRow = { id: string; occurrence_id: string | null; event_type: string; actor_id: string; performer_id: string | null; occurred_at: string; recorded_at: string; value: Record<string, unknown> };
 type Evaluation = { id: string; occurrence_id: string | null; evaluation_status: string; result_codes: string[]; evaluated_at: string };
-type Revision = { event_id: string; revision_no: number; revision_kind: string };
+type Revision = { event_id: string; revision_no: number; revision_kind: string; patch: Record<string, unknown> };
 
-const eventLabels: Record<string, string> = { meal: '식사', insulin: '인슐린', glucose: '혈당', elimination: '배변·배뇨', exercise: '운동', water: '음수', weight: '체중', symptom: '증상', medication: '약물' };
+const eventLabels: Record<string, string> = { meal: '식사', insulin: '인슐린', glucose: '혈당', elimination: '배변·배뇨', exercise: '운동 및 산책', water: '음수', weight: '체중', symptom: '증상', medication: '약물' };
 const dayLabels = ['일', '월', '화', '수', '목', '금', '토'];
 const defaultSteps: Step[] = [];
 const localDateFor = (timezone: string) => new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
@@ -80,7 +80,7 @@ export function CareRoutinePage({ pet, online, userId }: { pet: Pet; online: boo
     const versionResult = routineIds.length ? await client.from('care_routine_versions').select('id,routine_id,care_plan_version_id,version_no,recurrence,steps').in('routine_id', routineIds).order('version_no', { ascending: false }) : { data: [], error: null };
     const eventRows = (eventResult.data ?? []) as EventRow[];
     const eventIds = eventRows.map((item) => item.id);
-    const revisionResult = eventIds.length ? await client.from('health_event_revisions').select('event_id,revision_no,revision_kind').in('event_id', eventIds) : { data: [], error: null };
+    const revisionResult = eventIds.length ? await client.from('health_event_revisions').select('event_id,revision_no,revision_kind,patch').in('event_id', eventIds) : { data: [], error: null };
     const evaluationRows = (evaluationResult.data ?? []) as Evaluation[];
     const evaluationIds = evaluationRows.map((item) => item.id);
     const ackResult = evaluationIds.length ? await client.from('safety_acknowledgements').select('evaluation_id').in('evaluation_id', evaluationIds) : { data: [], error: null };
@@ -131,9 +131,17 @@ export function CareRoutinePage({ pet, online, userId }: { pet: Pet; online: boo
     const result = new Map<string, EventRow[]>();
     for (const event of events) {
       if (!event.occurrence_id) continue;
-      const latestRevision = revisions.filter((revision) => revision.event_id === event.id).sort((a, b) => b.revision_no - a.revision_no)[0];
+      const eventRevisions = revisions.filter((revision) => revision.event_id === event.id).sort((a, b) => a.revision_no - b.revision_no);
+      const latestRevision = eventRevisions.at(-1);
       if (latestRevision?.revision_kind === 'VOID') continue;
-      result.set(event.occurrence_id, [...(result.get(event.occurrence_id) ?? []), event]);
+      const value = { ...event.value };
+      for (const revision of eventRevisions) {
+        const patchValue = revision.patch.value;
+        if (revision.revision_kind === 'CORRECT' && patchValue && typeof patchValue === 'object' && !Array.isArray(patchValue)) {
+          Object.assign(value, patchValue);
+        }
+      }
+      result.set(event.occurrence_id, [...(result.get(event.occurrence_id) ?? []), { ...event, value }]);
     }
     return result;
   }, [events, revisions]);
@@ -201,6 +209,7 @@ export function CareRoutinePage({ pet, online, userId }: { pet: Pet; online: boo
         const version = versions.find((item) => item.id === occurrence.routine_version_id);
         const exception = eventRows.some((row) => ['PARTIAL','REFUSED'].includes(String(row.value.meal_status ?? '')));
         const record = eventRows[0];
+        const exerciseInProgress = record?.event_type === 'exercise' && record.value.activity_state === 'STARTED';
         const displayStatus = routineDisplayStatus({ hasRecord: Boolean(record), exceptionReported: exception,
           occurrenceStatus: occurrence.status, scheduledAt: occurrence.scheduled_at, now: currentTime });
         const isUpcoming = displayStatus === 'scheduled';
@@ -209,7 +218,7 @@ export function CareRoutinePage({ pet, online, userId }: { pet: Pet; online: boo
         const canAcknowledge = canWrite && evaluation?.result_codes.length && !acknowledged.includes(evaluation.id);
         return <li key={occurrence.id} className={`care-occurrence${isDue ? ' routine-current' : isUpcoming ? ' routine-upcoming' : ''}`}>
           <div className="care-occurrence-head"><strong>{eventLabels[occurrence.event_type] ?? occurrence.event_type}</strong><time>{occurrence.scheduled_local_time.slice(0, 5)}</time>
-            <span className={`routine-state ${displayStatus === 'recorded' || displayStatus === 'exception' ? 'recorded' : isUpcoming ? 'scheduled' : 'unknown'}`}>{({ recorded: '기록 완료', exception: '예외 보고', scheduled: '예정', unconfirmed: '기록 미확인', cancelled: '일정 취소', superseded: '이전 버전 일정', time_unresolved: '시각 확인 필요' } as const)[displayStatus]}</span>
+            <span className={`routine-state ${exerciseInProgress ? 'unknown' : displayStatus === 'recorded' || displayStatus === 'exception' ? 'recorded' : isUpcoming ? 'scheduled' : 'unknown'}`}>{exerciseInProgress ? '진행 중 · 종료 기록 전' : ({ recorded: '기록 완료', exception: '예외 보고', scheduled: '예정', unconfirmed: '기록 미확인', cancelled: '일정 취소', superseded: '이전 버전 일정', time_unresolved: '시각 확인 필요' } as const)[displayStatus]}</span>
           </div>
           <p>{routine?.name ?? 'Care Routine'} · 일정은 {occurrence.timezone} 기준 · {record ? `수행자 ${record.performer_id?.slice(0, 8) ?? '미지정'} · 기록자 ${record.actor_id.slice(0, 8)} · 실제 발생 ${dateTimeFor(record.occurred_at, pet.timezone)} · 서버 기록 ${dateTimeFor(record.recorded_at, pet.timezone)}` : isUpcoming ? '예정된 일정 · 수행 사실은 아직 확인되지 않음' : '기록 미확인 · 실제 수행 여부는 확인되지 않음'}</p>
           {exception && <div className="guard-warning"><strong>예외 보고</strong><span>식사 상태에 일부 섭취 또는 거부 보고가 있습니다. 임상 기준에 따른 판정은 제공하지 않습니다.</span></div>}

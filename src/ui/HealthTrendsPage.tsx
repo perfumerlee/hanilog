@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type PointerEvent } from 'react';
 import { Link } from 'react-router-dom';
+import { glucoseMeasurementConditionLabel } from '../lib/event-entry';
 import {
-  effectiveGlucoseValue, inPeriod, localDateKey, longGaps, mgDlSamples, monthlyCounts, sortSamples,
-  type GlucoseSample, type NumericGlucoseSample, type TrendPeriod,
+  effectiveGlucoseValue, inPeriod, localDateKey, longGaps, measuredLineSegments, mgDlSamples, monthlyCounts,
+  sortSamples, trendLineSegments, trendPoints,
+  type GlucoseSample, type NumericGlucoseSample, type TrendPeriod, type TrendPoint,
 } from '../lib/health-trends';
 import { supabase } from '../lib/supabase';
 
@@ -36,7 +38,8 @@ function toSample(event: RawEvent, revision?: Revision): GlucoseSample | null {
   const patchUnit = typeof revision?.patch.unit === 'string' ? revision.patch.unit : event.unit;
   const number = typeof correctedValue === 'number' ? correctedValue : Number(correctedValue);
   if (!Number.isFinite(number)) return null;
-  const valuePatch = value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : revision?.patch ?? {};
+  const revisedValue = value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+  const valuePatch = { ...event.value, ...revisedValue, ...(revision?.patch ?? {}) };
   return {
     id: event.id, occurredAt: event.occurred_at, recordedAt: event.recorded_at, value: number, unit: patchUnit,
     source: typeof valuePatch.measurement_source === 'string' ? valuePatch.measurement_source : '미기록',
@@ -55,6 +58,7 @@ export function HealthTrendsPage({ pet, userId, online, demoEvents }: Props) {
   const [verified, setVerified] = useState(Boolean(demoEvents));
   const [message, setMessage] = useState(demoEvents ? 'DEMO · 합성 데이터이며 서버 조회가 아닙니다.' : '');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showTrend, setShowTrend] = useState(false);
   const [relatedEvents, setRelatedEvents] = useState<RawEvent[]>([]);
   const [now] = useState(() => new Date());
   const demo = Boolean(demoEvents);
@@ -120,6 +124,10 @@ export function HealthTrendsPage({ pet, userId, online, demoEvents }: Props) {
   }, [sourceEvents, revisions]);
   const allSamples = samplesAndExcluded.valid;
   const samples = useMemo<NumericGlucoseSample[]>(() => inPeriod(allSamples, period, now), [allSamples, period, now]);
+  const actualSegments = useMemo(() => measuredLineSegments(samples), [samples]);
+  const derivedTrend = useMemo(() => trendPoints(samples, period, pet.timezone), [samples, period, pet.timezone]);
+  const derivedSegments = useMemo(() => trendLineSegments(derivedTrend, period), [derivedTrend, period]);
+  const trendSampleCount = derivedTrend.reduce((sum, point) => sum + point.count, 0);
   const newest = allSamples.at(-1);
   const previous = allSamples.at(-2);
   const selected = samples.find((item) => item.id === selectedId) ?? samples.at(-1) ?? null;
@@ -167,6 +175,11 @@ export function HealthTrendsPage({ pet, userId, online, demoEvents }: Props) {
       <section className="panel trends-panel">
         <div className="trends-heading"><div><p className="eyebrow">실제 측정값</p><h2>시간에 따른 기록</h2></div>
           <Link className="button-link trends-add" to="/record?event=glucose">혈당 기록 추가</Link></div>
+        <div className="trend-controls">
+          <label className="trend-toggle"><input type="checkbox" checked={showTrend} onChange={(event) => setShowTrend(event.target.checked)} />
+            <span>계산 추세 보기</span></label>
+          {showTrend && <span className="small-note">{period === '1y' || period === 'all' ? '월별 중앙값' : '7일 구간 중앙값'} · 실제 측정 {trendSampleCount}건 · 최소 3개 구간 필요</span>}
+        </div>
         <div className="period-picker" role="group" aria-label="추세 기간">
           {periods.map((item) => <button type="button" key={item.id} className={period === item.id ? 'period-chip selected' : 'period-chip'}
             aria-pressed={period === item.id} onClick={() => { setPeriod(item.id); setSelectedId(null); }}>{item.label}</button>)}
@@ -175,12 +188,15 @@ export function HealthTrendsPage({ pet, userId, online, demoEvents }: Props) {
           <p>기록이 없는 구간은 빈 상태로 유지합니다. 측정값을 생성하거나 보간하지 않습니다.</p>
           {allSamples.length === 0 && <Link to="/record?event=glucose" className="text-link">실제로 측정한 값 기록하기</Link>}</div>
           : <>
-            <GlucoseScatterChart samples={samples} timezone={pet.timezone} selectedId={selected?.id ?? null} onSelect={setSelectedId} />
-            <p className="chart-caption">X축 위치는 실제 측정 시각에 비례합니다. 점 사이를 선으로 연결하거나 미측정 값을 보간하지 않습니다. 단위: mg/dL</p>
+            <GlucoseScatterChart samples={samples} actualSegments={actualSegments} trendSegments={showTrend ? derivedSegments : []}
+              timezone={pet.timezone} selectedId={selected?.id ?? null} onSelect={setSelectedId} />
+            <p className="chart-caption">X축은 실제 측정 시각에 비례합니다. 얇은 실선은 7일 이내의 실제 측정값끼리만 직선 연결하며 그 사이 값은 측정값이 아닙니다.
+              {showTrend ? ' 점선은 선택한 기간별 중앙값으로 계산한 참고 추세이며 임상 판단이 아닙니다.' : ''} 단위: mg/dL</p>
+            {showTrend && derivedSegments.length === 0 && <p className="small-note" role="status">연결 가능한 구간이 부족해 계산 추세를 표시하지 않습니다. 미측정 구간을 가로질러 추세선을 그리지 않습니다.</p>}
             {selected && <section className="sample-detail" aria-live="polite">
               <div><p className="eyebrow">선택한 측정</p><h3>{selected.value} mg/dL</h3><p>{dateTime(selected.occurredAt, pet.timezone)}</p></div>
               <dl><div><dt>측정 출처</dt><dd>{selected.source ?? '미기록'}</dd></div>
-                <div><dt>측정 조건</dt><dd>{selected.condition ?? '미기록'}</dd></div>
+                <div><dt>측정 조건</dt><dd>{glucoseMeasurementConditionLabel(selected.condition)}</dd></div>
                 <div><dt>실제 측정자</dt><dd>{actorName(selected.performerId, userId)}</dd></div>
                 <div><dt>기록자</dt><dd>{actorName(selected.actorId, userId)}</dd></div>
                 <div><dt>서버 기록 시각</dt><dd>{dateTime(selected.recordedAt, pet.timezone)}</dd></div>
@@ -222,8 +238,9 @@ export function HealthTrendsPage({ pet, userId, online, demoEvents }: Props) {
   </main>;
 }
 
-function GlucoseScatterChart({ samples, timezone, selectedId, onSelect }: {
-  samples: NumericGlucoseSample[]; timezone: string; selectedId: string | null; onSelect: (id: string) => void;
+function GlucoseScatterChart({ samples, actualSegments, trendSegments, timezone, selectedId, onSelect }: {
+  samples: NumericGlucoseSample[]; actualSegments: NumericGlucoseSample[][]; trendSegments: TrendPoint[][];
+  timezone: string; selectedId: string | null; onSelect: (id: string) => void;
 }) {
   const sorted = sortSamples(samples);
   const width = 800; const height = 300;
@@ -237,24 +254,43 @@ function GlucoseScatterChart({ samples, timezone, selectedId, onSelect }: {
   const tickValues = minValue === maxValue ? [minValue] : [minValue, (minValue + maxValue) / 2, maxValue];
   const startLabel = new Intl.DateTimeFormat('ko-KR', { timeZone: timezone, month: 'numeric', day: 'numeric' }).format(new Date(minTime));
   const endLabel = new Intl.DateTimeFormat('ko-KR', { timeZone: timezone, month: 'numeric', day: 'numeric' }).format(new Date(maxTime));
+  const pathsFor = <T extends { occurredAt: string; value: number }>(segments: T[][]) => segments.map((segment) =>
+    segment.length > 1 ? `M ${xFor(Date.parse(segment[0].occurredAt))} ${yFor(segment[0].value)} ${segment.slice(1).map((point) => `L ${xFor(Date.parse(point.occurredAt))} ${yFor(point.value)}`).join(' ')}` : '').filter(Boolean);
+  const actualPaths = pathsFor(actualSegments);
+  const trendPaths = pathsFor(trendSegments);
+  const selectNearest = (event: PointerEvent<SVGSVGElement>) => {
+    const svg = event.currentTarget;
+    const matrix = svg.getScreenCTM();
+    if (!matrix) return;
+    const point = svg.createSVGPoint();
+    let closest: NumericGlucoseSample | null = null;
+    let distance = Number.POSITIVE_INFINITY;
+    for (const sample of sorted) {
+      point.x = xFor(Date.parse(sample.occurredAt)); point.y = yFor(sample.value);
+      const screenPoint = point.matrixTransform(matrix);
+      const nextDistance = Math.hypot(screenPoint.x - event.clientX, screenPoint.y - event.clientY);
+      if (nextDistance < distance) { distance = nextDistance; closest = sample; }
+    }
+    if (closest && distance <= 22) onSelect(closest.id);
+  };
   return <div className="chart-scroll" role="group" aria-label="실제 혈당 측정값 산점도와 데이터 목록">
-    <svg className="glucose-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`측정 기록 ${sorted.length}건의 실제 측정 시각과 mg/dL 값 산점도`}>
+    <svg className="glucose-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`측정 기록 ${sorted.length}건의 실제 측정 시각과 mg/dL 값 그래프. 측정점을 선택하면 상세 정보를 확인합니다.`}
+      onPointerUp={selectNearest}>
       {tickValues.map((value) => <g key={value}>
         <line x1={left} x2={width - right} y1={yFor(value)} y2={yFor(value)} stroke="#dce7df" strokeDasharray="4 6" />
         <text x={left - 10} y={yFor(value) + 5} textAnchor="end" className="chart-axis-label">{Number(value.toFixed(1))}</text>
       </g>)}
       <line x1={left} x2={width - right} y1={height - bottom} y2={height - bottom} stroke="#8da295" />
+      {actualPaths.map((path, index) => <path key={`actual-${index}`} d={path} className="actual-series-line" aria-hidden="true" />)}
+      {trendPaths.map((path, index) => <path key={`trend-${index}`} d={path} className="derived-trend-line" aria-hidden="true" />)}
       <text x={left} y={height - 14} className="chart-axis-label">{startLabel}</text>
       <text x={width - right} y={height - 14} textAnchor="end" className="chart-axis-label">{endLabel}</text>
-      {sorted.map((sample, index) => <circle key={`${sample.id}-${index}`} cx={xFor(Date.parse(sample.occurredAt))} cy={yFor(sample.value)}
-        r={sample.id === selectedId ? 9 : sorted.length > 120 ? 4.5 : sorted.length > 40 ? 6 : 8}
-        className={sample.id === selectedId ? 'chart-point selected' : 'chart-point'} role="button" tabIndex={sample.id === selectedId ? 0 : -1}
-        aria-label={`${dateTime(sample.occurredAt, timezone)}, ${sample.value} mg/dL`}
-        onClick={() => onSelect(sample.id)} onFocus={() => onSelect(sample.id)}
-        onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect(sample.id); } }}>
+      {sorted.map((sample, index) => <g key={`${sample.id}-${index}`} aria-hidden="true">
+        <circle cx={xFor(Date.parse(sample.occurredAt))} cy={yFor(sample.value)} r={sample.id === selectedId ? 8 : sorted.length > 120 ? 3.5 : sorted.length > 40 ? 5 : 7}
+          className={sample.id === selectedId ? 'chart-point selected' : 'chart-point'} />
         <title>{dateTime(sample.occurredAt, timezone)} · {sample.value} mg/dL</title>
-      </circle>)}
-      <text x={12} y={24} className="chart-unit-label">mg/dL</text>
+      </g>)}
+      <text x={width - right} y={14} textAnchor="end" className="chart-unit-label">mg/dL</text>
     </svg>
   </div>;
 }

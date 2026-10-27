@@ -1,5 +1,5 @@
 begin;
-select plan(22);
+select plan(23);
 
 insert into auth.users(id,aud,role,email,encrypted_password,email_confirmed_at,raw_app_meta_data,raw_user_meta_data,created_at,updated_at)
 values
@@ -23,6 +23,9 @@ select is(public.resolve_household_invitation(current_setting('test.invite'),tru
 select is((select count(*)::integer from public.pets where id=current_setting('test.pet')::uuid),1,'accepted Pet grant becomes visible through RLS');
 select throws_ok(format('select public.resolve_household_invitation(%L,true)',current_setting('test.invite')),
   '42501','INVITATION_INVALID_OR_USED','accepted token cannot be reused');
+select throws_ok(
+  $$select public.rename_household(current_setting('test.hh')::uuid,'Caregiver rename denied')$$,
+  '42501','FORBIDDEN','caregiver cannot rename a household managed by its primary caregiver');
 
 select set_config('request.jwt.claims','{"sub":"00000000-0000-4000-8000-000000000031","role":"authenticated","email":"phase3-primary@example.test"}',true);
 select set_config('test.routine',public.save_care_routine(
