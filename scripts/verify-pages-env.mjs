@@ -1,8 +1,25 @@
 /* global process, Buffer, URL, console */
-import { loadEnv } from 'vite';
+import { readFileSync, existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 const expectedUrl = 'https://vxgdewxqtbuychrvunjr.supabase.co';
-const fileEnv = loadEnv('staging', process.cwd(), '');
+// This validator runs before npm ci in GitHub Actions, so it must not depend on
+// Vite or any package in node_modules. Parse only the simple KEY=value syntax
+// used by local Staging env files; process environment always has precedence.
+const fileEnv = {};
+for (const file of ['.env', '.env.local', '.env.staging', '.env.staging.local']) {
+  const path = resolve(process.cwd(), file);
+  if (!existsSync(path)) continue;
+  for (const line of readFileSync(path, 'utf8').split(/\r?\n/)) {
+    const match = line.trim().match(/^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
+    if (!match) continue;
+    let value = match[2].trim();
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    }
+    fileEnv[match[1]] = value;
+  }
+}
 const env = (name) => process.env[name] ?? fileEnv[name];
 const urlValue = env('VITE_SUPABASE_URL');
 const key = env('VITE_SUPABASE_PUBLISHABLE_KEY') ?? '';
