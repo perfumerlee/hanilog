@@ -22,12 +22,6 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
-    env:
-      PAGES_BASE_PATH: hanilog
-      VITE_DEMO_MODE: 'false'
-      VITE_PET_PROFILE_PHOTO_UPLOAD_ENABLED: 'false'
-      VITE_SUPABASE_URL: https://vxgdewxqtbuychrvunjr.supabase.co
-      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.HANILOG_STAGING_PUBLISHABLE_KEY }}
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -42,15 +36,31 @@ jobs:
 
       - name: Validate public Staging build inputs
         run: node scripts/verify-pages-env.mjs
+        env:
+          PAGES_BASE_PATH: hanilog
+          VITE_DEMO_MODE: 'false'
+          VITE_PET_PROFILE_PHOTO_UPLOAD_ENABLED: 'false'
+          VITE_SUPABASE_URL: https://vxgdewxqtbuychrvunjr.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.HANILOG_STAGING_PUBLISHABLE_KEY }}
 
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
+        env:
+          VITE_DEMO_MODE: 'true'
       - run: npm run build:staging
+        env:
+          PAGES_BASE_PATH: hanilog
+          VITE_DEMO_MODE: 'false'
+          VITE_PET_PROFILE_PHOTO_UPLOAD_ENABLED: 'false'
+          VITE_SUPABASE_URL: https://vxgdewxqtbuychrvunjr.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.HANILOG_STAGING_PUBLISHABLE_KEY }}
 
       - name: Inspect deployable artifact
         run: node scripts/verify-pages-build.mjs
+        env:
+          PAGES_BASE_PATH: hanilog
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
