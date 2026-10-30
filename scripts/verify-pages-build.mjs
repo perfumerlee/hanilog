@@ -3,6 +3,9 @@ import { readdir, readFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 
 const root = process.env.PAGES_ARTIFACT_DIR ?? 'dist';
+const baseName = process.env.PAGES_BASE_PATH ?? 'hanilog';
+if (!['hanilog', 'hanilog-staging'].includes(baseName)) throw new Error('Unapproved Pages base.');
+const expectedBase = '/' + baseName + '/';
 const files = [];
 
 async function walk(directory) {
@@ -38,11 +41,12 @@ for (const path of files) {
 }
 
 const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
-if (manifest.start_url !== '/hanilog/' || manifest.scope !== '/hanilog/') {
+if (manifest.start_url !== expectedBase || manifest.scope !== expectedBase) {
   throw new Error('PWA start_url and scope must both be /hanilog/.');
 }
 const html = await readFile(join(root, 'index.html'), 'utf8');
-if (!html.includes('/hanilog/')) throw new Error('HTML asset paths do not use the GitHub Pages project base.');
+if (!html.includes(expectedBase)) throw new Error('HTML asset paths do not use the GitHub Pages project base.');
 if (!files.some((path) => /(?:^|[\\/])sw\.js$/.test(path))) throw new Error('Pages artifact is missing the service worker.');
 
-console.log(`Pages artifact checks passed: ${files.length} files, ${totalBytes} bytes; no server-key marker; PWA scope /hanilog/.`);
+console.log(`Pages artifact checks passed: ${files.length} files, ${totalBytes} bytes; no server-key marker; PWA scope ${expectedBase}.`);
+

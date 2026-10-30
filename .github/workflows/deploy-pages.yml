@@ -1,10 +1,10 @@
-name: Publish HaniLog Staging to GitHub Pages
+name: Publish HaniLog Production to GitHub Pages
 
 on:
   workflow_dispatch:
     inputs:
       confirm_public_deployment:
-        description: 'I understand that GitHub Pages is public and will serve the Staging app.'
+        description: 'I understand that GitHub Pages is public and will serve the Production app.'
         required: true
         type: boolean
         default: false
@@ -34,14 +34,15 @@ jobs:
           node-version: 24
           cache: npm
 
-      - name: Validate public Staging build inputs
+      - name: Validate public Production build inputs
         run: node scripts/verify-pages-env.mjs
         env:
+          HANILOG_DEPLOY_TARGET: production
           PAGES_BASE_PATH: hanilog
           VITE_DEMO_MODE: 'false'
           VITE_PET_PROFILE_PHOTO_UPLOAD_ENABLED: 'false'
-          VITE_SUPABASE_URL: https://vxgdewxqtbuychrvunjr.supabase.co
-          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.HANILOG_STAGING_PUBLISHABLE_KEY }}
+          VITE_SUPABASE_URL: https://lfbcxtaqpnbvxpsoywtg.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.HANILOG_PRODUCTION_PUBLISHABLE_KEY }}
 
       - run: npm ci
       - run: npm run typecheck
@@ -49,17 +50,19 @@ jobs:
       - run: npm test
         env:
           VITE_DEMO_MODE: 'true'
-      - run: npm run build:staging
+      - run: npm run build
         env:
+          HANILOG_DEPLOY_TARGET: production
           PAGES_BASE_PATH: hanilog
           VITE_DEMO_MODE: 'false'
           VITE_PET_PROFILE_PHOTO_UPLOAD_ENABLED: 'false'
-          VITE_SUPABASE_URL: https://vxgdewxqtbuychrvunjr.supabase.co
-          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.HANILOG_STAGING_PUBLISHABLE_KEY }}
+          VITE_SUPABASE_URL: https://lfbcxtaqpnbvxpsoywtg.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.HANILOG_PRODUCTION_PUBLISHABLE_KEY }}
 
       - name: Inspect deployable artifact
         run: node scripts/verify-pages-build.mjs
         env:
+          HANILOG_DEPLOY_TARGET: production
           PAGES_BASE_PATH: hanilog
 
       - name: Upload Pages artifact
@@ -85,3 +88,4 @@ jobs:
       - name: Deploy approved artifact
         id: deployment
         uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5
+

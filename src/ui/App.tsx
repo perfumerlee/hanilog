@@ -195,6 +195,7 @@ export function App() {
       <header className="topbar">
         <Link to="/" className="brand"><img src={`${import.meta.env.BASE_URL}paw.svg`} alt="" /> HaniLog</Link>
         {stagingMode && <span className="environment-badge">STAGING · 합성 전용</span>}
+        {import.meta.env.MODE === 'production' && <span className="environment-badge">운영 환경</span>}
         <span className={`connection ${demoMode ? 'offline' : online ? 'online' : 'offline'}`} role="status">
           {demoMode ? 'DEMO · 서버 연결 및 저장 없음' : online ? '연결됨 · 서버 최신 상태는 새로고침으로 확인' : '오프라인 · 최신 상태 확인 불가'}
         </span>
@@ -490,7 +491,7 @@ function Login({ initialMessage = '' }: { initialMessage?: string }) {
         <label>이메일<input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></label>
         <label>비밀번호<input type="password" autoComplete={creatingAccount ? 'new-password' : 'current-password'} required value={password} onChange={(event) => setPassword(event.target.value)} /></label>
         <button disabled={busy}>{busy ? '확인 중…' : creatingAccount ? '계정 만들기' : '로그인'}</button>
-        {!stagingMode && <button type="button" className="secondary-action" onClick={() => { setCreatingAccount((current) => !current); setMessage(''); }}>
+        {!stagingMode && import.meta.env.MODE !== 'production' && <button type="button" className="secondary-action" onClick={() => { setCreatingAccount((current) => !current); setMessage(''); }}>
           {creatingAccount ? '이미 계정이 있어요' : '새 계정 만들기'}
         </button>}
         {message && <p role="alert" className="error-text">{message}</p>}
@@ -1811,3 +1812,4 @@ function ActivityElapsedTimer({ startedAt }: { startedAt: string }) {
     {`${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`}
   </output>;
 }
+

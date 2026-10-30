@@ -97,7 +97,7 @@ export function PetProfileEditor({
   }
 
   async function choose(file?: File) {
-    if (import.meta.env.MODE !== 'demo' && import.meta.env.VITE_PET_PROFILE_PHOTO_UPLOAD_ENABLED !== 'true') {
+    if (import.meta.env.MODE === 'production' || (import.meta.env.MODE !== 'demo' && import.meta.env.VITE_PET_PROFILE_PHOTO_UPLOAD_ENABLED !== 'true')) {
       setMessage('사진 업로드는 현재 점검 중이라 잠시 중지했어요. 기본 아바타를 사용해 주세요.');
       return;
     }
@@ -147,7 +147,7 @@ export function PetProfileEditor({
     && `${item.family} ${item.label} 강아지 믹스견`.includes(query.trim()));
   const persistent = Boolean(petId && supabase);
   const photoUploadEnabled = import.meta.env.MODE === 'demo'
-    || import.meta.env.VITE_PET_PROFILE_PHOTO_UPLOAD_ENABLED === 'true';
+    || (import.meta.env.MODE !== 'production' && import.meta.env.VITE_PET_PROFILE_PHOTO_UPLOAD_ENABLED === 'true');
   return <section className="pet-journal-profile" aria-label="반려동물 프로필">
     <div className="profile-heading">
       <img className="profile-portrait" src={(dirty ? photo : photoPath ? photo : '') || displayedAvatar.src} alt={`${name || '반려동물'} 프로필`} />
@@ -213,3 +213,4 @@ export function PetProfileEditor({
     </details>
   </section>;
 }
+

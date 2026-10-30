@@ -5,6 +5,14 @@ const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 const demoBuild = import.meta.env.MODE === 'demo' || import.meta.env.VITE_DEMO_MODE === 'true';
 const stagingBuild = import.meta.env.MODE === 'staging';
 const stagingUrl = 'https://vxgdewxqtbuychrvunjr.supabase.co';
+// Only the approved Production project is allowed. A normal compile may use local
+// Supabase, but must never silently turn a cloud Staging URL into Production.
+function isLoopbackUrl(value: string): boolean {
+  try { return ['localhost', '127.0.0.1', '[::1]'].includes(new URL(value).hostname); }
+  catch { return false; }
+}
+const productionUrl = 'https://lfbcxtaqpnbvxpsoywtg.supabase.co';
+const unapprovedProduction = import.meta.env.MODE === 'production' && Boolean(url) && !isLoopbackUrl(url) && url !== productionUrl;
 
 function isServerSecret(key: string): boolean {
   if (key.startsWith('sb_secret_')) return true;
@@ -22,6 +30,7 @@ const wrongStagingUrl = stagingBuild && Boolean(url) && url !== stagingUrl;
 const forbiddenBrowserKey = Boolean(publishableKey) && isServerSecret(publishableKey);
 
 export const supabaseConfigurationError = demoBuild ? ''
+  : unapprovedProduction ? '운영 빌드 대상 URL이 승인된 hanilog-production 프로젝트와 일치하지 않습니다.'
   : wrongStagingUrl ? 'Staging 빌드 대상 URL이 승인된 hanilog-staging 프로젝트와 일치하지 않습니다.'
     : forbiddenBrowserKey ? '서버 비밀키는 브라우저에서 사용할 수 없습니다. Publishable Key만 설정해 주세요.'
       : '';
@@ -40,3 +49,4 @@ export function userFacingError(error: unknown): string {
   if (error instanceof Error) return error.message;
   return '요청을 완료하지 못했습니다. 연결 상태를 확인하고 다시 시도해 주세요.';
 }
+
