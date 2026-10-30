@@ -77,7 +77,7 @@ export function HealthTrendsPage({ pet, userId, online, demoEvents }: Props) {
       const pageSize = 1000;
       for (let start = 0; ; start += pageSize) {
         const result = await supabase!.from('health_events')
-          .select('id,occurred_at,recorded_at,actor_id,performer_id,value,unit,source,occurrence_id')
+          .select('id,event_type,occurred_at,recorded_at,actor_id,performer_id,value,unit,source,occurrence_id')
           .eq('pet_id', pet.id).eq('event_type', 'glucose')
           .order('occurred_at', { ascending: true }).order('id', { ascending: true })
           .range(start, start + pageSize - 1);
