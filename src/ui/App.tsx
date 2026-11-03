@@ -22,6 +22,7 @@ import { HealthTrendsPage } from './HealthTrendsPage';
 import { effectiveGlucoseValue } from '../lib/health-trends';
 import { authCallbackPurpose, authFailureMessage, authLinkErrorMessage, authRedirectTo, type AuthCallbackPurpose } from '../lib/auth-redirect';
 import { detectBrowserTimezone, formatTimezoneLabel, timezoneOptionsFor } from '../lib/timezone';
+import { RecordChoices, RecordDateStrip } from './RecordControls';
 import { PetProfileEditor } from './PetProfileEditor';
 import { persistPetProfile } from '../lib/pet-profile-persistence';
 import { isPetAvatarId, type PetAvatarId } from '../lib/pet-profile';
@@ -1348,6 +1349,24 @@ export function QuickRecordPage(props: {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
   const [activityMessage, setActivityMessage] = useState('');
+  type Draft = { numericValue: string; unit: string; note: string; mealStatus: string; eliminationType: string;
+    description: string; measurementSource: string; measurementCondition: string; doseAmount: string;
+    insulinProductLabel: string; occurrenceId: string; performedByMe: boolean };
+  const drafts = useRef<Partial<Record<EventType, Draft>>>({});
+  function selectRecordType(next: EventType) {
+    if (next === eventType || saving) return;
+    drafts.current[eventType] = { numericValue, unit, note, mealStatus, eliminationType, description,
+      measurementSource, measurementCondition, doseAmount, insulinProductLabel, occurrenceId, performedByMe };
+    const draft = drafts.current[next];
+    setNumericValue(draft?.numericValue ?? ''); setUnit(draft?.unit ?? ''); setNote(draft?.note ?? '');
+    setMealStatus(draft?.mealStatus ?? ''); setEliminationType(draft?.eliminationType ?? '');
+    setDescription(draft?.description ?? ''); setMeasurementSource(draft?.measurementSource ?? '');
+    setMeasurementCondition(draft?.measurementCondition ?? ''); setDoseAmount(draft?.doseAmount ?? '');
+    setInsulinProductLabel(draft?.insulinProductLabel ?? ''); setOccurrenceId(draft?.occurrenceId ?? '');
+    setPerformedByMe(draft?.performedByMe ?? false); setConfirmedAlreadyOccurred(false); setFormError('');
+    setEventType(next);
+  }
+
   const activeExercise = useMemo(() => props.events
     .filter((item) => item.event_type === 'exercise')
     .map((item) => {
@@ -1483,8 +1502,8 @@ export function QuickRecordPage(props: {
   }
 
   return <main className="page-container record-page">
-    <section className="page-heading"><p className="eyebrow">빠른 기록</p><h1>{pet.name}의 실제 돌봄을 기록해요</h1>
-      <p>발생한 사실을 기록합니다. 기록 입력은 투여 지시나 임상적 승인으로 사용되지 않습니다.</p></section>
+    <section className="page-heading"><p className="eyebrow">빠른 기록</p><h1>{pet.name}의 하루를 남겨요</h1>
+      <p>관찰한 일을 골라 기록하세요. 선택만으로 저장되지는 않아요.</p></section>
     {props.demoOnly && <div className="notice notice-warning" role="status">DEMO · 제출한 내용은 이 탭의 메모리에만 표시되며 서버에 저장되지 않습니다.</div>}
     {activityMessage && <p className="activity-message" role="status">{activityMessage}</p>}
     {activeExercise && <section className="activity-session-bar" aria-label="진행 중인 운동 및 산책 기록">
@@ -1494,27 +1513,14 @@ export function QuickRecordPage(props: {
         onClick={() => void finishExerciseSession()}>{saving ? '저장 중…' : '산책 종료 · 저장'}</button>
       {!online && <p role="status">UNVERIFIED · 오프라인이라 종료 시각을 저장할 수 없습니다.</p>}
     </section>}
+    {eventType !== 'exercise' && <RecordDateStrip value={occurredLocal} onChange={setOccurredLocal} />}
     <form className="record-form" onSubmit={(event) => void handleSubmit(event)} noValidate>
       <fieldset className="event-type-fieldset">
         <legend>무엇을 기록할까요?</legend>
         <div className="event-type-grid">{eventOptions.map((option) =>
           <label className={eventType === option.type ? 'type-choice selected' : 'type-choice'} key={option.type}>
             <input type="radio" name="event-type" value={option.type} checked={eventType === option.type}
-              onChange={() => {
-                setEventType(option.type);
-                setNumericValue('');
-                setUnit('');
-                setMealStatus('');
-                setEliminationType('');
-                setDescription('');
-                setMeasurementSource('');
-                setMeasurementCondition('');
-                setDoseAmount('');
-                setInsulinProductLabel('');
-                setOccurrenceId('');
-                setConfirmedAlreadyOccurred(false);
-                setFormError('');
-              }} />
+              disabled={saving} onChange={() => selectRecordType(option.type)} />
             <span className="type-icon" aria-hidden="true">{option.icon}</span>
             <span className="type-label">{option.label}</span>
           </label>)}</div>
@@ -1529,38 +1535,22 @@ export function QuickRecordPage(props: {
           {eventType === 'exercise'
             ? <p className="activity-start-hint">시작 버튼을 누르면 현재 시각을 서버에 저장하고 타이머를 시작합니다.</p>
             : <label className="field-label">실제 발생 시각
-              <input type="datetime-local" required value={occurredLocal} onChange={(event) => setOccurredLocal(event.target.value)} />
+              <input aria-label="실제 발생 시각" type="datetime-local" required value={occurredLocal} onChange={(event) => setOccurredLocal(event.target.value)} />
               <small>기기 시간대 기준 입력 · 서버에는 UTC로 저장</small>
             </label>}
-          {eventType !== 'insulin' && <label className="field-label">연결할 돌봄 일정 (선택)
-            <select value={occurrenceId} onChange={(event) => setOccurrenceId(event.target.value)}>
-              <option value="">일정 연결 안 함</option>
-              {occurrences.filter((occurrence) => occurrence.event_type === eventType).map((occurrence) => <option key={occurrence.id} value={occurrence.id}>
-                {occurrence.scheduled_local_date} · {occurrence.scheduled_local_time.slice(0, 5)} · {occurrence.status === 'SCHEDULE_TIME_UNRESOLVED' ? '시각 확인 필요' : occurrence.occurrence_key}
-              </option>)}
-            </select><small>일정 연결은 기록 분류용이며 돌봄 수행 여부나 의료적 적정성을 승인하지 않습니다.</small>
-          </label>}
           {eventType === 'glucose' && <>
             <label className="field-label">측정값<input type="number" inputMode="decimal" step="any" value={numericValue} onChange={(event) => setNumericValue(event.target.value)} required /></label>
             <div className="field-label glucose-unit-field"><span>측정 단위</span><span className="unit-fixed">{GLUCOSE_UNIT}</span><small>신규 혈당 기록은 mg/dL로 저장됩니다.</small></div>
-            <label className="field-label">측정 출처 (선택)<input maxLength={120} value={measurementSource} onChange={(event) => setMeasurementSource(event.target.value)} placeholder="예: 혈당계, 병원 검사" /></label>
-            <label className="field-label">측정 조건 (선택)<select value={measurementCondition} onChange={(event) => setMeasurementCondition(event.target.value)}>
-              <option value="">미기록</option>{GLUCOSE_MEASUREMENT_CONDITIONS.map((condition) =>
-                <option key={condition.value} value={condition.value}>{condition.label}</option>)}
-            </select></label>
+            <RecordChoices label="측정 조건 (선택)" value={measurementCondition}
+              options={[{ value: '', label: '미기록' }, ...GLUCOSE_MEASUREMENT_CONDITIONS]} onChange={setMeasurementCondition} />
           </>}
           {eventType === 'weight' && <>
             <label className="field-label">측정값<input type="number" inputMode="decimal" step="any" value={numericValue} onChange={(event) => setNumericValue(event.target.value)} required /></label>
             <label className="field-label">측정 단위<input value={unit} onChange={(event) => setUnit(event.target.value)} placeholder="예: kg" required /></label>
           </>}
           {eventType === 'meal' && <>
-            <label className="field-label">관찰한 식사 상태
-              <select value={mealStatus} onChange={(event) => setMealStatus(event.target.value)} required>
-                <option value="">선택하세요</option><option value="ATE">섭취 확인</option>
-                <option value="PARTIAL">일부 섭취 보고</option><option value="REFUSED">식사 거부 보고</option>
-              </select>
-              <small>수량 기준이나 임상 판단을 적용하지 않습니다.</small>
-            </label>
+            <RecordChoices label="관찰한 식사 상태" value={mealStatus} onChange={setMealStatus}
+              options={[{ value: 'ATE', label: '섭취 확인' }, { value: 'PARTIAL', label: '일부 섭취' }, { value: 'REFUSED', label: '식사 거부' }]} />
             <label className="field-label">실제 섭취량 (선택)<input type="number" inputMode="decimal" step="any" value={numericValue} onChange={(event) => setNumericValue(event.target.value)} /></label>
             <label className="field-label">섭취량 단위 (선택)<input value={unit} onChange={(event) => setUnit(event.target.value)} placeholder="보호자가 확인한 단위" /></label>
           </>}
@@ -1568,12 +1558,8 @@ export function QuickRecordPage(props: {
             <label className="field-label">관찰한 음수량 (선택)<input type="number" inputMode="decimal" step="any" value={numericValue} onChange={(event) => setNumericValue(event.target.value)} /></label>
             <label className="field-label">단위 (선택)<input value={unit} onChange={(event) => setUnit(event.target.value)} /></label>
           </>}
-          {eventType === 'elimination' && <label className="field-label">관찰한 유형
-            <select value={eliminationType} onChange={(event) => setEliminationType(event.target.value)} required>
-              <option value="">선택하세요</option><option value="URINATION">배뇨</option>
-              <option value="BOWEL_MOVEMENT">배변</option><option value="BOTH">배변·배뇨 모두</option>
-            </select>
-          </label>}
+          {eventType === 'elimination' && <RecordChoices label="관찰한 유형" value={eliminationType} onChange={setEliminationType}
+            options={[{ value: 'URINATION', label: '배뇨' }, { value: 'BOWEL_MOVEMENT', label: '배변' }, { value: 'BOTH', label: '배변·배뇨 모두' }]} />}
           {eventType === 'exercise' && <>
             {!activeExercise && <p className="small-note">중간에 배변·배뇨 등 다른 일을 별도로 기록해도 시작한 타이머는 유지됩니다.</p>}
             <label className="field-label">활동 내용 (선택)<input value={description} onChange={(event) => setDescription(event.target.value)} placeholder="예: 산책" /></label>
@@ -1637,18 +1623,40 @@ export function QuickRecordPage(props: {
               이미 실제로 발생한 투여 사실을 기록합니다.</label>
           </>}
           {eventType === 'symptom' && <p className="field-hint">증상이나 컨디션을 관찰한 표현 그대로 적어 주세요. 앱은 진단하거나 분류하지 않습니다.</p>}
-          <label className="field-label full-field">메모 (선택)
+          {eventType === 'symptom' && <>          <label className="field-label full-field">메모 (선택)
+            <textarea rows={3} maxLength={1000} value={note} onChange={(event) => setNote(event.target.value)}
+              placeholder="관찰한 증상이나 컨디션을 적어 주세요" />
+            <small>{note.length}/1000</small>
+          </label></>}
+          <details className="record-details full-field" key={eventType}>
+            <summary>상세 입력 · 메모와 일정 연결</summary><div className="form-grid">
+          {eventType !== 'insulin' && <label className="field-label">연결할 돌봄 일정 (선택)
+            <select value={occurrenceId} onChange={(event) => setOccurrenceId(event.target.value)}>
+              <option value="">일정 연결 안 함</option>
+              {occurrences.filter((occurrence) => occurrence.event_type === eventType).map((occurrence) => <option key={occurrence.id} value={occurrence.id}>
+                {occurrence.scheduled_local_date} · {occurrence.scheduled_local_time.slice(0, 5)} · {occurrence.status === 'SCHEDULE_TIME_UNRESOLVED' ? '시각 확인 필요' : occurrence.occurrence_key}
+              </option>)}
+            </select><small>일정 연결은 기록 분류용이며 돌봄 수행 여부나 의료적 적정성을 승인하지 않습니다.</small>
+          </label>}
+
+            {eventType === 'glucose' && <>            <label className="field-label">측정 출처 (선택)<input maxLength={120} value={measurementSource} onChange={(event) => setMeasurementSource(event.target.value)} placeholder="예: 혈당계, 병원 검사" /></label>
+</>}
+            {eventType !== 'symptom' && <>          <label className="field-label full-field">메모 (선택)
             <textarea rows={3} maxLength={1000} value={note} onChange={(event) => setNote(event.target.value)}
               placeholder={eventType === 'insulin' ? '실제 발생 시각 등 사실을 적어 주세요. 투여량은 알고 있는 경우에만 별도 입력하세요.' : '관찰하거나 수행한 내용을 기록하세요'} />
             <small>{note.length}/1000</small>
-          </label>
+          </label></>}
+            </div>
+          </details>
           {eventType !== 'insulin' && <label className="check-row"><input type="checkbox" checked={performedByMe} onChange={(event) => setPerformedByMe(event.target.checked)} />내가 직접 수행하거나 측정함</label>}
         </div>
         {formError && <p role="alert" className="inline-error">{formError}</p>}
+        <div className="record-save-bar"><p className="small-note">{props.demoOnly ? '데모 미리보기 · 서버 저장 안 됨' : '서버 확인 후 저장 결과를 알려드려요'}</p>
         <button className={eventType === 'insulin' ? 'submit-button insulin-submit' : 'submit-button'}
           type="submit" disabled={saving || !online || (eventType === 'exercise' && !!activeExercise)}>
           {saving ? (props.demoOnly ? '데모 화면 반영 중…' : '서버 확인 중…') : eventType === 'exercise' ? '운동 및 산책 시작 · 저장' : props.demoOnly ? '데모 화면에만 추가 (저장 안 됨)' : eventType === 'insulin' ? '이미 발생한 투여 사실 저장' : '기록 저장'}
         </button>
+        </div>
         {!online && <p className="small-note">오프라인에서는 서버 저장을 시도하지 않습니다. 입력은 확정 기록이 아닙니다.</p>}
       </section>
     </form>

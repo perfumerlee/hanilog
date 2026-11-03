@@ -27,10 +27,7 @@ describe('QuickRecordPage', () => {
     const onSubmit = vi.fn().mockResolvedValue(false);
     render(<QuickRecordPage {...props} onSubmit={onSubmit} />);
     fireEvent.change(screen.getByLabelText('측정값'), { target: { value: '150' } });
-    const condition = screen.getByLabelText('측정 조건 (선택)');
-    expect(screen.getByRole('option', { name: '운동 전' })).toHaveValue('BEFORE_EXERCISE');
-    expect(screen.getByRole('option', { name: '운동 후' })).toHaveValue('AFTER_EXERCISE');
-    fireEvent.change(condition, { target: { value: 'BEFORE_EXERCISE' } });
+    fireEvent.click(screen.getByRole('radio', { name: '운동 전' }));
     fireEvent.click(screen.getByRole('button', { name: '기록 저장' }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({ eventType: 'glucose', measurementCondition: 'BEFORE_EXERCISE' }), null, false));
@@ -84,4 +81,35 @@ describe('QuickRecordPage', () => {
     expect(screen.getByRole('button', { name: '기록 저장' })).toBeDisabled();
     expect(screen.getByText(/오프라인에서는 서버 저장을 시도하지 않습니다/)).toBeInTheDocument();
   });
+});
+
+it('preserves type-specific drafts without submitting when choices change', async () => {
+  const onSubmit = vi.fn().mockResolvedValue(false);
+  render(<QuickRecordPage {...props} onSubmit={onSubmit} />);
+  fireEvent.change(screen.getByLabelText('측정값'), { target: { value: '164' } });
+  fireEvent.click(screen.getByRole('radio', { name: '식사' }));
+  fireEvent.click(screen.getByRole('radio', { name: '일부 섭취' }));
+  expect(onSubmit).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('radio', { name: '혈당' }));
+  expect(screen.getByLabelText('측정값')).toHaveValue(164);
+  fireEvent.click(screen.getByRole('radio', { name: '식사' }));
+  expect(screen.getByRole('radio', { name: /일부 섭취/ })).toBeChecked();
+  fireEvent.click(screen.getByRole('button', { name: '기록 저장' }));
+  await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ mealStatus: 'PARTIAL', numericValue: '' }), null, false));
+});
+
+it('updates the selected date without fabricating a different occurrence time', () => {
+  render(<QuickRecordPage {...props} />);
+  fireEvent.change(screen.getByLabelText('실제 발생 시각'), { target: { value: '2026-10-20T14:35' } });
+  fireEvent.change(screen.getByLabelText('기록 날짜'), { target: { value: '2026-10-18' } });
+  expect(screen.getByLabelText('실제 발생 시각')).toHaveValue('2026-10-18T14:35');
+});
+
+it('requires insulin confirmation again after switching record types', () => {
+  render(<QuickRecordPage {...props} />);
+  fireEvent.click(screen.getByRole('radio', { name: '인슐린' }));
+  fireEvent.click(screen.getByRole('checkbox', { name: /이미 실제로 발생한 투여 사실/ }));
+  fireEvent.click(screen.getByRole('radio', { name: '혈당' }));
+  fireEvent.click(screen.getByRole('radio', { name: '인슐린' }));
+  expect(screen.getByRole('checkbox', { name: /이미 실제로 발생한 투여 사실/ })).not.toBeChecked();
 });
