@@ -11,39 +11,24 @@ const base: EventEntryFields = {
   mealStatus: '',
   eliminationType: '',
   description: '',
-  confirmedAlreadyOccurred: false,
 };
 
 describe('health event form validation', () => {
-  it('requires an explicit confirmation that an insulin event already happened', () => {
-    expect(validateEventEntry(base).error).toContain('이미 실제로 발생한 투여 사실');
-    const result = validateEventEntry({ ...base, confirmedAlreadyOccurred: true });
-    expect(result.value?.value).toEqual({});
-    expect(result.value?.unit).toBeNull();
-  });
-
-  it('does not add or infer an insulin dose', () => {
-    const result = validateEventEntry({ ...base, confirmedAlreadyOccurred: true, note: '합성 관찰 메모' });
-    expect(result.value?.value).toEqual({ note: '합성 관찰 메모' });
-    expect(JSON.stringify(result.value)).not.toMatch(/dose|용량/i);
-  });
-
-  it('stores the actually reported insulin amount in mL without conversion', () => {
-    const result = validateEventEntry({ ...base, confirmedAlreadyOccurred: true, doseAmount: '0.05', doseUnit: 'mL',
-      insulinProductLabel: '합성 라벨 표기' });
+  it('requires and stores the actually reported insulin amount in U', () => {
+    expect(validateEventEntry(base).error).toContain('0보다 큰 U 값');
+    const result = validateEventEntry({ ...base, doseAmount: '2.5', doseUnit: 'U',
+      insulinProductLabel: '합성 제품명' });
     expect(result.value?.value).toMatchObject({
-      administered_dose_value: 0.05, administered_dose_unit: 'mL', insulin_product_label: '합성 라벨 표기',
+      administered_dose_value: 2.5, administered_dose_unit: 'U', insulin_product_label: '합성 제품명',
     });
-    expect(validateEventEntry({ ...base, confirmedAlreadyOccurred: true, doseAmount: '5.5',
-      doseUnit: 'U' as never }).error).toContain('확인한 mL');
   });
 
-  it('requires both an amount and unit when the optional dose is started', () => {
-    const confirmed = { ...base, confirmedAlreadyOccurred: true };
-    expect(validateEventEntry({ ...confirmed, doseUnit: 'mL' }).error).toContain('0보다 큰 숫자');
-    expect(validateEventEntry({ ...confirmed, doseAmount: '2' }).error).toContain('확인한 mL');
-    expect(validateEventEntry({ ...confirmed, doseAmount: '0', doseUnit: 'mL' }).error).toContain('0보다 큰 숫자');
-    expect(validateEventEntry({ ...confirmed, doseAmount: '-2', doseUnit: 'mL' }).error).toContain('0보다 큰 숫자');
+  it('requires a positive insulin dose, the U unit and a product label', () => {
+    expect(validateEventEntry({ ...base, doseUnit: 'U' }).error).toContain('0보다 큰 U 값');
+    expect(validateEventEntry({ ...base, doseAmount: '2', doseUnit: '' }).error).toContain('단위는 U');
+    expect(validateEventEntry({ ...base, doseAmount: '2', doseUnit: 'U' }).error).toContain('제품');
+    expect(validateEventEntry({ ...base, doseAmount: '0', doseUnit: 'U', insulinProductLabel: '합성' }).error).toContain('0보다 큰 U 값');
+    expect(validateEventEntry({ ...base, doseAmount: '-2', doseUnit: 'U', insulinProductLabel: '합성' }).error).toContain('0보다 큰 U 값');
   });
 
   it('requires a numeric glucose observation and fixes new measurements to mg/dL without thresholds', () => {

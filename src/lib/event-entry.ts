@@ -22,11 +22,10 @@ export interface EventEntryFields {
   mealStatus: string;
   eliminationType: string;
   description: string;
-  confirmedAlreadyOccurred: boolean;
   measurementSource?: string;
   measurementCondition?: string;
   doseAmount?: string;
-  doseUnit?: 'mL' | '';
+  doseUnit?: 'U' | '';
   insulinProductLabel?: string;
   activityStartedLocal?: string;
   activityEndedLocal?: string;
@@ -55,22 +54,19 @@ export function validateEventEntry(fields: EventEntryFields): { value?: Validate
   if (note) value.note = note;
   let unit: string | null = fields.unit.trim() || null;
 
-  if (fields.eventType === 'insulin' && !fields.confirmedAlreadyOccurred) {
-    return { error: '이미 실제로 발생한 투여 사실임을 확인해 주세요.' };
-  }
-
   if (fields.eventType === 'insulin') {
     const amountText = fields.doseAmount?.trim() ?? '';
     const doseUnit = fields.doseUnit ?? '';
-    if (amountText || doseUnit) {
-      const amount = parseOptionalNumber(amountText);
-      if (amount === null || amount === undefined || amount <= 0) return { error: '실제 투여량을 0보다 큰 숫자로 입력해 주세요.' };
-      if (doseUnit !== 'mL') return { error: '실제 투여량은 수의사가 확인한 mL 값으로 입력해 주세요.' };
-      value.administered_dose_value = amount;
-      value.administered_dose_unit = doseUnit;
-    }
+    const amount = parseOptionalNumber(amountText);
+    if (amount === null || amount === undefined || amount <= 0) return { error: '실제 투여량을 0보다 큰 U 값으로 입력해 주세요.' };
+    if (doseUnit !== 'U') return { error: '투여량 단위는 U로 기록해 주세요.' };
+    unit = 'U';
+    value.administered_dose_value = amount;
+    value.administered_dose_unit = 'U';
     const productLabel = fields.insulinProductLabel?.trim();
-    if (productLabel) value.insulin_product_label = productLabel.slice(0, 120);
+    if (!productLabel) return { error: '처방받은 인슐린 제품을 입력해 주세요.' };
+    if (productLabel.length > 120) return { error: '인슐린 제품명은 120자 이내로 입력해 주세요.' };
+    value.insulin_product_label = productLabel;
   }
 
   if (fields.eventType === 'glucose' || fields.eventType === 'weight') {

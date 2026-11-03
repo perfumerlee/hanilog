@@ -30,6 +30,7 @@ import { isPetAvatarId, type PetAvatarId } from '../lib/pet-profile';
 type Pet = {
   id: string; household_id: string; name: string; timezone: string;
   profile_avatar_id?: string | null; profile_photo_object_path?: string | null; profile_revision?: number | null;
+  default_insulin_product?: string | null;
   profileCanEdit?: boolean;
 };
 type HealthEvent = {
@@ -85,6 +86,7 @@ const eventOptions: { type: EventType; label: string; icon: string; short: strin
   { type: 'weight', label: '체중', icon: '◌', short: '측정값과 단위' },
   { type: 'symptom', label: '증상·컨디션', icon: '♡', short: '관찰한 상태' },
 ];
+const commonInsulinProductLabels = ['캐니슐린', '프로진크', 'NPH', '글라진', '디터미르'];
 const eventLabels = Object.fromEntries(eventOptions.map((option) => [option.type, option.label])) as Record<EventType, string>;
 const localDateTimeNow = () => {
   const now = new Date();
@@ -260,12 +262,12 @@ function DemoWorkspace() {
   const date = todayForTimezone(pet.timezone);
   const timelineDate = timelineSelection.petId === pet.id ? timelineSelection.date : date;
 
-  async function addDemoEvent(fields: EventEntryFields, occurrenceId: string | null, performed: boolean) {
+  async function addDemoEvent(fields: EventEntryFields, occurrenceId: string | null) {
     const validated = validateEventEntry(fields);
     if (!validated.value) return false;
     const event: HealthEvent = {
       id: crypto.randomUUID(), pet_id: pet.id, actor_id: demoUserId,
-      performer_id: performed ? demoUserId : null, event_type: fields.eventType,
+      performer_id: null, event_type: fields.eventType,
       occurred_at: validated.value.occurredAt, recorded_at: new Date().toISOString(),
       occurrence_id: occurrenceId, plan_version_id: null,
       value: validated.value.value, unit: validated.value.unit,
@@ -616,7 +618,7 @@ function Workspace({ userId, online }: { userId: string; online: boolean }) {
     if (!supabase) return false;
     setLoadingPets(true);
     const [petResult, householdResult, membershipResult, grantResult] = await Promise.all([
-      supabase.from('pets').select('id,household_id,name,timezone,profile_avatar_id,profile_photo_object_path,profile_revision').order('created_at', { ascending: true }),
+      supabase.from('pets').select('id,household_id,name,timezone,profile_avatar_id,profile_photo_object_path,profile_revision,default_insulin_product').order('created_at', { ascending: true }),
       supabase.from('households').select('id,name').order('created_at', { ascending: true }),
       supabase.from('household_memberships').select('household_id,role').eq('user_id', userId).eq('status', 'ACTIVE'),
       supabase.from('pet_access_grants').select('pet_id,access_role').eq('user_id', userId).eq('status', 'ACTIVE'),
@@ -870,7 +872,7 @@ function Workspace({ userId, online }: { userId: string; online: boolean }) {
     setCreating(false);
   }
 
-  async function submitHealthEvent(fields: EventEntryFields, occurrenceId: string | null, confirmedPerformed: boolean): Promise<boolean> {
+  async function submitHealthEvent(fields: EventEntryFields, occurrenceId: string | null): Promise<boolean> {
     if (!supabase || !selectedPet) return false;
     const validation = validateEventEntry(fields);
     if (validation.error || !validation.value) {
@@ -886,7 +888,7 @@ function Workspace({ userId, online }: { userId: string; online: boolean }) {
       value: validation.value.value,
       unit: validation.value.unit,
       clientTimezone,
-      performerId: confirmedPerformed ? userId : null,
+      performerId: null,
     }, pendingCommand.current);
     pendingCommand.current = command;
     setRecordNotice(null);
@@ -931,6 +933,21 @@ function Workspace({ userId, online }: { userId: string; online: boolean }) {
         : `서버 기록 확인 완료 · ${evaluationStatus}`,
     });
     await refreshPetData(selectedPet.id);
+    return true;
+  }
+
+  async function savePetInsulinProduct(product: string): Promise<boolean> {
+    if (!supabase || !selectedPet || !selectedPet.profileCanEdit || !online) return false;
+    const { error } = await supabase.rpc('update_pet_default_insulin_product', {
+      p_pet_id: selectedPet.id,
+      p_product: product.trim(),
+    });
+    if (error) {
+      setRecordNotice({ kind: 'error', text: userFacingError(error) });
+      return false;
+    }
+    setRecordNotice({ kind: 'success', text: '반려동물의 기본 인슐린 제품을 서버에서 확인했습니다.' });
+    await refreshPets();
     return true;
   }
 
@@ -1021,7 +1038,8 @@ function Workspace({ userId, online }: { userId: string; online: boolean }) {
             planApproval={dataReady ? planApproval : {}} online={online}
             presetEventType={new URLSearchParams(location.search).get('event') ?? undefined}
             presetOccurrenceId={new URLSearchParams(location.search).get('occurrence') ?? undefined}
-            onSubmit={submitHealthEvent} onSaveExerciseEnd={saveExerciseEnd} />} />
+            onSubmit={submitHealthEvent} onSaveExerciseEnd={saveExerciseEnd}
+            onSaveInsulinDefault={selectedPet.profileCanEdit ? savePetInsulinProduct : undefined} />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       </div>
@@ -1324,8 +1342,9 @@ function mealStatusLabel(status: string) {
 export function QuickRecordPage(props: {
   pet: Pet; userId: string; occurrences: RoutineOccurrence[]; presetEventType?: string; presetOccurrenceId?: string;
   events: HealthEvent[]; revisions: EventRevision[]; planApproval: Record<string, string>; online: boolean; demoOnly?: boolean;
-  onSubmit: (fields: EventEntryFields, occurrenceId: string | null, confirmedPerformed: boolean) => Promise<boolean>;
+  onSubmit: (fields: EventEntryFields, occurrenceId: string | null) => Promise<boolean>;
   onSaveExerciseEnd?: (eventId: string, endedAt: string, expectedRevision: number, durationSeconds: number) => Promise<boolean>;
+  onSaveInsulinDefault?: (product: string) => Promise<boolean>;
 }) {
   const { pet, userId, occurrences, planApproval, online, onSubmit } = props;
   const initialEventType = eventOptions.find((option) => option.type === props.presetEventType)?.type ?? 'glucose';
@@ -1340,9 +1359,10 @@ export function QuickRecordPage(props: {
   const [measurementSource, setMeasurementSource] = useState('');
   const [measurementCondition, setMeasurementCondition] = useState('');
   const [doseAmount, setDoseAmount] = useState('');
-  const [insulinProductLabel, setInsulinProductLabel] = useState('');
+  const [insulinProductLabel, setInsulinProductLabel] = useState(() => pet.default_insulin_product?.trim() ?? '');
+  const [savingInsulinDefault, setSavingInsulinDefault] = useState(false);
+  const [insulinDefaultMessage, setInsulinDefaultMessage] = useState('');
   const [occurrenceId, setOccurrenceId] = useState(props.presetOccurrenceId ?? '');
-  const [confirmedAlreadyOccurred, setConfirmedAlreadyOccurred] = useState(false);
   const [showAllRecordTypes, setShowAllRecordTypes] = useState(false);
   const visibleEventOptions = showAllRecordTypes
     ? eventOptions
@@ -1366,7 +1386,7 @@ export function QuickRecordPage(props: {
     setDescription(draft?.description ?? ''); setMeasurementSource(draft?.measurementSource ?? '');
     setMeasurementCondition(draft?.measurementCondition ?? ''); setDoseAmount(draft?.doseAmount ?? '');
     setInsulinProductLabel(draft?.insulinProductLabel ?? ''); setOccurrenceId(draft?.occurrenceId ?? '');
-    setConfirmedAlreadyOccurred(false); setFormError('');
+    setFormError('');
     if (['meal', 'water', 'weight', 'symptom', 'exercise'].includes(next)) setShowAllRecordTypes(true);
     else setShowAllRecordTypes(false);
     setEventType(next);
@@ -1384,6 +1404,18 @@ export function QuickRecordPage(props: {
   [props.events, props.revisions]);
   const selectedOccurrence = occurrences.find((item) => item.id === occurrenceId);
   const selectedApproval = selectedOccurrence ? planApproval[selectedOccurrence.care_plan_version_id] : null;
+  const insulinProductSelection = !insulinProductLabel ? ''
+    : commonInsulinProductLabels.includes(insulinProductLabel) ? insulinProductLabel : '__custom__';
+
+  async function saveInsulinDefault() {
+    const product = insulinProductLabel.trim();
+    if (!product || !props.onSaveInsulinDefault || savingInsulinDefault) return;
+    setSavingInsulinDefault(true);
+    setInsulinDefaultMessage('');
+    const saved = await props.onSaveInsulinDefault(product);
+    setSavingInsulinDefault(false);
+    setInsulinDefaultMessage(saved ? '이 반려동물의 기본 제품으로 저장했습니다.' : '기본 제품을 저장하지 못했습니다. 연결과 권한을 확인해 주세요.');
+  }
 
   useEffect(() => {
     if (eventType !== 'insulin' || !occurrenceId) {
@@ -1465,12 +1497,12 @@ export function QuickRecordPage(props: {
       const startFields: EventEntryFields = {
         eventType: 'exercise', occurredLocal: startedLocal, activityStartedLocal: startedLocal,
         activityState: 'STARTED', note, numericValue: '', unit: '분', mealStatus: '', eliminationType: '',
-        description, confirmedAlreadyOccurred: false,
+        description,
       };
       const startValidation = validateEventEntry(startFields);
       if (startValidation.error) { setFormError(startValidation.error); return; }
       setSaving(true);
-      const saved = await onSubmit(startFields, occurrenceId || null, false);
+      const saved = await onSubmit(startFields, occurrenceId || null);
       setSaving(false);
       if (!saved) return;
       setActivityMessage('시작 시각을 저장하고 타이머를 시작했습니다.');
@@ -1478,8 +1510,8 @@ export function QuickRecordPage(props: {
       return;
     }
     const fields: EventEntryFields = {
-      eventType, occurredLocal, note, numericValue, unit, mealStatus, eliminationType, description, confirmedAlreadyOccurred,
-      measurementSource, measurementCondition, doseAmount, doseUnit: doseAmount.trim() ? 'mL' : '', insulinProductLabel,
+      eventType, occurredLocal, note, numericValue, unit, mealStatus, eliminationType, description,
+      measurementSource, measurementCondition, doseAmount, doseUnit: eventType === 'insulin' ? 'U' : '', insulinProductLabel,
     };
     const validation = validateEventEntry(fields);
     if (validation.error) {
@@ -1487,7 +1519,7 @@ export function QuickRecordPage(props: {
       return;
     }
     setSaving(true);
-    const saved = await onSubmit(fields, occurrenceId || null, confirmedAlreadyOccurred);
+    const saved = await onSubmit(fields, occurrenceId || null);
     setSaving(false);
     if (saved) {
       setNumericValue('');
@@ -1497,10 +1529,9 @@ export function QuickRecordPage(props: {
       setMeasurementSource('');
       setMeasurementCondition('');
       setDoseAmount('');
-      setInsulinProductLabel('');
+      setInsulinProductLabel(pet.default_insulin_product?.trim() ?? '');
       setMealStatus('');
       setEliminationType('');
-      setConfirmedAlreadyOccurred(false);
       setOccurrenceId('');
     }
   }
@@ -1533,8 +1564,8 @@ export function QuickRecordPage(props: {
 
       <section className={eventType === 'insulin' ? 'insulin-record-section' : 'event-fields'}>
         {eventType === 'insulin' && <div className="insulin-header">
-          <p className="eyebrow">사후 기록 전용</p><h2>이미 발생한 투여 사실</h2>
-          <p>이 화면은 신규 투여를 안내하지 않습니다. 용량이나 투여 가능 여부를 판단하지 않습니다.</p>
+          <p className="eyebrow">투여 후 기록</p><h2>실제 투여 내용을 기록해요</h2>
+          <p>기억하는 투여량과 제품을 그대로 남겨요. 앱은 용량을 계산하거나 투여를 판단하지 않습니다.</p>
         </div>}
         <div className="form-grid">
           {eventType === 'exercise' && <p className="activity-start-hint">시작 버튼을 누르면 현재 시각을 서버에 저장하고 타이머를 시작합니다.</p>}
@@ -1565,20 +1596,36 @@ export function QuickRecordPage(props: {
             <label className="field-label">활동 내용 (선택)<input value={description} onChange={(event) => setDescription(event.target.value)} placeholder="예: 산책" /></label>
           </>}
           {eventType === 'insulin' && <>
-            <details className="record-details insulin-extra-details">
-              <summary>추가 정보 · 투여량, 제품, 일정</summary>
-            <label className="field-label">실제 투여량 (선택)
-              <input type="number" inputMode="decimal" min="0" step="any" value={doseAmount}
-                onChange={(event) => setDoseAmount(event.target.value)} placeholder="실제 기록을 알고 있을 때만 입력" />
-            </label>
-            <div className="field-label glucose-unit-field"><span>투여량 단위</span><span className="unit-fixed">mL</span>
-              <small>U(인슐린 단위·‘칸’)와 mL(부피)는 다른 단위이며 제품 농도에 따라 관계가 달라집니다. 처방이 U/‘칸’으로만 되어 있으면 직접 환산하지 말고 병원에 mL 값을 확인하세요.</small>
+            <div className="field-label insulin-product-field">인슐린 제품
+              <select aria-label="인슐린 제품" value={insulinProductSelection} required
+                onChange={(event) => { if (event.target.value !== '__custom__') setInsulinProductLabel(event.target.value); setInsulinDefaultMessage(''); }}>
+                <option value="">제품 선택</option>
+                <option value="캐니슐린">캐니슐린</option>
+                <option value="프로진크">프로진크</option>
+                <option value="NPH">NPH</option>
+                <option value="글라진">글라진</option>
+                <option value="디터미르">디터미르</option>
+                <option value="__custom__">다른 제품 직접 입력</option>
+              </select>
+              {insulinProductSelection === '__custom__' && <input aria-label="직접 입력한 인슐린 제품" maxLength={120} value={insulinProductLabel}
+                onChange={(event) => { setInsulinProductLabel(event.target.value); setInsulinDefaultMessage(''); }}
+                placeholder="처방 제품명을 입력" required />}
+              <small>목록은 제품명을 기록하기 위한 선택지이며, 처방·추천 목록이 아닙니다. 수의사가 처방한 제품을 고르세요.</small>
+              {props.onSaveInsulinDefault && insulinProductLabel.trim() !== (pet.default_insulin_product ?? '').trim() &&
+                <button type="button" className="insulin-default-save" disabled={!online || savingInsulinDefault || !insulinProductLabel.trim()}
+                  onClick={() => void saveInsulinDefault()}>{savingInsulinDefault ? '저장 중…' : '이 반려동물의 기본 제품으로 저장'}</button>}
+              {insulinDefaultMessage && <small role="status">{insulinDefaultMessage}</small>}
+              {!pet.default_insulin_product && <small>자주 사용하는 제품을 선택한 뒤 기본 제품으로 저장할 수 있습니다.</small>}
+              {props.demoOnly && <small>DEMO에서는 기본 제품 변경이 서버에 저장되지 않습니다.</small>}
             </div>
-            <label className="field-label">제품명·농도 표기 (선택)
-              <input maxLength={120} value={insulinProductLabel} onChange={(event) => setInsulinProductLabel(event.target.value)}
-                placeholder="포장·용기 표기를 그대로 입력 · 모르면 비워 두세요" />
-              <small>U와 mL는 서로 바꾸어 읽을 수 없습니다. 제품 농도와 주사기 표기가 처방·교육 내용과 맞는지 의료진에게 확인하세요.</small>
-            </label>
+            <div className="insulin-dose-row">
+              <label className="field-label">실제 투여량<input type="number" inputMode="decimal" min="0" step="any" value={doseAmount}
+                onChange={(event) => setDoseAmount(event.target.value)} placeholder="예: 2" required /></label>
+              <div className="field-label glucose-unit-field"><span>단위</span><span className="unit-fixed">U</span></div>
+            </div>
+            <p className="insulin-dose-note">수의사가 정한 값을 실제 기록에서 확인해 입력하세요. mL로 환산하지 않습니다.</p>
+            <details className="record-details insulin-extra-details">
+              <summary>추가 정보 · 일정 및 도움말</summary>
             <label className="field-label">연결할 예정 일정 (선택)
               <select value={occurrenceId} onChange={(event) => setOccurrenceId(event.target.value)}>
                 <option value="">일정 연결 안 함</option>
@@ -1604,7 +1651,7 @@ export function QuickRecordPage(props: {
               <div className="insulin-help-content">
                 <p><strong>이 도움말은 개별 투여 지시나 실습을 대신하지 않습니다.</strong> 제품과 주사기 종류에 따라 준비 방법이 다르므로, 담당 수의사에게 실제 제품으로 시범과 확인을 요청하고 제품 설명서를 우선하세요.</p>
                 <ul>
-                  <li>라벨의 제품명·농도와 처방에 지정된 주사기 또는 기기가 일치하는지 확인하세요. U(인슐린 단위·‘칸’)와 mL(부피)는 다른 단위입니다. 처방이 U로만 되어 있으면 수의사에게 해당 제품의 mL 값을 확인하고 직접 환산하지 마세요.</li>
+                  <li>제품명·농도와 수의사가 안내한 주사기 또는 기기가 일치하는지 확인하세요. U와 mL는 서로 다른 단위이므로 직접 환산하지 마세요.</li>
                   <li>흔들기·굴리기, 보관 온도와 사용 기간은 제품마다 다릅니다. 라벨과 수의사 안내를 따르고, 얼거나 과열·직사광선에 노출된 제품은 사용 여부를 병원에 확인하세요.</li>
                   <li>기포가 보이거나 눈금의 실제 양을 확신할 수 없다면 임의로 보정하지 마세요. 기포 확인·제거 방법도 해당 제품과 기기의 설명 및 수의사 시범을 따르세요.</li>
                   <li>주사 준비·투여 방법은 진료팀에게 직접 배우세요. 매회 새 주사기와 바늘을 사용하고, 사용한 바늘은 바로 안전한 손상성 폐기 용기에 넣으세요.</li>
@@ -1619,11 +1666,8 @@ export function QuickRecordPage(props: {
                   <a href="https://www.cdc.gov/infection-control/hcp/environmental-control/summary-recommendations.html" target="_blank" rel="noreferrer">CDC: 손상성 폐기물 안전</a>
                 </nav>
               </div>
-        </details>
             </details>
-            <label className="check-row"><input type="checkbox" checked={confirmedAlreadyOccurred}
-              onChange={(event) => setConfirmedAlreadyOccurred(event.target.checked)} required />
-              이미 실제로 발생한 투여 사실을 기록합니다.</label>
+            </details>
           </>}
           {eventType === 'symptom' && <p className="field-hint">증상이나 컨디션을 관찰한 표현 그대로 적어 주세요. 앱은 진단하거나 분류하지 않습니다.</p>}
           {eventType === 'symptom' && <>          <label className="field-label full-field">메모 (선택)
@@ -1651,7 +1695,7 @@ export function QuickRecordPage(props: {
 </>}
             {eventType !== 'symptom' && <>          <label className="field-label full-field">메모 (선택)
             <textarea rows={3} maxLength={1000} value={note} onChange={(event) => setNote(event.target.value)}
-              placeholder={eventType === 'insulin' ? '실제 발생 시각 등 사실을 적어 주세요. 투여량은 알고 있는 경우에만 별도 입력하세요.' : '관찰하거나 수행한 내용을 기록하세요'} />
+              placeholder={eventType === 'insulin' ? '필요한 경우 실제 발생 상황을 적어 주세요' : '관찰하거나 수행한 내용을 기록하세요'} />
             <small>{note.length}/1000</small>
           </label></>}
             </div>
@@ -1661,7 +1705,7 @@ export function QuickRecordPage(props: {
         <div className="record-save-bar"><p className="small-note">{props.demoOnly ? '데모 미리보기 · 서버 저장 안 됨' : '서버 확인 후 저장 결과를 알려드려요'}</p>
         <button className={eventType === 'insulin' ? 'submit-button insulin-submit' : 'submit-button'}
           type="submit" disabled={saving || !online || (eventType === 'exercise' && !!activeExercise)}>
-          {saving ? (props.demoOnly ? '데모 화면 반영 중…' : '서버 확인 중…') : eventType === 'exercise' ? '운동 및 산책 시작 · 저장' : props.demoOnly ? '데모 화면에만 추가 (저장 안 됨)' : eventType === 'insulin' ? '이미 발생한 투여 사실 저장' : '기록 저장'}
+          {saving ? (props.demoOnly ? '데모 화면 반영 중…' : '서버 확인 중…') : eventType === 'exercise' ? '운동 및 산책 시작 · 저장' : props.demoOnly ? '데모 화면에만 추가 (저장 안 됨)' : '기록 저장'}
         </button>
         </div>
         {!online && <p className="small-note">오프라인에서는 서버 저장을 시도하지 않습니다. 입력은 확정 기록이 아닙니다.</p>}

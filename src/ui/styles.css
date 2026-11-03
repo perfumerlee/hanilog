@@ -589,6 +589,12 @@ button, a, input, select, textarea, summary { scroll-margin: 1rem; }
 .record-more-types { display: block; min-height: 44px; margin: .35rem auto 0; padding-inline: .8rem; color: var(--green-dark); background: transparent; font-weight: 700; }
 .record-more-types:hover { background: #e8f1e7; }
 .insulin-extra-details { grid-column: 1 / -1; }
+.insulin-product-field { grid-column: 1 / -1; }
+.insulin-default-save { display: block; min-height: 44px; margin-top: .45rem; padding: .55rem .8rem; border: 1px solid var(--line); border-radius: 12px; color: var(--green-dark); background: #edf4eb; font-weight: 700; }
+.insulin-default-save:disabled { opacity: .6; }
+.insulin-dose-row { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0,2fr) minmax(74px,1fr); gap: .8rem; align-items: end; }
+.insulin-dose-row .field-label { margin: 0; }
+.insulin-dose-note { grid-column: 1 / -1; margin: -.3rem 0 .5rem; color: var(--muted); font-size: .85rem; }
 .record-details .record-date-strip { grid-column: 1 / -1; }
 .insulin-extra-details > .field-label, .insulin-extra-details > .glucose-unit-field,
 .insulin-extra-details > .safety-check, .insulin-extra-details > .insulin-help { margin-block: .7rem; }
