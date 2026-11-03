@@ -1360,6 +1360,7 @@ export function QuickRecordPage(props: {
   const [measurementCondition, setMeasurementCondition] = useState('');
   const [doseAmount, setDoseAmount] = useState('');
   const [insulinProductLabel, setInsulinProductLabel] = useState(() => pet.default_insulin_product?.trim() ?? '');
+  const insulinProductDefaultRef = useRef({ petId: pet.id, value: pet.default_insulin_product?.trim() ?? '' });
   const [savingInsulinDefault, setSavingInsulinDefault] = useState(false);
   const [insulinDefaultMessage, setInsulinDefaultMessage] = useState('');
   const [occurrenceId, setOccurrenceId] = useState(props.presetOccurrenceId ?? '');
@@ -1404,8 +1405,17 @@ export function QuickRecordPage(props: {
   [props.events, props.revisions]);
   const selectedOccurrence = occurrences.find((item) => item.id === occurrenceId);
   const selectedApproval = selectedOccurrence ? planApproval[selectedOccurrence.care_plan_version_id] : null;
+  const savedInsulinProduct = pet.default_insulin_product?.trim() ?? '';
   const insulinProductSelection = !insulinProductLabel ? ''
     : commonInsulinProductLabels.includes(insulinProductLabel) ? insulinProductLabel : '__custom__';
+
+  useEffect(() => {
+    const previous = insulinProductDefaultRef.current;
+    if (previous.petId !== pet.id || !insulinProductLabel.trim() || insulinProductLabel === previous.value) {
+      setInsulinProductLabel(savedInsulinProduct);
+    }
+    insulinProductDefaultRef.current = { petId: pet.id, value: savedInsulinProduct };
+  }, [pet.id, savedInsulinProduct, insulinProductLabel]);
 
   async function saveInsulinDefault() {
     const product = insulinProductLabel.trim();

@@ -60,6 +60,13 @@ describe('QuickRecordPage', () => {
     );
   });
 
+  it('applies the saved per-pet product when profile data arrives after the form mounts', () => {
+    const view = render(<QuickRecordPage {...props} />);
+    fireEvent.click(screen.getByRole('radio', { name: /인슐린/ }));
+    view.rerender(<QuickRecordPage {...props} pet={{ ...props.pet, default_insulin_product: '캐니슐린' }} />);
+    expect(screen.getByLabelText('인슐린 제품')).toHaveValue('캐니슐린');
+  });
+
   it('keeps insulin help and occurrence details collapsed until requested', () => {
     render(<QuickRecordPage {...props} />);
     fireEvent.click(screen.getByRole('radio', { name: /인슐린/ }));
