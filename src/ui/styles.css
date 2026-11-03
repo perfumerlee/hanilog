@@ -582,10 +582,16 @@ button, a, input, select, textarea, summary { scroll-margin: 1rem; }
 .record-week button strong { font-size: 1.15rem; }
 .record-week button span, .record-week button small { font-size: .75rem; }
 .record-week button[aria-pressed="true"] { background: var(--green); color: white; border-color: var(--green); }
-.record-page .event-type-grid { grid-template-columns: repeat(4, minmax(0,1fr)); gap: .55rem; }
-.record-page .type-choice { min-height: 78px; border-radius: 16px; background: transparent; }
+.record-page .event-type-grid { grid-template-columns: repeat(3, minmax(0,1fr)); gap: .55rem; }
+.record-page .type-choice { min-height: 72px; border-radius: 16px; background: transparent; }
 .record-page .type-choice.selected { background: #e5efe4; box-shadow: inset 0 0 0 1px var(--green); }
 .record-page .type-icon { font-size: 1.45rem; }
+.record-more-types { display: block; min-height: 44px; margin: .35rem auto 0; padding-inline: .8rem; color: var(--green-dark); background: transparent; font-weight: 700; }
+.record-more-types:hover { background: #e8f1e7; }
+.insulin-extra-details { grid-column: 1 / -1; }
+.record-details .record-date-strip { grid-column: 1 / -1; }
+.insulin-extra-details > .field-label, .insulin-extra-details > .glucose-unit-field,
+.insulin-extra-details > .safety-check, .insulin-extra-details > .insulin-help { margin-block: .7rem; }
 .record-page .event-fields { margin-top: 1.2rem; padding: 1.15rem; background: var(--paper); border-radius: 20px; border: 1px solid var(--line); }
 .record-choices { grid-column: 1 / -1; min-width: 0; margin: .3rem 0; padding: 0; border: 0; }
 .record-choices legend { font-weight: 600; margin-bottom: .65rem; }
@@ -608,6 +614,6 @@ button, a, input, select, textarea, summary { scroll-margin: 1rem; }
   .record-choices label { flex: 1 1 auto; }
 }
 @media (min-width: 900px) {
-  .record-page .event-type-grid { grid-template-columns: repeat(4, minmax(0,1fr)); }
+  .record-page .event-type-grid { grid-template-columns: repeat(3, minmax(0,1fr)); }
   .record-week button { min-height: 84px; }
 }

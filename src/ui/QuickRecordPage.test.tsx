@@ -87,11 +87,13 @@ it('preserves type-specific drafts without submitting when choices change', asyn
   const onSubmit = vi.fn().mockResolvedValue(false);
   render(<QuickRecordPage {...props} onSubmit={onSubmit} />);
   fireEvent.change(screen.getByLabelText('측정값'), { target: { value: '164' } });
+  fireEvent.click(screen.getByRole('button', { name: '다른 기록 종류 보기' }));
   fireEvent.click(screen.getByRole('radio', { name: '식사' }));
   fireEvent.click(screen.getByRole('radio', { name: '일부 섭취' }));
   expect(onSubmit).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('radio', { name: '혈당' }));
   expect(screen.getByLabelText('측정값')).toHaveValue(164);
+  fireEvent.click(screen.getByRole('button', { name: '다른 기록 종류 보기' }));
   fireEvent.click(screen.getByRole('radio', { name: '식사' }));
   expect(screen.getByRole('radio', { name: /일부 섭취/ })).toBeChecked();
   fireEvent.click(screen.getByRole('button', { name: '기록 저장' }));

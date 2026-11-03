@@ -77,10 +77,10 @@ type SafetyResponse = {
 
 const eventOptions: { type: EventType; label: string; icon: string; short: string }[] = [
   { type: 'glucose', label: '혈당', icon: '◉', short: '측정값과 단위' },
-  { type: 'meal', label: '식사', icon: '◒', short: '식사와 실제 섭취' },
   { type: 'insulin', label: '인슐린', icon: '↗', short: '이미 발생한 투여 기록' },
-  { type: 'water', label: '음수', icon: '⌁', short: '관찰한 음수량' },
   { type: 'elimination', label: '배변·배뇨', icon: '⌖', short: '관찰한 내용' },
+  { type: 'meal', label: '식사', icon: '◒', short: '식사와 실제 섭취' },
+  { type: 'water', label: '음수', icon: '⌁', short: '관찰한 음수량' },
   { type: 'exercise', label: '운동 및 산책', icon: '⌁', short: '실제 활동' },
   { type: 'weight', label: '체중', icon: '◌', short: '측정값과 단위' },
   { type: 'symptom', label: '증상·컨디션', icon: '♡', short: '관찰한 상태' },
@@ -1343,7 +1343,10 @@ export function QuickRecordPage(props: {
   const [insulinProductLabel, setInsulinProductLabel] = useState('');
   const [occurrenceId, setOccurrenceId] = useState(props.presetOccurrenceId ?? '');
   const [confirmedAlreadyOccurred, setConfirmedAlreadyOccurred] = useState(false);
-  const [performedByMe, setPerformedByMe] = useState(false);
+  const [showAllRecordTypes, setShowAllRecordTypes] = useState(false);
+  const visibleEventOptions = showAllRecordTypes
+    ? eventOptions
+    : eventOptions.filter((option, index) => index < 3 || option.type === eventType);
   const [preflight, setPreflight] = useState<'idle' | 'checking' | 'verified' | 'unverified'>('idle');
   const [priorEvents, setPriorEvents] = useState<HealthEvent[]>([]);
   const [saving, setSaving] = useState(false);
@@ -1351,19 +1354,21 @@ export function QuickRecordPage(props: {
   const [activityMessage, setActivityMessage] = useState('');
   type Draft = { numericValue: string; unit: string; note: string; mealStatus: string; eliminationType: string;
     description: string; measurementSource: string; measurementCondition: string; doseAmount: string;
-    insulinProductLabel: string; occurrenceId: string; performedByMe: boolean };
+    insulinProductLabel: string; occurrenceId: string };
   const drafts = useRef<Partial<Record<EventType, Draft>>>({});
   function selectRecordType(next: EventType) {
     if (next === eventType || saving) return;
     drafts.current[eventType] = { numericValue, unit, note, mealStatus, eliminationType, description,
-      measurementSource, measurementCondition, doseAmount, insulinProductLabel, occurrenceId, performedByMe };
+      measurementSource, measurementCondition, doseAmount, insulinProductLabel, occurrenceId };
     const draft = drafts.current[next];
     setNumericValue(draft?.numericValue ?? ''); setUnit(draft?.unit ?? ''); setNote(draft?.note ?? '');
     setMealStatus(draft?.mealStatus ?? ''); setEliminationType(draft?.eliminationType ?? '');
     setDescription(draft?.description ?? ''); setMeasurementSource(draft?.measurementSource ?? '');
     setMeasurementCondition(draft?.measurementCondition ?? ''); setDoseAmount(draft?.doseAmount ?? '');
     setInsulinProductLabel(draft?.insulinProductLabel ?? ''); setOccurrenceId(draft?.occurrenceId ?? '');
-    setPerformedByMe(draft?.performedByMe ?? false); setConfirmedAlreadyOccurred(false); setFormError('');
+    setConfirmedAlreadyOccurred(false); setFormError('');
+    if (['meal', 'water', 'weight', 'symptom', 'exercise'].includes(next)) setShowAllRecordTypes(true);
+    else setShowAllRecordTypes(false);
     setEventType(next);
   }
 
@@ -1465,11 +1470,11 @@ export function QuickRecordPage(props: {
       const startValidation = validateEventEntry(startFields);
       if (startValidation.error) { setFormError(startValidation.error); return; }
       setSaving(true);
-      const saved = await onSubmit(startFields, occurrenceId || null, performedByMe);
+      const saved = await onSubmit(startFields, occurrenceId || null, false);
       setSaving(false);
       if (!saved) return;
       setActivityMessage('시작 시각을 저장하고 타이머를 시작했습니다.');
-      setNote(''); setDescription(''); setOccurrenceId(''); setPerformedByMe(false);
+      setNote(''); setDescription(''); setOccurrenceId('');
       return;
     }
     const fields: EventEntryFields = {
@@ -1482,7 +1487,7 @@ export function QuickRecordPage(props: {
       return;
     }
     setSaving(true);
-    const saved = await onSubmit(fields, occurrenceId || null, performedByMe || confirmedAlreadyOccurred);
+    const saved = await onSubmit(fields, occurrenceId || null, confirmedAlreadyOccurred);
     setSaving(false);
     if (saved) {
       setNumericValue('');
@@ -1496,7 +1501,6 @@ export function QuickRecordPage(props: {
       setMealStatus('');
       setEliminationType('');
       setConfirmedAlreadyOccurred(false);
-      setPerformedByMe(false);
       setOccurrenceId('');
     }
   }
@@ -1513,17 +1517,18 @@ export function QuickRecordPage(props: {
         onClick={() => void finishExerciseSession()}>{saving ? '저장 중…' : '산책 종료 · 저장'}</button>
       {!online && <p role="status">UNVERIFIED · 오프라인이라 종료 시각을 저장할 수 없습니다.</p>}
     </section>}
-    {eventType !== 'exercise' && <RecordDateStrip value={occurredLocal} onChange={setOccurredLocal} />}
     <form className="record-form" onSubmit={(event) => void handleSubmit(event)} noValidate>
       <fieldset className="event-type-fieldset">
         <legend>무엇을 기록할까요?</legend>
-        <div className="event-type-grid">{eventOptions.map((option) =>
+        <div className="event-type-grid">{visibleEventOptions.map((option) =>
           <label className={eventType === option.type ? 'type-choice selected' : 'type-choice'} key={option.type}>
             <input type="radio" name="event-type" value={option.type} checked={eventType === option.type}
               disabled={saving} onChange={() => selectRecordType(option.type)} />
             <span className="type-icon" aria-hidden="true">{option.icon}</span>
             <span className="type-label">{option.label}</span>
           </label>)}</div>
+        <button type="button" className="record-more-types" aria-expanded={showAllRecordTypes}
+          onClick={() => setShowAllRecordTypes((current) => !current)}>{showAllRecordTypes ? '다른 기록 종류 접기' : '다른 기록 종류 보기'}</button>
       </fieldset>
 
       <section className={eventType === 'insulin' ? 'insulin-record-section' : 'event-fields'}>
@@ -1532,12 +1537,7 @@ export function QuickRecordPage(props: {
           <p>이 화면은 신규 투여를 안내하지 않습니다. 용량이나 투여 가능 여부를 판단하지 않습니다.</p>
         </div>}
         <div className="form-grid">
-          {eventType === 'exercise'
-            ? <p className="activity-start-hint">시작 버튼을 누르면 현재 시각을 서버에 저장하고 타이머를 시작합니다.</p>
-            : <label className="field-label">실제 발생 시각
-              <input aria-label="실제 발생 시각" type="datetime-local" required value={occurredLocal} onChange={(event) => setOccurredLocal(event.target.value)} />
-              <small>기기 시간대 기준 입력 · 서버에는 UTC로 저장</small>
-            </label>}
+          {eventType === 'exercise' && <p className="activity-start-hint">시작 버튼을 누르면 현재 시각을 서버에 저장하고 타이머를 시작합니다.</p>}
           {eventType === 'glucose' && <>
             <label className="field-label">측정값<input type="number" inputMode="decimal" step="any" value={numericValue} onChange={(event) => setNumericValue(event.target.value)} required /></label>
             <div className="field-label glucose-unit-field"><span>측정 단위</span><span className="unit-fixed">{GLUCOSE_UNIT}</span><small>신규 혈당 기록은 mg/dL로 저장됩니다.</small></div>
@@ -1565,6 +1565,8 @@ export function QuickRecordPage(props: {
             <label className="field-label">활동 내용 (선택)<input value={description} onChange={(event) => setDescription(event.target.value)} placeholder="예: 산책" /></label>
           </>}
           {eventType === 'insulin' && <>
+            <details className="record-details insulin-extra-details">
+              <summary>추가 정보 · 투여량, 제품, 일정</summary>
             <label className="field-label">실제 투여량 (선택)
               <input type="number" inputMode="decimal" min="0" step="any" value={doseAmount}
                 onChange={(event) => setDoseAmount(event.target.value)} placeholder="실제 기록을 알고 있을 때만 입력" />
@@ -1617,6 +1619,7 @@ export function QuickRecordPage(props: {
                   <a href="https://www.cdc.gov/infection-control/hcp/environmental-control/summary-recommendations.html" target="_blank" rel="noreferrer">CDC: 손상성 폐기물 안전</a>
                 </nav>
               </div>
+        </details>
             </details>
             <label className="check-row"><input type="checkbox" checked={confirmedAlreadyOccurred}
               onChange={(event) => setConfirmedAlreadyOccurred(event.target.checked)} required />
@@ -1629,7 +1632,12 @@ export function QuickRecordPage(props: {
             <small>{note.length}/1000</small>
           </label></>}
           <details className="record-details full-field" key={eventType}>
-            <summary>상세 입력 · 메모와 일정 연결</summary><div className="form-grid">
+            <summary>상세 입력 · 시각, 메모와 일정 연결</summary><div className="form-grid">
+          {eventType !== 'exercise' && <RecordDateStrip value={occurredLocal} onChange={setOccurredLocal} />}
+          {eventType !== 'exercise' && <label className="field-label">실제 발생 시각
+            <input aria-label="실제 발생 시각" type="datetime-local" required value={occurredLocal} onChange={(event) => setOccurredLocal(event.target.value)} />
+            <small>기기 시간대 기준 · 서버에는 UTC로 저장</small>
+          </label>}
           {eventType !== 'insulin' && <label className="field-label">연결할 돌봄 일정 (선택)
             <select value={occurrenceId} onChange={(event) => setOccurrenceId(event.target.value)}>
               <option value="">일정 연결 안 함</option>
@@ -1648,7 +1656,6 @@ export function QuickRecordPage(props: {
           </label></>}
             </div>
           </details>
-          {eventType !== 'insulin' && <label className="check-row"><input type="checkbox" checked={performedByMe} onChange={(event) => setPerformedByMe(event.target.checked)} />내가 직접 수행하거나 측정함</label>}
         </div>
         {formError && <p role="alert" className="inline-error">{formError}</p>}
         <div className="record-save-bar"><p className="small-note">{props.demoOnly ? '데모 미리보기 · 서버 저장 안 됨' : '서버 확인 후 저장 결과를 알려드려요'}</p>
