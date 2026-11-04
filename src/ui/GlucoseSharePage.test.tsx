@@ -13,6 +13,11 @@ it('opens latest measured local day, preserves values above 500, and filters lis
  await waitFor(() => expect(screen.getByLabelText('날짜')).toHaveValue('2026-11-03'));
  expect(screen.getByRole('heading',{name:'이날 측정값 (1건)'})).toBeInTheDocument();
  expect(screen.getAllByText('550 mg/dL').length).toBeGreaterThan(0);
+ fireEvent.click(document.querySelector('.chart-point')!);
+ expect(screen.getByRole('status')).toHaveTextContent('550 mg/dL');
+ expect(screen.getByRole('status')).toHaveTextContent('오전 9:00:00');
+ fireEvent.keyDown(document.querySelector('.chart-point')!, { key: 'Escape' });
+ expect(screen.queryByRole('status')).not.toBeInTheDocument();
  expect(document.querySelectorAll('.chart-axis-label').length).toBeGreaterThanOrEqual(17);
  fireEvent.click(screen.getByRole('button',{name:'이전'}));
  expect(screen.getByLabelText('날짜')).toHaveValue('2026-11-02');

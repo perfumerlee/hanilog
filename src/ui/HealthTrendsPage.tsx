@@ -316,6 +316,16 @@ export function GlucoseScatterChart({ samples, actualSegments, trendSegments, ti
     segment.length > 1 ? `M ${xFor(Date.parse(segment[0].occurredAt))} ${yFor(segment[0].value)} ${segment.slice(1).map((point) => `L ${xFor(Date.parse(point.occurredAt))} ${yFor(point.value)}`).join(' ')}` : '').filter(Boolean);
   const actualPaths = pathsFor(actualSegments);
   const trendPaths = pathsFor(trendSegments);
+  const [tooltipId, setTooltipId] = useState<string | null>(null);
+  const selectPoint = (id: string) => { onSelect(id); setTooltipId(id); };
+  const tooltipSample = tooltipId === selectedId ? sorted.find((sample) => sample.id === tooltipId) : undefined;
+  const tooltipWidth = 176;
+  const tooltipHeight = 70;
+  const tooltipPointX = tooltipSample ? xFor(Date.parse(tooltipSample.occurredAt)) : 0;
+  const tooltipPointY = tooltipSample ? yFor(tooltipSample.value) : 0;
+  const tooltipX = Math.max(left, Math.min(width - right - tooltipWidth, tooltipPointX - tooltipWidth / 2));
+  const tooltipAbove = tooltipPointY - tooltipHeight - 14 >= top;
+  const tooltipY = tooltipAbove ? tooltipPointY - tooltipHeight - 14 : tooltipPointY + 14;
   const selectNearest = (event: PointerEvent<SVGSVGElement>) => {
     const svg = event.currentTarget;
     const matrix = svg.getScreenCTM();
@@ -329,7 +339,8 @@ export function GlucoseScatterChart({ samples, actualSegments, trendSegments, ti
       const nextDistance = Math.hypot(screenPoint.x - event.clientX, screenPoint.y - event.clientY);
       if (nextDistance < distance) { distance = nextDistance; closest = sample; }
     }
-    if (closest && distance <= 22) onSelect(closest.id);
+    if (closest && distance <= 22) selectPoint(closest.id);
+    else setTooltipId(null);
   };
   return <div ref={chartRef} className="chart-scroll" role="group" aria-label="실제 혈당 측정값 산점도와 데이터 목록">
     <svg className="glucose-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${mode === 'day' ? '하루 시간대별' : '기간별'} 실제 측정 기록 ${sorted.length}건과 mg/dL 값. 측정점을 선택하면 상세 정보를 확인합니다.`}
@@ -361,11 +372,24 @@ export function GlucoseScatterChart({ samples, actualSegments, trendSegments, ti
       {trendPaths.map((path, index) => <path key={`trend-${index}`} d={path} className="derived-trend-line" aria-hidden="true" />)}
       {mode === 'period' && <><text x={left} y={height - 14} className="chart-axis-label">{startLabel}</text>
         <text x={width - right} y={height - 14} textAnchor="end" className="chart-axis-label">{endLabel}</text></>}
-      {sorted.map((sample, index) => <g key={`${sample.id}-${index}`} aria-hidden="true">
+      {sorted.map((sample, index) => <g key={`${sample.id}-${index}`}>
         <circle cx={xFor(Date.parse(sample.occurredAt))} cy={yFor(sample.value)} r={sample.id === selectedId ? 8 : sorted.length > 120 ? 3.5 : sorted.length > 40 ? 5 : 7}
-          className={sample.id === selectedId ? 'chart-point selected' : 'chart-point'} />
+          className={sample.id === selectedId ? 'chart-point selected' : 'chart-point'}
+          role="button" tabIndex={0} aria-label={dateTime(sample.occurredAt, timezone) + ' · ' + sample.value + ' mg/dL'}
+          onClick={() => selectPoint(sample.id)} onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectPoint(sample.id); }
+            if (event.key === 'Escape') setTooltipId(null);
+          }} />
         <title>{dateTime(sample.occurredAt, timezone)} · {sample.value} mg/dL</title>
       </g>)}
+      {tooltipSample && <g className="glucose-point-tooltip" role="status" aria-live="polite" style={{ pointerEvents: 'none' }}>
+        <line x1={tooltipPointX} y1={tooltipPointY} x2={Math.max(tooltipX + 12, Math.min(tooltipX + tooltipWidth - 12, tooltipPointX))}
+          y2={tooltipAbove ? tooltipY + tooltipHeight : tooltipY} stroke="#527560" />
+        <rect x={tooltipX} y={tooltipY} width={tooltipWidth} height={tooltipHeight} rx={10} fill="#fffefa" stroke="#527560" />
+        <text x={tooltipX + 12} y={tooltipY + 23} fill="#174b40" fontSize={17} fontWeight={700}>{tooltipSample.value} mg/dL</text>
+        <text x={tooltipX + 12} y={tooltipY + 43} fill="#405e4d" fontSize={12}>{new Intl.DateTimeFormat('ko-KR', {timeZone: timezone, year: 'numeric', month: 'numeric', day: 'numeric'}).format(new Date(tooltipSample.occurredAt))}</text>
+        <text x={tooltipX + 12} y={tooltipY + 59} fill="#405e4d" fontSize={13}>{new Intl.DateTimeFormat('ko-KR', {timeZone: timezone, hour: 'numeric', minute: '2-digit', second: '2-digit'}).format(new Date(tooltipSample.occurredAt))}</text>
+      </g>}
       <text x={width - right} y={14} textAnchor="end" className="chart-unit-label">mg/dL</text>
     </svg>
   </div>;
