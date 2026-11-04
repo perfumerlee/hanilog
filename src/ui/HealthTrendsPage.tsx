@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type PointerEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { glucoseMeasurementConditionLabel } from '../lib/event-entry';
 import {
   effectiveGlucoseValue, inPeriod, localDateKey, localMinuteOfDay, longGaps, measuredLineSegments, mgDlSamples, monthlyCounts, samplesForLocalDay,
@@ -53,8 +53,9 @@ function toSample(event: RawEvent, revision?: Revision): GlucoseSample | null {
 }
 
 export function HealthTrendsPage({ pet, userId, online, demoEvents }: Props) {
+  const [searchParams] = useSearchParams();
   const [period, setPeriod] = useState<TrendPeriod>('30d');
-  const [displayMode, setDisplayMode] = useState<'period' | 'day'>('period');
+  const [displayMode, setDisplayMode] = useState<'period' | 'day'>(() => searchParams.get('view') === 'day' ? 'day' : 'period');
   const [events, setEvents] = useState<RawEvent[]>(demoEvents ?? []);
   const [revisions, setRevisions] = useState<Revision[]>([]);
   const [loading, setLoading] = useState(!demoEvents);
@@ -177,6 +178,13 @@ export function HealthTrendsPage({ pet, userId, online, demoEvents }: Props) {
   const dayContext = demoEvents
     ? demoEvents.filter((event) => ['meal', 'insulin'].includes(event.event_type) && localDateKey(event.occurred_at, pet.timezone) === selectedDay)
     : relatedEvents;
+  const glucoseCareTools = <GlucoseCareTools petId={pet.id} petName={pet.name} timezone={pet.timezone} canEdit={pet.profileCanEdit === true} demo={demo} target={activeTargetRange}
+    onTargetSaved={async () => {
+      if (!supabase || demo) return;
+      const { data } = await supabase.from('pet_glucose_target_ranges').select('id,lower_mg_dl,upper_mg_dl,source_label,effective_on')
+        .eq('pet_id', pet.id).is('superseded_at', null).maybeSingle();
+      setTargetRange(data as TargetRange | null);
+    }} />;
 
   return <main className="page-container trends-page">
     <section className="page-heading"><p className="eyebrow">건강 추세</p><h1>{pet.name}의 혈당 기록</h1>
@@ -191,6 +199,7 @@ export function HealthTrendsPage({ pet, userId, online, demoEvents }: Props) {
         <div><span className="eyebrow">직전 측정 비교</span><strong>{delta === null ? '비교할 기록 없음' : `${delta > 0 ? '+' : ''}${delta} mg/dL`}</strong>
           <small>{delta === null || !previous ? '건강 상태의 개선·악화를 의미하지 않습니다' : `직전 측정 ${dateTime(previous.occurredAt, pet.timezone)} · 해석이 아닌 값 차이`}</small></div>
       </section>
+      {glucoseCareTools}
       <section className="panel trends-panel">
         <div className="trends-heading"><div><p className="eyebrow">실제 측정값</p><h2>{displayMode === 'day' ? `${selectedDay} 시간대별 혈당` : '시간에 따른 기록'}</h2></div>
           <Link className="button-link trends-add" to="/record?event=glucose">혈당 기록 추가</Link></div>
@@ -265,13 +274,6 @@ export function HealthTrendsPage({ pet, userId, online, demoEvents }: Props) {
         <ul>{excluded.slice(-20).reverse().map((item) => <li key={item.id}>{dateTime(item.occurredAt, pet.timezone)} · 저장 단위 {item.unit ?? '미기록'} · 그래프 미표시</li>)}</ul>
       </details>}
       <p className="timeline-footnote">혈액검사 항목은 검사법과 단위에 따라 별도로 관리해야 하며 이 혈당 그래프에 섞지 않습니다. 자동 진단이나 투약 판단은 제공하지 않습니다.</p>
-      <GlucoseCareTools petId={pet.id} petName={pet.name} timezone={pet.timezone} canEdit={pet.profileCanEdit === true} demo={demo} target={activeTargetRange}
-        onTargetSaved={async () => {
-          if (!supabase || demo) return;
-          const { data } = await supabase.from('pet_glucose_target_ranges').select('id,lower_mg_dl,upper_mg_dl,source_label,effective_on')
-            .eq('pet_id', pet.id).is('superseded_at', null).maybeSingle();
-          setTargetRange(data as TargetRange | null);
-        }} />
     </>}
   </main>;
 }

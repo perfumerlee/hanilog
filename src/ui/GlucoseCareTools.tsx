@@ -22,6 +22,7 @@ export function GlucoseCareTools({ petId, petName, timezone, canEdit, demo = fal
   const [fromDate, setFromDate] = useState(() => dayShift(today(timezone), -29));
   const [toDate, setToDate] = useState(() => today(timezone));
   const [includeCareTimes, setIncludeCareTimes] = useState(false);
+  const [acknowledgeBearerLink, setAcknowledgeBearerLink] = useState(false);
   const [expiresDays, setExpiresDays] = useState('1');
   const [shares, setShares] = useState<GlucoseShareRange[]>([]);
   const [newLink, setNewLink] = useState('');
@@ -93,7 +94,9 @@ export function GlucoseCareTools({ petId, petName, timezone, canEdit, demo = fal
 
   return <section className="panel glucose-care-tools">
     <h2>혈당 기준과 공유</h2>
-    <section className="glucose-target-tools">
+    <details className="glucose-target-tools">
+      <summary><strong>수의사 목표 범위</strong><span>{target ? `${target.lower_mg_dl}–${target.upper_mg_dl} mg/dL` : '설정 안 됨'}</span></summary>
+      <div className="glucose-tool-content">
       <div className="section-heading"><div><p className="eyebrow">수의사 안내</p><h3>목표 범위</h3></div>
         {canEdit && !demo && <button type="button" className="text-button" aria-expanded={targetOpen} onClick={() => {
           if (!targetOpen && target) {
@@ -116,16 +119,18 @@ export function GlucoseCareTools({ petId, petName, timezone, canEdit, demo = fal
         <button type="submit" className="button-primary" disabled={pending}>{pending ? '저장 중…' : '범위 저장'}</button>
       </form>}
       <small className="target-range-disclaimer">초록색 영역은 기록 확인용 참고 범위입니다. 치료 효과나 안전을 보증하지 않습니다.</small>
-    </section>
-    <section className="glucose-share-tools">
-      <div className="section-heading"><div><p className="eyebrow">읽기 전용</p><h3>주치의와 공유</h3></div>
-        {canEdit && !demo && <button type="button" className="text-button" aria-expanded={shareOpen} onClick={() => {
-          const opening = !shareOpen;
-          setShareOpen(opening);
-          if (opening) void loadShares();
-        }}>{shareOpen ? '접기' : '공유 링크 만들기'}</button>}</div>
-      <p className="small-note">선택한 기간의 그래프와 실제 혈당값만 보여줍니다. 링크를 받은 사람은 보호자 인증 없이 열 수 있으니 전달 대상과 만료일을 확인하세요.</p>
-      {shareOpen && <form className="glucose-share-form" onSubmit={(event) => void createShare(event)}>
+      </div>
+    </details>
+    <details className="glucose-share-tools" onToggle={(event) => {
+      const opening = event.currentTarget.open;
+      setShareOpen(opening);
+      if (opening) void loadShares();
+    }}>
+      <summary><strong>주치의와 혈당 공유</strong><span>기간을 정해 읽기 전용 링크 만들기</span></summary>
+      <div className="glucose-tool-content">
+      {!demo && canEdit && <p className="eyebrow">읽기 전용 · 만료 및 취소 가능</p>}
+      {!demo && <p className="notice notice-warning" role="note">현재 링크는 별도의 수신자 인증 없이, 링크를 가진 사람이면 누구나 열 수 있습니다. 문자나 메신저 전달 시 재전달될 수 있어요. 수신자 확인 기능은 아직 제공하지 않습니다.</p>}
+      {shareOpen && canEdit && !demo && <form className="glucose-share-form" onSubmit={(event) => void createShare(event)}>
         <div className="form-grid">
           <label className="field-label">공유 시작일<input type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} required /></label>
           <label className="field-label">공유 종료일<input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} required /></label>
@@ -134,6 +139,7 @@ export function GlucoseCareTools({ petId, petName, timezone, canEdit, demo = fal
           </select></label>
         </div>
         <label className="check-row"><input type="checkbox" checked={includeCareTimes} onChange={(event) => setIncludeCareTimes(event.target.checked)} />같은 기간의 식사·인슐린 기록 시각도 포함</label>
+        <label className="check-row share-access-ack"><input type="checkbox" checked={acknowledgeBearerLink} required onChange={(event) => setAcknowledgeBearerLink(event.target.checked)} />링크만 가진 사람도 만료 전까지 열람할 수 있음을 확인했습니다.</label>
         <button type="submit" className="button-primary" disabled={pending}>{pending ? '안전한 링크 생성 중…' : '링크 만들고 복사'}</button>
         {newLink && <label className="field-label full-field">공유 링크<input readOnly value={newLink} onFocus={(event) => event.currentTarget.select()} /></label>}
       </form>}
@@ -144,7 +150,8 @@ export function GlucoseCareTools({ petId, petName, timezone, canEdit, demo = fal
         </li>)}
       </ul>}
       {demo && <small>DEMO에서는 공유 링크가 생성되지 않습니다.</small>}
-    </section>
+      </div>
+    </details>
     {message && <p role="status" className="small-note glucose-tools-message">{message}</p>}
   </section>;
 }

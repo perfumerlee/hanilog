@@ -35,4 +35,23 @@ describe('HealthTrendsPage', () => {
     expect(screen.queryByRole('img', { name: /그래프/ })).not.toBeInTheDocument();
     expect(screen.queryByText(/mg\/dL$/)).not.toBeInTheDocument();
   });
+
+  it('opens the selected day view directly and keeps target/share tools compact until requested', () => {
+    const events = [{
+      id: 'today-synthetic', occurred_at: new Date().toISOString(), event_type: 'glucose',
+      recorded_at: new Date().toISOString(), actor_id: 'synthetic-user', performer_id: 'synthetic-user',
+      value: { observed_value: 164 }, unit: 'mg/dL', source: 'synthetic', occurrence_id: null,
+    }];
+    render(<MemoryRouter initialEntries={['/trends?view=day']}><HealthTrendsPage
+      pet={{ id: 'synthetic-pet', name: '합성 반려견', timezone: 'Asia/Seoul' }}
+      userId="synthetic-user" online demoEvents={events} /></MemoryRouter>);
+    expect(screen.getByRole('button', { name: '하루 보기' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('heading', { name: /시간대별 혈당/ })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '164 mg/dL' })).toBeInTheDocument();
+    const shareDisclosure = screen.getByText('주치의와 혈당 공유').closest('details');
+    expect(shareDisclosure).not.toHaveAttribute('open');
+    fireEvent.click(shareDisclosure!.querySelector('summary')!);
+    expect(shareDisclosure).toHaveAttribute('open');
+    expect(screen.getByText('DEMO에서는 공유 링크가 생성되지 않습니다.')).toBeInTheDocument();
+  });
 });

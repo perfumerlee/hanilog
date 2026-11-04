@@ -277,6 +277,8 @@ footer { margin-top: auto; padding: .8rem 1rem 1.1rem; text-align: center; color
 .unit-fixed { width: max-content; }
 .glucose-unit-field { align-content: start; }
 .text-link { display: inline-flex; align-items: center; min-height: 44px; }
+.dashboard-glucose-links { display: flex; align-items: center; flex-wrap: wrap; gap: .55rem .85rem; margin-top: .25rem; }
+.dashboard-glucose-links .button-link { margin: 0; }
 .routine-list li { min-width: 0; }
 .routine-list li.routine-current { margin-inline: -.45rem; padding-inline: .45rem; border-radius: 12px; background: #fff7e9; border-left: 4px solid #a96d2e; }
 .routine-list li.routine-upcoming { background: #f6f8f3; }
@@ -367,6 +369,7 @@ button, a, input, select, textarea, summary { scroll-margin: 1rem; }
 .daily-graph-date input { margin-top: .15rem; }
 .timeline-type-filter { margin: .35rem 0 .75rem; padding: .7rem; border: 1px solid var(--line); border-radius: 15px; background: var(--paper); }
 .timeline-filter-heading { display: flex; justify-content: space-between; align-items: center; gap: .5rem; margin-bottom: .4rem; color: var(--ink); font-size: .82rem; }
+.timeline-filter-actions { display: flex; align-items: center; gap: .5rem; }
 .timeline-filter-chips { display: flex; flex-wrap: wrap; gap: .35rem; }
 .timeline-filter-chip { min-height: 40px; padding: .38rem .6rem; border: 1px solid var(--line); border-radius: 99px; background: #f7f8f4; color: #596a60; font-size: .75rem; }
 .timeline-filter-chip.selected { border-color: #6b9477; background: #e7f0e6; color: #205843; font-weight: 800; }
@@ -374,6 +377,9 @@ button, a, input, select, textarea, summary { scroll-margin: 1rem; }
 .glucose-care-tools { display: grid; gap: .9rem; }
 .glucose-care-tools > h2 { margin: 0; font-size: 1.05rem; }
 .glucose-target-tools, .glucose-share-tools { display: grid; gap: .55rem; padding-top: .7rem; border-top: 1px solid var(--line); }
+.glucose-target-tools > summary, .glucose-share-tools > summary { display: flex; min-height: 44px; align-items: center; justify-content: space-between; gap: .75rem; cursor: pointer; list-style-position: inside; }
+.glucose-target-tools > summary span, .glucose-share-tools > summary span { color: var(--muted); font-size: .78rem; text-align: right; }
+.glucose-tool-content { display: grid; gap: .55rem; padding-top: .5rem; }
 .glucose-target-tools h3, .glucose-share-tools h3 { margin: 0; font-size: .98rem; }
 .target-range-value { color: #356d47; font-size: 1.35rem; font-variant-numeric: tabular-nums; }
 .target-range-form, .glucose-share-form { display: grid; gap: .6rem; padding: .7rem; border-radius: 14px; background: #f6f8f3; }

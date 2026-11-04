@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import {
   retryOrCreateHealthEventCommand,
@@ -73,6 +73,7 @@ const eventOptions: { type: EventType; label: string; icon: string; short: strin
   { type: 'weight', label: '체중', icon: '◌', short: '측정값과 단위' },
   { type: 'symptom', label: '증상·컨디션', icon: '♡', short: '관찰한 상태' },
 ];
+const coreTimelineTypes: EventType[] = ['glucose', 'insulin', 'elimination'];
 const commonInsulinProductLabels = ['캐니슐린', '프로진크', 'NPH', '글라진', '디터미르'];
 const eventLabels = Object.fromEntries(eventOptions.map((option) => [option.type, option.label])) as Record<EventType, string>;
 const localDateTimeNow = () => {
@@ -1176,7 +1177,10 @@ function DashboardPage(props: {
             <p className="glucose-meta">{dateTimeInTimezone(recentGlucose.occurred_at, pet.timezone)} · {actorLabel(recentGlucose.actor_id, userId)}</p>
           </> : <p className="empty glucose-empty">mg/dL로 확인 가능한 최근 혈당 기록이 없습니다.</p>}
           {recentGlucoseSeries.length > 1 && <MiniGlucoseTrend events={recentGlucoseSeries.slice(-8)} revisions={revisions} />}
-          <Link className="text-link" to="/trends">건강 추세 전체 보기</Link>
+          <div className="dashboard-glucose-links">
+            <Link className="button-link" to="/trends?view=day">오늘 혈당 그래프</Link>
+            <Link className="text-link" to="/trends">기간별 추세</Link>
+          </div>
         </section>
 
         <section className="summary-grid" aria-label="오늘 건강 기록 요약">
@@ -1543,13 +1547,19 @@ export function QuickRecordPage(props: {
   </main>;
 }
 
-function TimelinePage(props: {
+export function TimelinePage(props: {
   pet: Pet; events: HealthEvent[]; revisions: EventRevision[]; userId: string;
   dateFilter: string; setDateFilter: (value: string) => void; loading: boolean;
   onSaveExerciseEnd?: (eventId: string, endedAt: string, expectedRevision: number, durationSeconds: number) => Promise<boolean>;
 }) {
   const { pet, events, revisions, userId, dateFilter, setDateFilter, loading, onSaveExerciseEnd } = props;
-  const [visibleTypes, setVisibleTypes] = useState<Set<EventType>>(() => new Set(eventOptions.map((item) => item.type)));
+  const [searchParams, setSearchParams] = useSearchParams();
+  const visibleTypes = useMemo(() => {
+    const serialized = searchParams.get('types');
+    if (serialized === null) return new Set(coreTimelineTypes);
+    const allowed = new Set(eventOptions.map((item) => item.type));
+    return new Set(serialized.split(',').filter((type): type is EventType => allowed.has(type as EventType)));
+  }, [searchParams]);
   const dailyEvents = useMemo(() => events
     .filter((event) => localDateKey(event.occurred_at, pet.timezone) === dateFilter)
     .sort((a, b) => Date.parse(b.occurred_at) - Date.parse(a.occurred_at)), [events, pet.timezone, dateFilter]);
@@ -1559,17 +1569,26 @@ function TimelinePage(props: {
     <section className="page-heading"><p className="eyebrow">건강 기록</p><h1>하루 타임라인</h1>
       <p>{pet.name}의 실제 발생 시각을 {formatTimezoneLabel(pet.timezone)} 기준으로 보여줍니다.</p></section>
     <div className="timeline-filter"><label htmlFor="timeline-date">날짜 선택</label>
-      <input id="timeline-date" type="date" value={dateFilter} onChange={(event) => setDateFilter(event.target.value)} /></div>
+      <input id="timeline-date" type="date" value={dateFilter} onChange={(event) => {
+        const date = event.target.value;
+        setDateFilter(date);
+        setSearchParams((current) => { const next = new URLSearchParams(current); next.set('date', date); return next; });
+      }} /></div>
     <section className="timeline-type-filter" aria-label="표시할 기록 종류">
       <div className="timeline-filter-heading"><strong>보고 싶은 기록</strong>
-        {visibleTypes.size !== eventOptions.length && <button type="button" className="text-button" onClick={() => setVisibleTypes(new Set(eventOptions.map((item) => item.type)))}>모두 보기</button>}</div>
+        <div className="timeline-filter-actions">
+          <button type="button" className="text-button" onClick={() => setSearchParams((current) => { const next = new URLSearchParams(current); next.set('types', coreTimelineTypes.join(',')); return next; })}>주요 기록</button>
+          {visibleTypes.size !== eventOptions.length && <button type="button" className="text-button" onClick={() => setSearchParams((current) => { const next = new URLSearchParams(current); next.set('types', eventOptions.map((item) => item.type).join(',')); return next; })}>전체 보기</button>}
+        </div></div>
       <div className="timeline-filter-chips" role="group" aria-label="기록 종류 필터">
         {eventOptions.map((option) => <button type="button" key={option.type}
           className={visibleTypes.has(option.type) ? 'timeline-filter-chip selected' : 'timeline-filter-chip'}
           aria-pressed={visibleTypes.has(option.type)}
-          onClick={() => setVisibleTypes((current) => {
-            const next = new Set(current);
-            if (next.has(option.type)) next.delete(option.type); else next.add(option.type);
+          onClick={() => setSearchParams((current) => {
+            const currentTypes = new Set(visibleTypes);
+            const next = new URLSearchParams(current);
+            if (currentTypes.has(option.type)) currentTypes.delete(option.type); else currentTypes.add(option.type);
+            next.set('types', eventOptions.filter((item) => currentTypes.has(item.type)).map((item) => item.type).join(','));
             return next;
           })}>{option.icon} {option.label}</button>)}
       </div>
