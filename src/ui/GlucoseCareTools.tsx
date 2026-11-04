@@ -62,8 +62,8 @@ export function GlucoseCareTools({ petId, petName, timezone, canEdit, demo = fal
       p_pet_id: petId, p_lower_mg_dl: low, p_upper_mg_dl: high, p_source_label: source.trim(), p_effective_on: effectiveOn,
     });
     setPending(false);
-    if (error) setMessage(error.code === '42501' ? '이 목표 범위를 변경할 권한이 없습니다.' : '목표 범위를 저장하지 못했습니다. 서버 적용과 입력값을 확인해 주세요.');
-    else { setMessage('목표 범위 저장을 확인했습니다.'); await onTargetSaved(); setTargetOpen(false); }
+    if (error) setMessage(error.code === '42501' ? '이 혈당 안정범위를 변경할 권한이 없습니다.' : '혈당 안정범위를 저장하지 못했습니다. 서버 적용과 입력값을 확인해 주세요.');
+    else { setMessage('혈당 안정범위 저장을 확인했습니다.'); await onTargetSaved(); setTargetOpen(false); }
   }
 
   async function createShare(event: FormEvent<HTMLFormElement>) {
@@ -75,10 +75,9 @@ export function GlucoseCareTools({ petId, petName, timezone, canEdit, demo = fal
     setPending(true); setNewLink(''); setMessage('');
     try {
       const { token, tokenHash } = createShareToken();
-      const expiresAt = new Date(Date.now() + Number(expiresDays) * 86_400_000).toISOString();
       const result = await callGlucoseShare<{ share: GlucoseShareRange }>(supabase, {
         action: 'create', pet_id: petId, token_hash: await tokenHash, from_date: fromDate, to_date: toDate,
-        expires_at: expiresAt, include_care_times: includeCareTimes,
+        expires_days: Number(expiresDays), include_care_times: includeCareTimes,
       });
       if (!result.share?.id) throw new Error('SHARE_CREATE_FAILED');
       const link = glucoseShareUrl(token);
@@ -92,7 +91,7 @@ export function GlucoseCareTools({ petId, petName, timezone, canEdit, demo = fal
         : code === 'SHARE_FUNCTION_NOT_DEPLOYED' ? '공유 기능 서버가 아직 운영 환경에 적용되지 않았습니다. 서버 배포가 필요합니다.'
           : code === 'SHARE_SCHEMA_UNAVAILABLE' ? '공유 기능의 데이터베이스 설정이 아직 운영 환경에 적용되지 않았습니다.'
             : code === 'SHARE_SERVICE_UNAVAILABLE' ? '공유 서버가 일시적으로 응답하지 않습니다. 잠시 후 다시 시도해 주세요.'
-              : '공유 링크를 만들지 못했습니다. 연결 상태와 공유 기능 서버 설정을 확인해 주세요.');
+              : '공유 링크를 만들지 못했습니다. 오류 코드: ' + (/^[A-Z_]{3,64}$/.test(code) ? code : 'NETWORK_ERROR'));
     } finally { setPending(false); }
   }
 
@@ -109,9 +108,9 @@ export function GlucoseCareTools({ petId, petName, timezone, canEdit, demo = fal
   return <section className="panel glucose-care-tools">
     <h2>혈당 기준과 공유</h2>
     <details className="glucose-target-tools">
-      <summary><strong>수의사 목표 범위</strong><span>{target ? `${target.lower_mg_dl}–${target.upper_mg_dl} mg/dL` : '설정 안 됨'}</span></summary>
+      <summary><strong>혈당 안정범위</strong><span>{target ? `${target.lower_mg_dl}–${target.upper_mg_dl} mg/dL` : '설정 안 됨'}</span></summary>
       <div className="glucose-tool-content">
-      <div className="section-heading"><div><p className="eyebrow">수의사 안내</p><h3>목표 범위</h3></div>
+      <div className="section-heading"><div><p className="eyebrow">수의사 안내</p><h3>혈당 안정범위</h3></div>
         {canEdit && !demo && <button type="button" className="text-button" aria-expanded={targetOpen} onClick={() => {
           if (!targetOpen && target) {
             setLower(String(target.lower_mg_dl)); setUpper(String(target.upper_mg_dl));
@@ -121,7 +120,7 @@ export function GlucoseCareTools({ petId, petName, timezone, canEdit, demo = fal
         }}>{target ? '범위 수정' : '범위 입력'}</button>}</div>
       {target ? <><strong className="target-range-value">{target.lower_mg_dl}–{target.upper_mg_dl} mg/dL</strong>
         <small>{target.source_label} · 적용 시작 {target.effective_on}</small></>
-        : <p className="small-note">등록된 수의사 안내 범위가 없습니다. 임의 범위는 표시하지 않습니다.</p>}
+        : <p className="small-note">등록된 혈당 안정범위가 없습니다. 임의 범위는 표시하지 않습니다.</p>}
       {targetOpen && <form className="target-range-form" onSubmit={(event) => void saveTarget(event)}>
         <p>담당 수의사에게 안내받은 수치만 입력하세요. HaniLog는 정상·위험 여부나 투여 적정성을 판단하지 않습니다.</p>
         <div className="form-grid">

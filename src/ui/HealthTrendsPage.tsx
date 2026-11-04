@@ -189,7 +189,7 @@ export function HealthTrendsPage({ pet, userId, online, demoEvents }: Props) {
 
   return <main className="page-container trends-page">
     <section className="page-heading"><p className="eyebrow">건강 추세</p><h1>{pet.name}의 혈당 기록</h1>
-      <p>실제 측정값과 수의사에게서 안내받은 목표 범위를 확인합니다. 그래프는 치료 효과나 투여 적정성을 판단하지 않습니다.</p></section>
+      <p>실제 측정값과 수의사에게서 안내받은 혈당 안정범위를 확인합니다. 그래프는 치료 효과나 투여 적정성을 판단하지 않습니다.</p></section>
     {currentMessage && <div className={demo ? 'notice notice-success' : 'notice notice-warning'} role={demo ? 'status' : 'alert'}>{currentMessage}</div>}
     {!online && !demo && <div className="notice notice-warning" role="status">UNVERIFIED · 마지막으로 본 값은 현재 최신 기록으로 확인되지 않았습니다.</div>}
     {isLoading && <p className="load-state" role="status">서버의 혈당 기록과 정정 이력을 확인하고 있습니다…</p>}
@@ -230,7 +230,7 @@ export function HealthTrendsPage({ pet, userId, online, demoEvents }: Props) {
               timezone={pet.timezone} selectedId={selected?.id ?? null} onSelect={setSelectedId} mode={displayMode} targetRange={activeTargetRange} />
             <p className="chart-caption">{displayMode === 'day' ? 'X축은 반려동물 생활 시간대의 00:00~24:00입니다. 6시간 이내 실제 측정값만 직선 연결하며 그 사이 값은 측정값이 아닙니다.'
               : 'X축은 실제 측정 시각에 비례합니다. 얇은 실선은 7일 이내의 실제 측정값끼리만 직선 연결하며 그 사이 값은 측정값이 아닙니다.'}
-              {activeTargetRange ? ` 초록색 영역은 ${activeTargetRange.source_label} 안내 목표 범위(${activeTargetRange.lower_mg_dl}–${activeTargetRange.upper_mg_dl} mg/dL) 참고 표시입니다.` : ' 수의사 안내 목표 범위가 등록되지 않았습니다. 목표 범위를 등록하면 그래프 안에 초록색 띠로 표시됩니다.'}
+              {activeTargetRange ? ` 초록색 영역은 ${activeTargetRange.source_label} 혈당 안정범위(${activeTargetRange.lower_mg_dl}–${activeTargetRange.upper_mg_dl} mg/dL) 참고 표시입니다.` : ' 혈당 안정범위가 등록되지 않았습니다. 혈당 안정범위를 등록하면 그래프 안에 초록색 띠로 표시됩니다.'}
               {showTrend ? ' 점선은 선택한 기간별 중앙값으로 계산한 참고 추세이며 임상 판단이 아닙니다.' : ''} 단위: mg/dL</p>
             {displayMode === 'period' && showTrend && derivedSegments.length === 0 && <p className="small-note" role="status">연결 가능한 구간이 부족해 계산 추세를 표시하지 않습니다. 미측정 구간을 가로질러 추세선을 그리지 않습니다.</p>}
             {selected && <section className="sample-detail" aria-live="polite">
@@ -331,7 +331,7 @@ function GlucoseScatterChart({ samples, actualSegments, trendSegments, timezone,
         <text x={left - 10} y={yFor(value) + 5} textAnchor="end" className="chart-axis-label">{Number(value.toFixed(1))}</text>
       </g>)}
       {targetRange && <text x={left + 8} y={yFor(targetRange.upper_mg_dl) + 16} className="target-band-label">
-        수의사 안내 범위 {targetRange.lower_mg_dl}–{targetRange.upper_mg_dl} mg/dL</text>}
+        혈당 안정범위 {targetRange.lower_mg_dl}–{targetRange.upper_mg_dl} mg/dL</text>}
       {xTicks.map((minute) => <g key={minute}><line x1={xPositionForMinute(minute)} x2={xPositionForMinute(minute)} y1={height - bottom} y2={height - bottom + 5} stroke="#8da295" />
         <text x={xPositionForMinute(minute)} y={height - 14} textAnchor={minute === 0 ? 'start' : minute === 1440 ? 'end' : 'middle'} className="chart-axis-label">{String(Math.floor(minute / 60)).padStart(2, '0')}:00</text></g>)}
       <line x1={left} x2={width - right} y1={height - bottom} y2={height - bottom} stroke="#8da295" />

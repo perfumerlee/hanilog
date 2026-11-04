@@ -100,7 +100,12 @@ Deno.serve(async (request) => {
     if (authError || !authData.user) return Response.json({ error: 'UNAUTHENTICATED' }, { status: 401, headers });
 
     if (payload.action === 'create') {
-      const { pet_id, token_hash, from_date, to_date, expires_at, include_care_times } = payload;
+      const { pet_id, token_hash, from_date, to_date, include_care_times } = payload;
+      // Server time avoids device clock skew at the maximum expiry boundary.
+      const days = payload.expires_days;
+      const expires_at = typeof days === 'number' && [1, 3, 7].includes(days)
+        ? new Date(Date.now() + days * 86_400_000 - 60_000).toISOString()
+        : payload.expires_at;
       if (typeof pet_id !== 'string' || !/^[0-9a-f-]{36}$/i.test(pet_id) || typeof token_hash !== 'string' || !/^[a-f0-9]{64}$/.test(token_hash) ||
           typeof from_date !== 'string' || typeof to_date !== 'string' || typeof expires_at !== 'string' || typeof include_care_times !== 'boolean') {
         return Response.json({ error: 'INVALID_REQUEST' }, { status: 400, headers });

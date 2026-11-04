@@ -58,10 +58,10 @@ export function GlucoseSharePage() {
     {share && !loading && <>
       <div className="notice notice-warning" role="note">보호자가 선택한 기간의 읽기 전용 정보입니다. 이 화면은 진단이나 투여 지시를 제공하지 않습니다.</div>
       <section className="panel share-target-summary">
-        <h2>목표 범위</h2>
+        <h2>혈당 안정범위</h2>
         {share.target_range ? <><strong>{share.target_range.lower_mg_dl}–{share.target_range.upper_mg_dl} mg/dL</strong>
-          <p>보호자가 입력한 수의사 안내 범위 · {share.target_range.source_label} · 적용 시작 {formatDate(share.target_range.effective_on)}</p></>
-          : <p>수의사에게서 받은 목표 범위가 등록되어 있지 않습니다.</p>}
+          <p>보호자가 입력한 혈당 안정범위 · {share.target_range.source_label} · 적용 시작 {formatDate(share.target_range.effective_on)}</p></>
+          : <p>수의사에게서 받은 혈당 안정범위가 등록되어 있지 않습니다.</p>}
         {share.target_range && <small>그래프의 초록색 영역은 공유된 목표 참고 범위이며 안전 판정이나 치료 승인이 아닙니다.</small>}
       </section>
       <section className="panel trends-panel">
