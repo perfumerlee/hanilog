@@ -308,7 +308,9 @@ export function GlucoseScatterChart({ samples, actualSegments, trendSegments, ti
   const tickValues = Array.from({ length: maxValue / 50 + 1 }, (_, index) => index * 50);
   const startLabel = mode === 'day' ? '00:00' : new Intl.DateTimeFormat('ko-KR', { timeZone: timezone, month: 'numeric', day: 'numeric' }).format(new Date(minTime));
   const endLabel = mode === 'day' ? '24:00' : new Intl.DateTimeFormat('ko-KR', { timeZone: timezone, month: 'numeric', day: 'numeric' }).format(new Date(maxTime));
-  const xTicks = mode === 'day' ? [0, 360, 720, 1080, 1440] : [];
+  const xTicks = mode === 'day' ? Array.from({ length: 25 }, (_, hour) => hour * 60) : [];
+  const compactTimeLabels = width < 620;
+  const timeLabelSize = Math.max(10, Math.min(15, width / 32));
   const xPositionForMinute = (minute: number) => left + minute / 1440 * (width - left - right);
   const pathsFor = <T extends { occurredAt: string; value: number }>(segments: T[][]) => segments.map((segment) =>
     segment.length > 1 ? `M ${xFor(Date.parse(segment[0].occurredAt))} ${yFor(segment[0].value)} ${segment.slice(1).map((point) => `L ${xFor(Date.parse(point.occurredAt))} ${yFor(point.value)}`).join(' ')}` : '').filter(Boolean);
@@ -340,8 +342,20 @@ export function GlucoseScatterChart({ samples, actualSegments, trendSegments, ti
       </g>)}
       {targetRange && <text x={left + 8} y={yFor(targetRange.upper_mg_dl) + 16} className="target-band-label">
         혈당 안정범위 {targetRange.lower_mg_dl}–{targetRange.upper_mg_dl} mg/dL</text>}
-      {xTicks.map((minute) => <g key={minute}><line x1={xPositionForMinute(minute)} x2={xPositionForMinute(minute)} y1={height - bottom} y2={height - bottom + 5} stroke="#8da295" />
-        <text x={xPositionForMinute(minute)} y={height - 14} textAnchor={minute === 0 ? 'start' : minute === 1440 ? 'end' : 'middle'} className="chart-axis-label">{String(Math.floor(minute / 60)).padStart(2, '0')}:00</text></g>)}
+      {xTicks.map((minute) => {
+        const major = minute % 180 === 0;
+        const hour = minute / 60;
+        const meridiem = hour < 12 || hour === 24 ? '오전' : '오후';
+        const clockHour = hour % 12 || 12;
+        const x = xPositionForMinute(minute);
+        return <g key={minute} className="hour-tick">
+          <line x1={x} x2={x} y1={height - bottom} y2={height - bottom + (major ? 9 : 5)} stroke="#8da295" />
+          {major && <text x={x} y={height - bottom + 23} textAnchor={minute === 0 ? 'start' : minute === 1440 ? 'end' : 'middle'}
+            className="chart-axis-label time-axis-label" style={{ fontSize: timeLabelSize }} aria-label={hour === 24 ? '다음 날 오전 12시' : meridiem + ' ' + clockHour + '시'}>
+            {compactTimeLabels ? <><tspan x={x}>{meridiem}</tspan><tspan x={x} dy="1.2em">{clockHour}시</tspan></> : meridiem + ' ' + clockHour + '시'}
+          </text>}
+        </g>;
+      })}
       <line x1={left} x2={width - right} y1={height - bottom} y2={height - bottom} stroke="#8da295" />
       {actualPaths.map((path, index) => <path key={`actual-${index}`} d={path} className="actual-series-line" aria-hidden="true" />)}
       {trendPaths.map((path, index) => <path key={`trend-${index}`} d={path} className="derived-trend-line" aria-hidden="true" />)}
