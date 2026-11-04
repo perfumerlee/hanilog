@@ -11,14 +11,13 @@ import {
   type HealthEventCommand,
 } from '../lib/event-command';
 import { formatGlucoseValue, GLUCOSE_MEASUREMENT_CONDITIONS, GLUCOSE_UNIT, validateEventEntry, type EventEntryFields } from '../lib/event-entry';
-import { routineDisplayStatus } from '../lib/routine-status';
 import { isSupabaseConfigured, supabase, supabaseConfigurationError, userFacingError } from '../lib/supabase';
 import { petInvalidationChannel, userAccessChannel } from '../lib/realtime';
-import { CareRoutinePage } from './CareRoutinePage';
 import { InvitationAcceptPage, SharedCarePage } from './SharedCarePage';
 import { NotificationsPage } from './NotificationsPage';
 import { PwaExperience } from './PwaExperience';
 import { HealthTrendsPage } from './HealthTrendsPage';
+import { GlucoseSharePage } from './GlucoseSharePage';
 import { effectiveGlucoseValue } from '../lib/health-trends';
 import { authCallbackPurpose, authFailureMessage, authLinkErrorMessage, authRedirectTo, type AuthCallbackPurpose } from '../lib/auth-redirect';
 import { detectBrowserTimezone, formatTimezoneLabel, timezoneOptionsFor } from '../lib/timezone';
@@ -55,18 +54,6 @@ type EventRevision = {
   reason_code: string;
   actor_id: string;
   recorded_at: string;
-};
-type RoutineOccurrence = {
-  id: string;
-  event_type: EventType;
-  occurrence_key: string;
-  step_key: string;
-  scheduled_local_date: string;
-  scheduled_local_time: string;
-  timezone: string;
-  scheduled_at: string | null;
-  status: string;
-  care_plan_version_id: string;
 };
 type SafetyResponse = {
   event_id: string;
@@ -188,7 +175,8 @@ export function App() {
     };
   }, []);
 
-  if (!sessionReady) return <main className="center-card" aria-live="polite">세션을 확인하고 있습니다…</main>;
+  const publicShareRoute = location.pathname.startsWith('/glucose-share/');
+  if (!sessionReady && !publicShareRoute) return <main className="center-card" aria-live="polite">세션을 확인하고 있습니다…</main>;
 
   const requestedInvitePath = (location.state as { from?: unknown } | null)?.from;
   const postLoginPath = typeof requestedInvitePath === 'string' && requestedInvitePath.startsWith('/invite') ? requestedInvitePath : '/';
@@ -207,6 +195,7 @@ export function App() {
       <PwaExperience />
       {!online && <div role="alert" className="offline-banner">서버 최신 상태를 확인할 수 없습니다. 기록은 서버 응답 전까지 확정되지 않습니다.</div>}
       <Routes>
+        <Route path="/glucose-share/:token" element={<GlucoseSharePage />} />
         {demoMode && <Route path="/*" element={<DemoWorkspace />} />}
         <Route path="/login" element={session ? <Navigate to={postLoginPath} replace /> : <Login initialMessage={authLinkMessage ?? ''} />} />
         <Route path="/*" element={authCallback === 'recovery'
@@ -256,9 +245,7 @@ function DemoWorkspace() {
   const [demoRevisions, setDemoRevisions] = useState<EventRevision[]>([]);
   const [timelineSelection, setTimelineSelection] = useState({ petId: demoPetList[0].id, date: todayForTimezone('Asia/Seoul') });
   const pet = demoPetList.find((item) => item.id === selectedPetId) ?? demoPetList[0];
-  const occurrences = useMemo(() => createDemoOccurrences(pet), [pet]);
   const petEvents = events.filter((event) => event.pet_id === pet.id);
-  const demoApproval: Record<string, string> = {};
   const date = todayForTimezone(pet.timezone);
   const timelineDate = timelineSelection.petId === pet.id ? timelineSelection.date : date;
 
@@ -314,19 +301,19 @@ function DemoWorkspace() {
           <Route path="/" element={<DashboardPage pet={pet} petsCount={demoPetList.length} households={demoHouseholds}
             selectedHouseholdId={demoHouseholds[0].id} setSelectedHouseholdId={() => undefined}
             events={petEvents.filter((event) => localDateKey(event.occurred_at, pet.timezone) === date)} allEvents={petEvents}
-            revisions={demoRevisions} occurrences={occurrences} planApproval={demoApproval} userId={demoUserId}
+            revisions={demoRevisions} userId={demoUserId}
             loading={false} dataMessage="DEMO 데이터 · 서버 조회 결과가 아닙니다." onCreateHousehold={noOpForm} onCreatePet={noOpForm}
             onRenameHousehold={async () => false}
             householdName="" setHouseholdName={() => undefined} petName="" setPetName={() => undefined}
             petTimezone={pet.timezone} setPetTimezone={() => undefined} creating={false} />} />
-          <Route path="/record" element={<QuickRecordPage key={pet.id} pet={pet} userId={demoUserId} occurrences={occurrences}
-            events={petEvents} revisions={demoRevisions} planApproval={demoApproval} online demoOnly onSubmit={addDemoEvent}
+          <Route path="/record" element={<QuickRecordPage key={pet.id} pet={pet}
+            events={petEvents} revisions={demoRevisions} online demoOnly onSubmit={addDemoEvent}
             onSaveExerciseEnd={saveDemoExerciseEnd} />} />
           <Route path="/timeline" element={<TimelinePage pet={pet} events={petEvents} revisions={demoRevisions} userId={demoUserId}
             dateFilter={timelineDate} setDateFilter={(value) => setTimelineSelection({ petId: pet.id, date: value })} loading={false}
             onSaveExerciseEnd={saveDemoExerciseEnd} />} />
           <Route path="/trends" element={<HealthTrendsPage pet={pet} userId={demoUserId} online demoEvents={petEvents} />} />
-          <Route path="/care" element={<DemoCarePage pet={pet} occurrences={occurrences} events={petEvents} />} />
+          <Route path="/care" element={<Navigate to="/timeline" replace />} />
           <Route path="/shared" element={<DemoSharedCarePage />} />
           <Route path="/notifications" element={<DemoNotificationsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
@@ -369,31 +356,6 @@ function createDemoEvents(): HealthEvent[] {
         plan_version_id: null, value: item.value, unit: item.unit };
     });
   });
-}
-
-function createDemoOccurrences(pet: Pet): RoutineOccurrence[] {
-  const localDate = todayForTimezone(pet.timezone);
-  const entries: { key: string; type: EventType; time: string }[] = [
-    { key: 'am-meal', type: 'meal', time: '08:00' }, { key: 'am-insulin', type: 'insulin', time: '08:15' },
-    { key: 'am-exercise', type: 'exercise', time: '09:00' }, { key: 'pm-meal', type: 'meal', time: '18:00' },
-    { key: 'pm-insulin', type: 'insulin', time: '18:15' }, { key: 'pm-exercise', type: 'exercise', time: '19:00' },
-  ];
-  return entries.map((entry) => ({ id: `demo-${pet.id}-${entry.key}`, event_type: entry.type,
-    occurrence_key: entry.key, step_key: entry.key, scheduled_local_date: localDate,
-    scheduled_local_time: entry.time, timezone: pet.timezone,
-    scheduled_at: new Date(`${localDate}T${entry.time}:00+09:00`).toISOString(), status: 'SCHEDULED',
-    care_plan_version_id: `demo-plan-${pet.id}` }));
-}
-
-function DemoCarePage({ pet, occurrences, events }: { pet: Pet; occurrences: RoutineOccurrence[]; events: HealthEvent[] }) {
-  return <main className="page-container"><section className="page-heading"><p className="eyebrow">관리 루틴 · DEMO</p><h1>{pet.name}의 오늘 일정</h1>
-    <p>합성 예시 루틴입니다. 치료계획 승인이나 투여 판단을 뜻하지 않습니다.</p></section>
-    <section className="panel"><ul className="care-occurrence-list">{occurrences.map((item) => {
-      const hasEvent = events.some((event) => event.occurrence_id === item.id);
-      return <li className="care-occurrence-row" key={item.id}><div><strong>{item.scheduled_local_time} · {eventLabels[item.event_type]}</strong>
-        <small>{hasEvent ? '기록됨 (데모 메모리)' : '기록 미확인 · 실제 미실시 여부는 알 수 없음'}</small></div>
-        <span className={`routine-state ${hasEvent ? 'recorded' : 'unknown'}`}>{hasEvent ? '기록됨' : '미확인'}</span></li>;
-    })}</ul><p className="small-note">서버 Safety Evaluation을 수행하지 않습니다.</p></section></main>;
 }
 
 function DemoSharedCarePage() {
@@ -564,8 +526,6 @@ function Workspace({ userId, online }: { userId: string; online: boolean }) {
   const [loadedPetId, setLoadedPetId] = useState('');
   const [events, setEvents] = useState<HealthEvent[]>([]);
   const [revisions, setRevisions] = useState<EventRevision[]>([]);
-  const [occurrences, setOccurrences] = useState<RoutineOccurrence[]>([]);
-  const [planApproval, setPlanApproval] = useState<Record<string, string>>({});
   const [syncAt, setSyncAt] = useState<string | null>(null);
   const [loadingPets, setLoadingPets] = useState(true);
   const [loadingEvents, setLoadingEvents] = useState(false);
@@ -606,7 +566,7 @@ function Workspace({ userId, online }: { userId: string; online: boolean }) {
   useEffect(() => {
     const handleOffline = () => {
       pendingCommand.current = null;
-      setEvents([]); setRevisions([]); setOccurrences([]); setPlanApproval({});
+      setEvents([]); setRevisions([]);
       setLoadedPetId(''); setSyncAt(null);
       setDataMessage('UNVERIFIED · 오프라인 상태에서는 최신 서버 기록을 표시할 수 없습니다.');
     };
@@ -652,8 +612,6 @@ function Workspace({ userId, online }: { userId: string; online: boolean }) {
       pendingCommand.current = null;
       setEvents([]);
       setRevisions([]);
-      setOccurrences([]);
-      setPlanApproval({});
       setLoadedPetId('');
       setRecordNotice(null);
       setDataMessage('');
@@ -669,20 +627,13 @@ function Workspace({ userId, online }: { userId: string; online: boolean }) {
   const refreshPetData = useCallback(async (petId: string) => {
     if (!supabase || !petId) return false;
     setLoadingEvents(true);
-    const [eventResult, occurrenceResult] = await Promise.all([
-      supabase.from('health_events')
+    const eventResult = await supabase.from('health_events')
         .select('id,pet_id,actor_id,performer_id,event_type,occurred_at,recorded_at,occurrence_id,plan_version_id,value,unit')
-        .eq('pet_id', petId).order('occurred_at', { ascending: false }).limit(120),
-      supabase.from('routine_occurrences')
-        .select('id,event_type,occurrence_key,step_key,scheduled_local_date,scheduled_local_time,timezone,scheduled_at,status,care_plan_version_id')
-        .eq('pet_id', petId).in('status', ['SCHEDULED','SCHEDULE_TIME_UNRESOLVED'])
-        .order('scheduled_at', { ascending: false, nullsFirst: false }).limit(80),
-    ]);
-    if (eventResult.error || occurrenceResult.error) {
-      const error = eventResult.error ?? occurrenceResult.error;
+        .eq('pet_id', petId).order('occurred_at', { ascending: false }).limit(120);
+    if (eventResult.error) {
+      const error = eventResult.error;
       setEvents([]);
       setRevisions([]);
-      setOccurrences([]);
       setLoadedPetId(petId);
       setDataMessage(errorCode(error) === '42501'
         ? '접근권한이 변경됐습니다. Pet 목록을 새로 확인해 주세요.'
@@ -691,28 +642,17 @@ function Workspace({ userId, online }: { userId: string; online: boolean }) {
       return false;
     }
     const nextEvents = (eventResult.data ?? []) as HealthEvent[];
-    const nextOccurrences = (occurrenceResult.data ?? []) as RoutineOccurrence[];
     setEvents(nextEvents);
-    setOccurrences(nextOccurrences);
     const eventIds = nextEvents.map((item) => item.id);
-    const planIds = [...new Set(nextOccurrences.map((item) => item.care_plan_version_id))];
-    const [revisionResult, planResult] = await Promise.all([
-      eventIds.length
-        ? supabase.from('health_event_revisions')
+    const revisionResult = eventIds.length
+        ? await supabase.from('health_event_revisions')
           .select('id,event_id,revision_no,revision_kind,patch,reason_code,actor_id,recorded_at')
           .in('event_id', eventIds)
-        : Promise.resolve({ data: [], error: null }),
-      planIds.length
-        ? supabase.from('care_plan_versions').select('id,approval_status').in('id', planIds)
-        : Promise.resolve({ data: [], error: null }),
-    ]);
+        : { data: [], error: null };
     setRevisions((revisionResult.data ?? []) as EventRevision[]);
-    const approvalMap: Record<string, string> = {};
-    for (const row of planResult.data ?? []) approvalMap[row.id] = row.approval_status;
-    setPlanApproval(approvalMap);
     setLoadedPetId(petId);
-    setDataMessage(revisionResult.error || planResult.error
-      ? '기록은 불러왔지만 일부 이력 또는 계획 상태를 확인하지 못했습니다.'
+    setDataMessage(revisionResult.error
+      ? '기록은 불러왔지만 일부 정정 이력을 확인하지 못했습니다.'
       : '');
     setSyncAt(new Date().toISOString());
     setLoadingEvents(false);
@@ -731,7 +671,7 @@ function Workspace({ userId, online }: { userId: string; online: boolean }) {
       pendingCommand.current = null;
       selectedPetIdRef.current = '';
       setSelectedPetId('');
-      setEvents([]); setRevisions([]); setOccurrences([]); setPlanApproval({});
+      setEvents([]); setRevisions([]);
       setLoadedPetId(''); setSyncAt(null); setRecordNotice(null);
       setDataMessage('접근권한 변경 알림을 받았습니다. 서버 권한을 다시 확인하는 동안 기록을 숨깁니다.');
       window.dispatchEvent(new Event('hanilog:access-changed'));
@@ -1013,7 +953,7 @@ function Workspace({ userId, online }: { userId: string; online: boolean }) {
           pet={selectedPet} petsCount={pets.length} households={households} selectedHouseholdId={selectedHouseholdId} setSelectedHouseholdId={setSelectedHouseholdId}
           onRenameHousehold={renameHousehold}
           events={todayEvents} allEvents={dataReady ? events : []} revisions={dataReady ? revisions : []}
-          occurrences={dataReady ? occurrences : []} planApproval={dataReady ? planApproval : {}} userId={userId}
+          userId={userId}
           loading={loadingPets || loadingEvents} dataMessage={dataMessage} accessMessage={accessMessage}
           onCreateHousehold={createHousehold} onCreatePet={createPet}
           petProfileDraft={petProfileDraft} onPetProfileDraftChange={setPetProfileDraft}
@@ -1028,16 +968,15 @@ function Workspace({ userId, online }: { userId: string; online: boolean }) {
             dateFilter={dateFilter} setDateFilter={setDateFilter} loading={loadingEvents} onSaveExerciseEnd={saveExerciseEnd} />} />
         <Route path="/trends" element={!selectedPet ? <SetupPrompt loading={loadingPets} accessMessage={accessMessage} />
           : <HealthTrendsPage key={`${selectedPet.id}:${online}:${dataReady}`} pet={selectedPet} userId={userId} online={online && dataReady} />} />
-        <Route path="/care" element={!selectedPet ? <SetupPrompt loading={loadingPets} accessMessage={accessMessage} /> : <CareRoutinePage key={selectedPet.id} pet={selectedPet} online={online} userId={userId} />} />
+        <Route path="/care" element={<Navigate to="/timeline" replace />} />
         <Route path="/shared" element={<SharedCarePage key={households.map((item) => item.id).join(':')} households={households} pets={pets} userId={userId} onRenameHousehold={renameHousehold} />} />
         <Route path="/notifications" element={<NotificationsPage key={`${userId}:${selectedPetId}:${pets.map((pet) => pet.id).join(':')}`} pets={pets} userId={userId} online={online} />} />
         <Route path="/record" element={!selectedPet
           ? <SetupPrompt loading={loadingPets} accessMessage={accessMessage} />
-          : <QuickRecordPage key={`${selectedPet.id}:${location.search}`} pet={selectedPet} userId={userId} occurrences={dataReady ? occurrences : []}
+          : <QuickRecordPage key={`${selectedPet.id}:${location.search}`} pet={selectedPet}
             events={dataReady ? events : []} revisions={dataReady ? revisions : []}
-            planApproval={dataReady ? planApproval : {}} online={online}
+            online={online}
             presetEventType={new URLSearchParams(location.search).get('event') ?? undefined}
-            presetOccurrenceId={new URLSearchParams(location.search).get('occurrence') ?? undefined}
             onSubmit={submitHealthEvent} onSaveExerciseEnd={saveExerciseEnd}
             onSaveInsulinDefault={selectedPet.profileCanEdit ? savePetInsulinProduct : undefined} />} />
         <Route path="*" element={<Navigate to="/" replace />} />
@@ -1058,7 +997,6 @@ function SessionNavigation({ pathname }: { pathname: string }) {
     { to: '/', label: '오늘', icon: '⌂' },
     { to: '/record', label: '빠른 기록', icon: '+' },
     { to: '/trends', label: '건강 추세', icon: '⌁' },
-    { to: '/care', label: '돌봄 루틴', icon: '✓' },
   ];
   useEffect(() => {
     const resetAtDesktop = () => {
@@ -1105,7 +1043,7 @@ function DashboardPage(props: {
   selectedHouseholdId: string; setSelectedHouseholdId: (id: string) => void;
   onRenameHousehold: (householdId: string, name: string) => Promise<boolean>;
   events: HealthEvent[]; allEvents: HealthEvent[]; revisions: EventRevision[];
-  occurrences: RoutineOccurrence[]; planApproval: Record<string, string>; userId: string;
+  userId: string;
   loading: boolean; dataMessage: string; accessMessage?: string;
   onCreateHousehold: (event: FormEvent<HTMLFormElement>) => void;
   onCreatePet: (event: FormEvent<HTMLFormElement>) => void;
@@ -1116,14 +1054,9 @@ function DashboardPage(props: {
   petName: string; setPetName: (value: string) => void;
   petTimezone: string; setPetTimezone: (value: string) => void; creating: boolean;
 }) {
-  const [currentTime, setCurrentTime] = useState(() => Date.now());
   const [reviewHousehold, setReviewHousehold] = useState(false);
-  useEffect(() => {
-    const timer = window.setInterval(() => setCurrentTime(Date.now()), 60_000);
-    return () => window.clearInterval(timer);
-  }, []);
   const {
-    pet, petsCount, households, selectedHouseholdId, setSelectedHouseholdId, onRenameHousehold, events, allEvents, revisions, occurrences, planApproval, userId,
+    pet, petsCount, households, selectedHouseholdId, setSelectedHouseholdId, onRenameHousehold, events, allEvents, revisions, userId,
     loading, accessMessage = '', onCreateHousehold, onCreatePet, householdName, setHouseholdName,
     petName, setPetName, petTimezone, setPetTimezone, creating,
     petProfileDraft = { avatarId: 'dog-1', photo: null }, onPetProfileDraftChange, onPetProfileSaved,
@@ -1216,7 +1149,6 @@ function DashboardPage(props: {
   const localToday = todayForTimezone(pet.timezone);
   const daily = events.filter((event) => localDateKey(event.occurred_at, pet.timezone) === localToday
     && latestRevision(revisions.filter((revision) => revision.event_id === event.id))?.revision_kind !== 'VOID');
-  const todayOccurrences = occurrences.filter((occurrence) => occurrence.scheduled_local_date === localToday);
   const recentGlucoseSeries = allEvents.filter((event) => event.event_type === 'glucose' && event.unit === GLUCOSE_UNIT
     && latestRevision(revisions.filter((revision) => revision.event_id === event.id))?.revision_kind !== 'VOID')
     .sort((a, b) => Date.parse(a.occurred_at) - Date.parse(b.occurred_at));
@@ -1254,32 +1186,6 @@ function DashboardPage(props: {
       </div>
 
       <div className="dashboard-secondary">
-        <section className="panel routine-panel">
-          <div className="section-heading"><div><p className="eyebrow">관리 루틴</p><h2>오늘의 케어 일정</h2></div><span className="section-date">{localToday}</span></div>
-          {!todayOccurrences.length ? <p className="empty">오늘 등록된 돌봄 일정이 없어요. 실제로 돌보지 않았다는 뜻은 아니에요.</p> :
-            <ul className="routine-list">{todayOccurrences.map((occurrence) => {
-              const matchedEvent = daily.find((event) => event.occurrence_id === occurrence.id
-                && latestRevision(revisions.filter((revision) => revision.event_id === event.id))?.revision_kind !== 'VOID');
-              const approval = planApproval[occurrence.care_plan_version_id];
-              const mealException = matchedEvent?.event_type === 'meal' && ['PARTIAL', 'REFUSED'].includes(String(matchedEvent.value.meal_status ?? ''));
-              const displayStatus = routineDisplayStatus({ hasRecord: Boolean(matchedEvent), exceptionReported: mealException,
-                occurrenceStatus: occurrence.status, scheduledAt: occurrence.scheduled_at, now: currentTime });
-              const isUpcoming = displayStatus === 'scheduled';
-              const isDue = displayStatus === 'unconfirmed';
-              const status = ({ recorded: '기록 완료', exception: '예외 보고', scheduled: '예정', unconfirmed: '기록 미확인',
-                cancelled: '일정 취소', superseded: '이전 일정', time_unresolved: '시각 확인 필요' } as const)[displayStatus];
-              const actor = matchedEvent
-                ? `${matchedEvent.performer_id ? `수행자 ${matchedEvent.performer_id === userId ? '나' : actorLabel(matchedEvent.performer_id, userId)}` : '수행자 미지정'} · 기록자 ${matchedEvent.actor_id === userId ? '나' : actorLabel(matchedEvent.actor_id, userId)}`
-                : approval === 'CLINICIAN_CONFIRMED' ? '의료진 확인 상태로 표시된 계획' : '계획 승인 확인 안 됨';
-              return <li key={occurrence.id} className={isDue ? 'routine-current' : isUpcoming ? 'routine-upcoming' : ''}>
-                <span className="routine-time">{occurrence.scheduled_local_time.slice(0, 5)}</span>
-                <span className="routine-label"><strong>{eventLabels[occurrence.event_type] ?? occurrence.event_type}</strong>
-                  <small>{actor}{matchedEvent ? ` · 실제 ${timeInTimezone(matchedEvent.occurred_at, pet.timezone)} · 기록 ${timeInTimezone(matchedEvent.recorded_at, pet.timezone)}` : ''}</small></span>
-                <span className={`routine-state ${displayStatus === 'recorded' || displayStatus === 'exception' ? 'recorded' : isUpcoming ? 'scheduled' : 'unknown'}`}>{status}</span>
-              </li>;
-            })}</ul>}
-          <p className="small-note">기록 미확인은 실제 미실시 판정이 아닙니다. 일정은 투약 가능 여부를 판단하지 않습니다.</p>
-        </section>
         <section className="panel quick-glance">
           <div className="section-heading"><div><p className="eyebrow">최근 건강 기록</p><h2>식사·인슐린 등</h2></div><Link to="/timeline">모두 보기</Link></div>
           <div className="glance-list">
@@ -1288,7 +1194,7 @@ function DashboardPage(props: {
           </div>
           {loading && <p className="small-note" role="status">서버 기록을 확인하고 있습니다…</p>}
         </section>
-        <p className="medical-note">Safety Guard는 일정·기록 간 데이터 상태만 표시합니다. 인슐린 투여를 승인하지 않습니다.</p>
+      <p className="medical-note">Safety Guard는 서버에서 확인된 데이터 상태만 보여줍니다. 인슐린 투여를 승인하지 않습니다.</p>
       </div>
     </div>
   </main>;
@@ -1340,13 +1246,13 @@ function mealStatusLabel(status: string) {
 }
 
 export function QuickRecordPage(props: {
-  pet: Pet; userId: string; occurrences: RoutineOccurrence[]; presetEventType?: string; presetOccurrenceId?: string;
-  events: HealthEvent[]; revisions: EventRevision[]; planApproval: Record<string, string>; online: boolean; demoOnly?: boolean;
+  pet: Pet; presetEventType?: string;
+  events: HealthEvent[]; revisions: EventRevision[]; online: boolean; demoOnly?: boolean;
   onSubmit: (fields: EventEntryFields, occurrenceId: string | null) => Promise<boolean>;
   onSaveExerciseEnd?: (eventId: string, endedAt: string, expectedRevision: number, durationSeconds: number) => Promise<boolean>;
   onSaveInsulinDefault?: (product: string) => Promise<boolean>;
 }) {
-  const { pet, userId, occurrences, planApproval, online, onSubmit } = props;
+  const { pet, online, onSubmit } = props;
   const initialEventType = eventOptions.find((option) => option.type === props.presetEventType)?.type ?? 'glucose';
   const [eventType, setEventType] = useState<EventType>(initialEventType);
   const [occurredLocal, setOccurredLocal] = useState(localDateTimeNow());
@@ -1363,30 +1269,27 @@ export function QuickRecordPage(props: {
   const insulinProductDefaultRef = useRef({ petId: pet.id, value: pet.default_insulin_product?.trim() ?? '' });
   const [savingInsulinDefault, setSavingInsulinDefault] = useState(false);
   const [insulinDefaultMessage, setInsulinDefaultMessage] = useState('');
-  const [occurrenceId, setOccurrenceId] = useState(props.presetOccurrenceId ?? '');
   const [showAllRecordTypes, setShowAllRecordTypes] = useState(false);
   const visibleEventOptions = showAllRecordTypes
     ? eventOptions
     : eventOptions.filter((option, index) => index < 3 || option.type === eventType);
-  const [preflight, setPreflight] = useState<'idle' | 'checking' | 'verified' | 'unverified'>('idle');
-  const [priorEvents, setPriorEvents] = useState<HealthEvent[]>([]);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
   const [activityMessage, setActivityMessage] = useState('');
   type Draft = { numericValue: string; unit: string; note: string; mealStatus: string; eliminationType: string;
     description: string; measurementSource: string; measurementCondition: string; doseAmount: string;
-    insulinProductLabel: string; occurrenceId: string };
+    insulinProductLabel: string };
   const drafts = useRef<Partial<Record<EventType, Draft>>>({});
   function selectRecordType(next: EventType) {
     if (next === eventType || saving) return;
     drafts.current[eventType] = { numericValue, unit, note, mealStatus, eliminationType, description,
-      measurementSource, measurementCondition, doseAmount, insulinProductLabel, occurrenceId };
+      measurementSource, measurementCondition, doseAmount, insulinProductLabel };
     const draft = drafts.current[next];
     setNumericValue(draft?.numericValue ?? ''); setUnit(draft?.unit ?? ''); setNote(draft?.note ?? '');
     setMealStatus(draft?.mealStatus ?? ''); setEliminationType(draft?.eliminationType ?? '');
     setDescription(draft?.description ?? ''); setMeasurementSource(draft?.measurementSource ?? '');
     setMeasurementCondition(draft?.measurementCondition ?? ''); setDoseAmount(draft?.doseAmount ?? '');
-    setInsulinProductLabel(draft?.insulinProductLabel ?? ''); setOccurrenceId(draft?.occurrenceId ?? '');
+    setInsulinProductLabel(draft?.insulinProductLabel ?? '');
     setFormError('');
     if (['meal', 'water', 'weight', 'symptom', 'exercise'].includes(next)) setShowAllRecordTypes(true);
     else setShowAllRecordTypes(false);
@@ -1403,8 +1306,6 @@ export function QuickRecordPage(props: {
     .filter((item) => item.value.activity_state === 'STARTED' && item.revision?.revision_kind !== 'VOID')
     .sort((a, b) => Date.parse(b.event.recorded_at) - Date.parse(a.event.recorded_at))[0],
   [props.events, props.revisions]);
-  const selectedOccurrence = occurrences.find((item) => item.id === occurrenceId);
-  const selectedApproval = selectedOccurrence ? planApproval[selectedOccurrence.care_plan_version_id] : null;
   const savedInsulinProduct = pet.default_insulin_product?.trim() ?? '';
   const insulinProductSelection = !insulinProductLabel ? ''
     : commonInsulinProductLabels.includes(insulinProductLabel) ? insulinProductLabel : '__custom__';
@@ -1426,58 +1327,6 @@ export function QuickRecordPage(props: {
     setSavingInsulinDefault(false);
     setInsulinDefaultMessage(saved ? '이 반려동물의 기본 제품으로 저장했습니다.' : '기본 제품을 저장하지 못했습니다. 연결과 권한을 확인해 주세요.');
   }
-
-  useEffect(() => {
-    if (eventType !== 'insulin' || !occurrenceId) {
-      return;
-    }
-    let cancelled = false;
-    let timer = 0;
-    async function checkOccurrence() {
-      setPreflight('checking');
-      if (!online || !supabase) {
-        setPreflight('unverified');
-        return;
-      }
-      const { data, error } = await supabase.from('health_events')
-        .select('id,pet_id,actor_id,performer_id,event_type,occurred_at,recorded_at,occurrence_id,plan_version_id,value,unit')
-        .eq('pet_id', pet.id).eq('occurrence_id', occurrenceId).eq('event_type', 'insulin')
-        .order('recorded_at', { ascending: true });
-      if (error) {
-        if (!cancelled) {
-          setPriorEvents([]);
-          setPreflight('unverified');
-        }
-        return;
-      }
-      const rows = (data ?? []) as HealthEvent[];
-      let activeRows = rows;
-      if (rows.length) {
-        const result = await supabase.from('health_event_revisions')
-          .select('event_id,revision_no,revision_kind')
-          .in('event_id', rows.map((row) => row.id));
-        if (result.error) {
-          if (!cancelled) {
-            setPriorEvents(rows);
-            setPreflight('unverified');
-          }
-          return;
-        }
-        const revisionRows = result.data ?? [];
-        activeRows = rows.filter((row) => {
-          const latest = revisionRows.filter((item) => item.event_id === row.id)
-            .sort((a, b) => b.revision_no - a.revision_no)[0];
-          return latest?.revision_kind !== 'VOID';
-        });
-      }
-      if (!cancelled) {
-        setPriorEvents(activeRows);
-        setPreflight('verified');
-      }
-    }
-    timer = window.setTimeout(() => { void checkOccurrence(); }, 0);
-    return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [eventType, occurrenceId, online, pet.id]);
 
   async function finishExerciseSession() {
     if (!activeExercise || !props.onSaveExerciseEnd || saving) return;
@@ -1512,11 +1361,11 @@ export function QuickRecordPage(props: {
       const startValidation = validateEventEntry(startFields);
       if (startValidation.error) { setFormError(startValidation.error); return; }
       setSaving(true);
-      const saved = await onSubmit(startFields, occurrenceId || null);
+      const saved = await onSubmit(startFields, null);
       setSaving(false);
       if (!saved) return;
       setActivityMessage('시작 시각을 저장하고 타이머를 시작했습니다.');
-      setNote(''); setDescription(''); setOccurrenceId('');
+      setNote(''); setDescription('');
       return;
     }
     const fields: EventEntryFields = {
@@ -1529,7 +1378,7 @@ export function QuickRecordPage(props: {
       return;
     }
     setSaving(true);
-    const saved = await onSubmit(fields, occurrenceId || null);
+    const saved = await onSubmit(fields, null);
     setSaving(false);
     if (saved) {
       setNumericValue('');
@@ -1542,7 +1391,6 @@ export function QuickRecordPage(props: {
       setInsulinProductLabel(pet.default_insulin_product?.trim() ?? '');
       setMealStatus('');
       setEliminationType('');
-      setOccurrenceId('');
     }
   }
 
@@ -1635,27 +1483,7 @@ export function QuickRecordPage(props: {
             </div>
             <p className="insulin-dose-note">수의사가 정한 값을 실제 기록에서 확인해 입력하세요. mL로 환산하지 않습니다.</p>
             <details className="record-details insulin-extra-details">
-              <summary>추가 정보 · 일정 및 도움말</summary>
-            <label className="field-label">연결할 예정 일정 (선택)
-              <select value={occurrenceId} onChange={(event) => setOccurrenceId(event.target.value)}>
-                <option value="">일정 연결 안 함</option>
-                {occurrences.filter((occurrence) => occurrence.event_type === eventType).map((occurrence) => <option key={occurrence.id} value={occurrence.id}>
-                  {occurrence.scheduled_local_date} · {occurrence.scheduled_local_time.slice(0, 5)} · {occurrence.status === 'SCHEDULE_TIME_UNRESOLVED' ? '시각 확인 필요' : occurrence.occurrence_key}
-                </option>)}
-              </select>
-              <small>시각이 가까운 일정에 자동 연결하지 않습니다.</small>
-            </label>
-            <div className="safety-check" role="status">
-              {!occurrenceId && <><strong>일정 연결 없음</strong><p>중복 일정 조회를 할 수 없습니다. 이미 발생한 행위 기록은 제출할 수 있습니다.</p></>}
-              {occurrenceId && preflight === 'checking' && <><strong>서버 일정 상태 확인 중</strong><p>확인 완료 전에는 투여 상태를 확정하지 않습니다.</p></>}
-              {occurrenceId && preflight === 'unverified' && <><strong>UNVERIFIED · 서버 확인 실패</strong><p>최신 일정 상태를 확인하지 못했습니다. 실제 발생 사실만 기록할 수 있습니다.</p></>}
-              {occurrenceId && preflight === 'verified' && <>
-                <strong>{priorEvents.length ? '같은 일정에 투여 기록이 있습니다' : '현재 서버에서 연결 기록을 찾지 못했습니다'}</strong>
-                <p>{priorEvents.length ? `${priorEvents.length}건의 기록을 확인했습니다. 중복 가능성을 표시하며 기록을 차단하지 않습니다.` : '기록이 없다는 뜻이며 실제 미실시를 의미하지 않습니다.'}</p>
-                {priorEvents.map((item) => <small key={item.id}>{dateTimeInTimezone(item.occurred_at, pet.timezone)} · {actorLabel(item.actor_id, userId)}</small>)}
-              </>}
-              {occurrenceId && <p className="plan-status">계획 상태: {selectedApproval === 'CLINICIAN_CONFIRMED' ? '의료진 확인 상태로 표시됨' : selectedApproval ? '의료진 확인 상태가 아님' : '확인할 수 없음'} · 투여 적정성 승인이 아닙니다.</p>}
-            </div>
+              <summary>추가 정보 · 도움말</summary>
             <details className="insulin-help">
               <summary>처음 인슐린을 준비하는 보호자 도움말</summary>
               <div className="insulin-help-content">
@@ -1686,21 +1514,12 @@ export function QuickRecordPage(props: {
             <small>{note.length}/1000</small>
           </label></>}
           <details className="record-details full-field" key={eventType}>
-            <summary>상세 입력 · 시각, 메모와 일정 연결</summary><div className="form-grid">
+            <summary>상세 입력 · 시각과 메모</summary><div className="form-grid">
           {eventType !== 'exercise' && <RecordDateStrip value={occurredLocal} onChange={setOccurredLocal} />}
           {eventType !== 'exercise' && <label className="field-label">실제 발생 시각
             <input aria-label="실제 발생 시각" type="datetime-local" required value={occurredLocal} onChange={(event) => setOccurredLocal(event.target.value)} />
             <small>기기 시간대 기준 · 서버에는 UTC로 저장</small>
           </label>}
-          {eventType !== 'insulin' && <label className="field-label">연결할 돌봄 일정 (선택)
-            <select value={occurrenceId} onChange={(event) => setOccurrenceId(event.target.value)}>
-              <option value="">일정 연결 안 함</option>
-              {occurrences.filter((occurrence) => occurrence.event_type === eventType).map((occurrence) => <option key={occurrence.id} value={occurrence.id}>
-                {occurrence.scheduled_local_date} · {occurrence.scheduled_local_time.slice(0, 5)} · {occurrence.status === 'SCHEDULE_TIME_UNRESOLVED' ? '시각 확인 필요' : occurrence.occurrence_key}
-              </option>)}
-            </select><small>일정 연결은 기록 분류용이며 돌봄 수행 여부나 의료적 적정성을 승인하지 않습니다.</small>
-          </label>}
-
             {eventType === 'glucose' && <>            <label className="field-label">측정 출처 (선택)<input maxLength={120} value={measurementSource} onChange={(event) => setMeasurementSource(event.target.value)} placeholder="예: 혈당계, 병원 검사" /></label>
 </>}
             {eventType !== 'symptom' && <>          <label className="field-label full-field">메모 (선택)
@@ -1730,22 +1549,40 @@ function TimelinePage(props: {
   onSaveExerciseEnd?: (eventId: string, endedAt: string, expectedRevision: number, durationSeconds: number) => Promise<boolean>;
 }) {
   const { pet, events, revisions, userId, dateFilter, setDateFilter, loading, onSaveExerciseEnd } = props;
+  const [visibleTypes, setVisibleTypes] = useState<Set<EventType>>(() => new Set(eventOptions.map((item) => item.type)));
   const dailyEvents = useMemo(() => events
     .filter((event) => localDateKey(event.occurred_at, pet.timezone) === dateFilter)
     .sort((a, b) => Date.parse(b.occurred_at) - Date.parse(a.occurred_at)), [events, pet.timezone, dateFilter]);
+  const filteredEvents = dailyEvents.filter((event) => visibleTypes.has(event.event_type));
 
   return <main className="page-container timeline-page">
     <section className="page-heading"><p className="eyebrow">건강 기록</p><h1>하루 타임라인</h1>
       <p>{pet.name}의 실제 발생 시각을 {formatTimezoneLabel(pet.timezone)} 기준으로 보여줍니다.</p></section>
     <div className="timeline-filter"><label htmlFor="timeline-date">날짜 선택</label>
       <input id="timeline-date" type="date" value={dateFilter} onChange={(event) => setDateFilter(event.target.value)} /></div>
+    <section className="timeline-type-filter" aria-label="표시할 기록 종류">
+      <div className="timeline-filter-heading"><strong>보고 싶은 기록</strong>
+        {visibleTypes.size !== eventOptions.length && <button type="button" className="text-button" onClick={() => setVisibleTypes(new Set(eventOptions.map((item) => item.type)))}>모두 보기</button>}</div>
+      <div className="timeline-filter-chips" role="group" aria-label="기록 종류 필터">
+        {eventOptions.map((option) => <button type="button" key={option.type}
+          className={visibleTypes.has(option.type) ? 'timeline-filter-chip selected' : 'timeline-filter-chip'}
+          aria-pressed={visibleTypes.has(option.type)}
+          onClick={() => setVisibleTypes((current) => {
+            const next = new Set(current);
+            if (next.has(option.type)) next.delete(option.type); else next.add(option.type);
+            return next;
+          })}>{option.icon} {option.label}</button>)}
+      </div>
+      <small>{filteredEvents.length} / {dailyEvents.length}개 기록 표시</small>
+    </section>
     {loading && <p role="status" className="load-state">서버에서 기록을 확인하고 있습니다…</p>}
     {!loading && dailyEvents.length === 0 && <section className="panel empty-panel">
       <span className="empty-illustration" aria-hidden="true">◷</span><h2>이 날짜에 서버 기록이 없습니다</h2>
       <p>기록이 없다는 사실은 실제 미실시를 뜻하지 않습니다.</p>
       <Link to="/record" className="button-link">실제 발생한 일 기록하기</Link>
     </section>}
-    {dailyEvents.length > 0 && <ol className="timeline-list">{dailyEvents.map((event) => {
+    {!loading && dailyEvents.length > 0 && filteredEvents.length === 0 && <section className="panel empty-panel"><h2>선택한 종류의 기록이 없습니다</h2><p>필터를 바꾸면 다른 기록을 볼 수 있어요.</p></section>}
+    {filteredEvents.length > 0 && <ol className="timeline-list">{filteredEvents.map((event) => {
       const itemRevisions = revisions.filter((revision) => revision.event_id === event.id).sort((a, b) => a.revision_no - b.revision_no);
       const latest = itemRevisions[itemRevisions.length - 1];
       const effectiveValue = effectiveEventValue(event.value, itemRevisions);
@@ -1771,7 +1608,6 @@ function TimelinePage(props: {
             <dl className="detail-list"><div><dt>기록 ID</dt><dd>{event.id}</dd></div>
               <div><dt>기록자 ID</dt><dd>{event.actor_id}</dd></div>
               <div><dt>실제 수행자</dt><dd>{event.performer_id ? actorLabel(event.performer_id, userId) : '지정되지 않음'}</dd></div>
-              <div><dt>Occurrence</dt><dd>{event.occurrence_id ?? '연결 없음'}</dd></div>
               <div><dt>단위</dt><dd>{event.event_type === 'glucose'
                 ? event.unit === GLUCOSE_UNIT ? GLUCOSE_UNIT : event.unit ? `${event.unit} · 기존 단위 보존, mg/dL로 변환하지 않음` : '기존 기록 · 저장 단위 확인 필요'
                 : event.unit ?? '없음'}</dd></div>

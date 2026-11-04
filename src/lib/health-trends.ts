@@ -19,6 +19,24 @@ export type TrendPoint = { occurredAt: string; value: number; count: number };
 const DAY_MS = 86_400_000;
 const WEEK_MS = 7 * DAY_MS;
 
+export function samplesForLocalDay<T extends GlucoseSample>(samples: T[], day: string, timezone: string): T[] {
+  return sortSamples(samples).filter((sample) => localDateKey(sample.occurredAt, timezone) === day);
+}
+
+export function localMinuteOfDay(instant: string, timezone: string): number {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: timezone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(new Date(instant));
+  const hour = Number(parts.find((part) => part.type === 'hour')?.value ?? 0);
+  const minute = Number(parts.find((part) => part.type === 'minute')?.value ?? 0);
+  return hour * 60 + minute;
+}
+
+export function shiftLocalDate(day: string, offsetDays: number): string {
+  const [year, month, date] = day.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, date + offsetDays)).toISOString().slice(0, 10);
+}
+
 /** Connect only observed values no more than seven elapsed days apart. */
 export function measuredLineSegments<T extends GlucoseSample>(samples: T[], maximumGapDays = 7): T[][] {
   const sorted = sortSamples(samples);

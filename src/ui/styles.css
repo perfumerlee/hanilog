@@ -359,6 +359,46 @@ button, a, input, select, textarea, summary { scroll-margin: 1rem; }
 .derived-trend-line { stroke: #b36a35; stroke-width: 3px; stroke-dasharray: 8 6; stroke-linecap: round; stroke-linejoin: round; opacity: .95; }
 .chart-point { fill: #4a8463; stroke: #fffefa; stroke-width: 3px; cursor: pointer; }
 .chart-point:hover, .chart-point:focus, .chart-point.selected { fill: #a35f2d; stroke: #f7dfc4; stroke-width: 4px; outline: none; }
+.target-band { fill: rgba(149, 190, 132, .24); stroke: rgba(91, 137, 91, .42); stroke-width: 1px; pointer-events: none; }
+.target-band-label { fill: #476d49; font-size: 12px; font-weight: 800; pointer-events: none; }
+.trend-display-toggle { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .35rem; margin-top: .7rem; }
+.daily-graph-date { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: end; gap: .45rem; margin: .55rem 0; }
+.daily-graph-date .field-label { min-width: 0; }
+.daily-graph-date input { margin-top: .15rem; }
+.timeline-type-filter { margin: .35rem 0 .75rem; padding: .7rem; border: 1px solid var(--line); border-radius: 15px; background: var(--paper); }
+.timeline-filter-heading { display: flex; justify-content: space-between; align-items: center; gap: .5rem; margin-bottom: .4rem; color: var(--ink); font-size: .82rem; }
+.timeline-filter-chips { display: flex; flex-wrap: wrap; gap: .35rem; }
+.timeline-filter-chip { min-height: 40px; padding: .38rem .6rem; border: 1px solid var(--line); border-radius: 99px; background: #f7f8f4; color: #596a60; font-size: .75rem; }
+.timeline-filter-chip.selected { border-color: #6b9477; background: #e7f0e6; color: #205843; font-weight: 800; }
+.timeline-type-filter > small { display: block; margin-top: .35rem; color: var(--muted); }
+.glucose-care-tools { display: grid; gap: .9rem; }
+.glucose-care-tools > h2 { margin: 0; font-size: 1.05rem; }
+.glucose-target-tools, .glucose-share-tools { display: grid; gap: .55rem; padding-top: .7rem; border-top: 1px solid var(--line); }
+.glucose-target-tools h3, .glucose-share-tools h3 { margin: 0; font-size: .98rem; }
+.target-range-value { color: #356d47; font-size: 1.35rem; font-variant-numeric: tabular-nums; }
+.target-range-form, .glucose-share-form { display: grid; gap: .6rem; padding: .7rem; border-radius: 14px; background: #f6f8f3; }
+.target-range-form > p { margin: 0; color: var(--muted); font-size: .78rem; line-height: 1.45; }
+.target-range-disclaimer, .glucose-share-tools > .small-note { color: var(--muted); line-height: 1.45; }
+.glucose-share-list, .share-care-times { list-style: none; margin: 0; padding: 0; }
+.glucose-share-list li, .share-care-times li { display: flex; align-items: center; justify-content: space-between; gap: .6rem; padding: .6rem 0; border-top: 1px solid var(--line); }
+.glucose-share-list li > span { display: grid; gap: .15rem; font-size: .78rem; }
+.glucose-share-list small, .share-care-times time { color: var(--muted); font-size: .7rem; }
+.glucose-tools-message { overflow-wrap: anywhere; }
+.public-glucose-share { padding-bottom: calc(1.5rem + env(safe-area-inset-bottom)); }
+.share-target-summary strong { color: #356d47; font-size: 1.35rem; font-variant-numeric: tabular-nums; }
+.share-target-summary p, .share-target-summary small { display: block; color: var(--muted); line-height: 1.5; }
+.share-chart-wrap { width: 100%; min-width: 0; }
+.share-selected-value { display: grid; gap: .2rem; padding: .7rem; border-radius: 12px; background: #eef4ea; }
+.share-selected-value strong { color: var(--green-dark); font-size: 1.2rem; }
+.share-selected-value span { color: var(--muted); font-size: .78rem; }
+.share-care-times small { display: block; margin-top: .5rem; color: var(--muted); line-height: 1.45; }
+@media (max-width: 420px) {
+  .trends-heading { align-items: flex-start; }
+  .trends-add { white-space: normal; text-align: center; }
+  .timeline-filter-chips { gap: .28rem; }
+  .timeline-filter-chip { padding-inline: .48rem; font-size: .7rem; }
+  .daily-graph-date .button-secondary { padding-inline: .55rem; }
+}
 .chart-caption { margin: .35rem .2rem .7rem; color: var(--muted); font-size: .76rem; line-height: 1.45; }
 .trend-empty { min-height: 150px; display: grid; align-content: center; justify-items: start; gap: .5rem; padding: .8rem .2rem; }
 .trend-empty h3 { margin: 0; font-size: .98rem; }

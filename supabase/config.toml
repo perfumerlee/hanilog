@@ -34,3 +34,6 @@ verify_jwt = false
 [functions.pet-profile-media]
 verify_jwt = true
 static_files = ["./functions/pet-profile-media/magick.wasm"]
+
+[functions.glucose-share]
+verify_jwt = false
