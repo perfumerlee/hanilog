@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type PointerEvent } from 'react';
+import { useEffect, useMemo, useState, useRef, type PointerEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { glucoseMeasurementConditionLabel } from '../lib/event-entry';
 import {
@@ -279,25 +279,33 @@ export function HealthTrendsPage({ pet, userId, online, demoEvents }: Props) {
   </main>;
 }
 
-function GlucoseScatterChart({ samples, actualSegments, trendSegments, timezone, selectedId, onSelect, mode, targetRange }: {
+export function GlucoseScatterChart({ samples, actualSegments, trendSegments, timezone, selectedId, onSelect, mode, targetRange }: {
   samples: NumericGlucoseSample[]; actualSegments: NumericGlucoseSample[][]; trendSegments: TrendPoint[][];
-  timezone: string; selectedId: string | null; onSelect: (id: string) => void; mode: 'period' | 'day'; targetRange: TargetRange | null;
+  timezone: string; selectedId: string | null; onSelect: (id: string) => void; mode: 'period' | 'day'; targetRange: Pick<TargetRange, 'lower_mg_dl' | 'upper_mg_dl'> | null;
 }) {
   const sorted = sortSamples(samples);
-  const width = 800; const height = 300;
+  const chartRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(800);
+  const height = 480;
+  useEffect(() => {
+    if (!chartRef.current || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry.contentRect.width > 0) setWidth(Math.max(280, entry.contentRect.width));
+    });
+    observer.observe(chartRef.current);
+    return () => observer.disconnect();
+  }, []);
   const left = 60; const right = 18; const top = 18; const bottom = 48;
   const times = sorted.map((item) => Date.parse(item.occurredAt));
   const values = sorted.map((item) => item.value);
   const minTime = Math.min(...times); const maxTime = Math.max(...times);
-  const rawMin = Math.min(...values, ...(targetRange ? [targetRange.lower_mg_dl] : []));
-  const rawMax = Math.max(...values, ...(targetRange ? [targetRange.upper_mg_dl] : []));
-  const pad = Math.max(5, (rawMax - rawMin) * .08);
-  const minValue = Math.max(0, rawMin - pad); const maxValue = rawMax + pad;
+  const minValue = 0;
+  const maxValue = Math.ceil(Math.max(500, ...values, targetRange?.upper_mg_dl ?? 0) / 50) * 50;
   const xFor = (time: number) => mode === 'day'
     ? left + localMinuteOfDay(new Date(time).toISOString(), timezone) / 1440 * (width - left - right)
     : maxTime === minTime ? (width + left - right) / 2 : left + (time - minTime) / (maxTime - minTime) * (width - left - right);
   const yFor = (value: number) => height - bottom - (value - minValue) / (maxValue - minValue || 1) * (height - top - bottom);
-  const tickValues = minValue === maxValue ? [minValue] : [minValue, (minValue + maxValue) / 2, maxValue];
+  const tickValues = Array.from({ length: maxValue / 50 + 1 }, (_, index) => index * 50);
   const startLabel = mode === 'day' ? '00:00' : new Intl.DateTimeFormat('ko-KR', { timeZone: timezone, month: 'numeric', day: 'numeric' }).format(new Date(minTime));
   const endLabel = mode === 'day' ? '24:00' : new Intl.DateTimeFormat('ko-KR', { timeZone: timezone, month: 'numeric', day: 'numeric' }).format(new Date(maxTime));
   const xTicks = mode === 'day' ? [0, 360, 720, 1080, 1440] : [];
@@ -321,7 +329,7 @@ function GlucoseScatterChart({ samples, actualSegments, trendSegments, timezone,
     }
     if (closest && distance <= 22) onSelect(closest.id);
   };
-  return <div className="chart-scroll" role="group" aria-label="실제 혈당 측정값 산점도와 데이터 목록">
+  return <div ref={chartRef} className="chart-scroll" role="group" aria-label="실제 혈당 측정값 산점도와 데이터 목록">
     <svg className="glucose-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${mode === 'day' ? '하루 시간대별' : '기간별'} 실제 측정 기록 ${sorted.length}건과 mg/dL 값. 측정점을 선택하면 상세 정보를 확인합니다.`}
       onPointerUp={selectNearest}>
       {targetRange && <rect x={left} y={yFor(targetRange.upper_mg_dl)} width={width - left - right}

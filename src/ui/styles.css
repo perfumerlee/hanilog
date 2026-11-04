@@ -673,3 +673,7 @@ button, a, input, select, textarea, summary { scroll-margin: 1rem; }
   .record-page .event-type-grid { grid-template-columns: repeat(3, minmax(0,1fr)); }
   .record-week button { min-height: 84px; }
 }
+
+.public-glucose-share .day-navigation { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: end; margin-block: 16px; }
+.public-glucose-share .day-navigation button { min-height: 44px; }
+.public-glucose-share .day-navigation input { width: 100%; min-width: 0; }

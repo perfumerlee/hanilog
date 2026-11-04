@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { measuredLineSegments, type GlucoseSample } from '../lib/health-trends';
+import { measuredLineSegments, localDateKey, samplesForLocalDay, shiftLocalDate, type GlucoseSample } from '../lib/health-trends';
 import { callGlucoseShare, GlucoseShareRequestError, type GlucoseSharePayload } from '../lib/glucose-share';
 import { supabase } from '../lib/supabase';
+
+import { GlucoseScatterChart } from './HealthTrendsPage';
 
 type ShareSample = GlucoseSample & { value: number };
 const formatDate = (date: string) => new Intl.DateTimeFormat('ko-KR', { dateStyle: 'long', timeZone: 'UTC' }).format(new Date(`${date}T12:00:00Z`));
@@ -14,6 +16,7 @@ export function GlucoseSharePage() {
   const { token = '' } = useParams();
   const [result, setResult] = useState<{ token: string; share?: GlucoseSharePayload; error?: string } | null>(null);
   const [selectedId, setSelectedId] = useState('');
+  const [chosenDay, setChosenDay] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -46,7 +49,11 @@ export function GlucoseSharePage() {
       source: typeof item.value.measurement_source === 'string' ? item.value.measurement_source : '미기록',
       revisionKind: item.revision_kind === 'CORRECT' ? 'CORRECT' as const : undefined }))
     .filter((item) => Number.isFinite(item.value)), [share]);
-  const selected = samples.find((item) => item.id === selectedId) ?? samples.at(-1) ?? null;
+  const latest = [...samples].sort((a, b) => Date.parse(a.occurredAt) - Date.parse(b.occurredAt)).at(-1);
+  const day = chosenDay || (share && latest ? localDateKey(latest.occurredAt, share.timezone) : share?.to_date ?? '');
+  const daily = share ? samplesForLocalDay(samples, day, share.timezone) : [];
+  const careTimes = share?.care_times.filter((item) => localDateKey(item.occurred_at, share.timezone) === day) ?? [];
+  const selected = daily.find((item) => item.id === selectedId) ?? daily.at(-1) ?? null;
 
   return <main className="page-container public-glucose-share">
     <header className="page-heading"><p className="eyebrow">HaniLog · 건강 기록 공유</p>
@@ -57,28 +64,26 @@ export function GlucoseSharePage() {
     {error && !loading && <section className="panel empty-panel"><h2>링크를 확인할 수 없습니다</h2><p>{error}</p></section>}
     {share && !loading && <>
       <div className="notice notice-warning" role="note">보호자가 선택한 기간의 읽기 전용 정보입니다. 이 화면은 진단이나 투여 지시를 제공하지 않습니다.</div>
-      <section className="panel share-target-summary">
-        <h2>혈당 안정범위</h2>
-        {share.target_range ? <><strong>{share.target_range.lower_mg_dl}–{share.target_range.upper_mg_dl} mg/dL</strong>
-          <p>보호자가 입력한 혈당 안정범위 · {share.target_range.source_label} · 적용 시작 {formatDate(share.target_range.effective_on)}</p></>
-          : <p>수의사에게서 받은 혈당 안정범위가 등록되어 있지 않습니다.</p>}
-        {share.target_range && <small>그래프의 초록색 영역은 공유된 목표 참고 범위이며 안전 판정이나 치료 승인이 아닙니다.</small>}
-      </section>
       <section className="panel trends-panel">
-        <div className="section-heading"><div><p className="eyebrow">실제 측정값 · mg/dL</p><h2>선택 기간 그래프</h2></div></div>
-        {samples.length ? <ShareChart samples={samples} timezone={share.timezone} target={share.target_range} onSelect={setSelectedId} selectedId={selected?.id ?? ''} />
-          : <p className="trend-empty">선택한 기간에 호환 가능한 혈당 측정값이 없습니다.</p>}
-        <p className="chart-caption">점은 실제 측정값입니다. 짧은 간격의 실제 기록만 직선으로 잇고, 그 사이의 수치는 측정값이 아닙니다.</p>
+        <div className="section-heading"><div><p className="eyebrow">실제 측정값 · mg/dL</p><h2>하루 혈당 그래프</h2></div></div>
+        <div className="day-navigation">
+          <button type="button" disabled={day <= share.from_date} onClick={() => setChosenDay(shiftLocalDate(day, -1))}>이전</button>
+          <label className="field-label">날짜<input type="date" value={day} min={share.from_date} max={share.to_date} onChange={(event) => { if (event.target.value >= share.from_date && event.target.value <= share.to_date) setChosenDay(event.target.value); }} /></label>
+          <button type="button" disabled={day >= share.to_date} onClick={() => setChosenDay(shiftLocalDate(day, 1))}>다음</button>
+        </div>
+        <GlucoseScatterChart samples={daily} actualSegments={measuredLineSegments(daily, .25)} trendSegments={[]} timezone={share.timezone} targetRange={share.target_range} onSelect={setSelectedId} selectedId={selected?.id ?? null} mode="day" />
+        {!daily.length && <p className="trend-empty">이 날짜에 기록된 혈당 측정값이 없습니다.</p>}
+        <p className="chart-caption">생활 시간대 {share.timezone} · 00:00~24:00. 점은 실제 측정값이며 6시간 이내 기록만 연결합니다. 중간 값은 측정값이 아닙니다. 초록색 혈당 안정범위는 설정된 참고 범위입니다.</p>
         {selected && <div className="share-selected-value" aria-live="polite"><strong>{selected.value} mg/dL</strong>
           <span>{formatTime(selected.occurredAt, share.timezone)} · {selected.condition ?? '측정 조건 미기록'}</span></div>}
       </section>
-      {share.care_times.length > 0 && <section className="panel"><h2>같은 기간의 식사·인슐린 기록 시각</h2>
-        <ul className="share-care-times">{share.care_times.map((item, index) => <li key={`${item.event_type}-${item.occurred_at}-${index}`}>
+      {careTimes.length > 0 && <section className="panel"><h2>이날의 식사·인슐린 기록 시각</h2>
+        <ul className="share-care-times">{careTimes.map((item, index) => <li key={`${item.event_type}-${item.occurred_at}-${index}`}>
           <span>{item.event_type === 'meal' ? '식사 기록' : '인슐린 기록'}</span><time>{formatTime(item.occurred_at, share.timezone)}</time>
         </li>)}</ul><small>투여량과 수행자 정보는 공유되지 않습니다. 시각 표시는 관련성이나 투여 적정성 판단이 아닙니다.</small>
       </section>}
-      <section className="panel measurement-list"><h2>측정값 목록 ({samples.length}건)</h2>
-        {samples.length ? <ol>{[...samples].reverse().map((sample) => <li key={sample.id}>
+      <section className="panel measurement-list"><h2>이날 측정값 ({daily.length}건)</h2>
+        {daily.length ? <ol>{[...daily].reverse().map((sample) => <li key={sample.id}>
           <button type="button" className={selected?.id === sample.id ? 'sample-row active' : 'sample-row'} onClick={() => setSelectedId(sample.id)}>
             <span><strong>{sample.value} mg/dL</strong><small>{formatTime(sample.occurredAt, share.timezone)}</small></span>
             <span><small>{sample.condition ?? '측정 조건 미기록'}</small><small>{sample.revisionKind ? '정정된 값' : '실제 측정값'}</small></span>
@@ -88,42 +93,4 @@ export function GlucoseSharePage() {
       <p className="timeline-footnote">공유 링크는 {new Date(share.expires_at).toLocaleString('ko-KR')}에 만료됩니다. 보호자가 링크를 취소하면 다시 열 수 없습니다.</p>
     </>}
   </main>;
-}
-
-function ShareChart({ samples, timezone, target, onSelect, selectedId }: {
-  samples: ShareSample[]; timezone: string;
-  target: GlucoseSharePayload['target_range']; onSelect: (id: string) => void; selectedId: string;
-}) {
-  const width = 800; const height = 280; const left = 56; const right = 18; const top = 20; const bottom = 42;
-  const sorted = [...samples].sort((a, b) => Date.parse(a.occurredAt) - Date.parse(b.occurredAt) || a.id.localeCompare(b.id));
-  const times = sorted.map((item) => Date.parse(item.occurredAt));
-  const vals = sorted.map((item) => item.value);
-  const minTime = Math.min(...times); const maxTime = Math.max(...times);
-  const minValue = Math.min(...vals, ...(target ? [target.lower_mg_dl] : []));
-  const maxValue = Math.max(...vals, ...(target ? [target.upper_mg_dl] : []));
-  const pad = Math.max(5, (maxValue - minValue) * .08);
-  const low = Math.max(0, minValue - pad); const high = maxValue + pad;
-  const x = (time: number) => maxTime === minTime ? (left + width - right) / 2 : left + (time - minTime) / (maxTime - minTime) * (width - left - right);
-  const y = (value: number) => height - bottom - (value - low) / (high - low || 1) * (height - top - bottom);
-  const segments = measuredLineSegments(sorted, 7);
-  const paths = segments.filter((segment) => segment.length > 1).map((segment) =>
-    `M ${x(Date.parse(segment[0].occurredAt))} ${y(segment[0].value)} ${segment.slice(1).map((item) => `L ${x(Date.parse(item.occurredAt))} ${y(item.value)}`).join(' ')}`);
-  const start = new Date(minTime).toLocaleDateString('ko-KR', { timeZone: timezone, month: 'numeric', day: 'numeric' });
-  const end = new Date(maxTime).toLocaleDateString('ko-KR', { timeZone: timezone, month: 'numeric', day: 'numeric' });
-  const ticks = [low, (low + high) / 2, high];
-  return <div className="share-chart-wrap"><svg className="glucose-chart share-chart" viewBox={`0 0 ${width} ${height}`} role="img"
-    aria-label={`${sorted.length}개 실제 혈당 측정값, mg/dL 시간 그래프`}>
-    {target && <><rect x={left} y={y(target.upper_mg_dl)} width={width - left - right} height={Math.max(0, y(target.lower_mg_dl) - y(target.upper_mg_dl))} className="target-band" />
-      <text x={left + 8} y={y(target.upper_mg_dl) + 16} className="target-band-label">목표 참고 범위</text></>}
-    {ticks.map((value) => <g key={value}><line x1={left} x2={width - right} y1={y(value)} y2={y(value)} stroke="#dce7df" />
-      <text x={left - 9} y={y(value) + 4} textAnchor="end" className="chart-axis-label">{Math.round(value)}</text></g>)}
-    {paths.map((path, index) => <path key={index} d={path} className="actual-series-line" />)}
-    {sorted.map((sample) => <circle key={sample.id} cx={x(Date.parse(sample.occurredAt))} cy={y(sample.value)} r={sample.id === selectedId ? 8 : 5}
-      className={sample.id === selectedId ? 'chart-point selected' : 'chart-point'} role="button" tabIndex={0}
-      aria-label={`${formatTime(sample.occurredAt, timezone)}, ${sample.value} mg/dL`} onClick={() => onSelect(sample.id)}
-      onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect(sample.id); } }} />)}
-    <text x={left} y={height - 12} className="chart-axis-label">{start}</text>
-    <text x={width - right} y={height - 12} textAnchor="end" className="chart-axis-label">{end}</text>
-    <text x={width - right} y={14} textAnchor="end" className="chart-unit-label">mg/dL</text>
-  </svg></div>;
 }
