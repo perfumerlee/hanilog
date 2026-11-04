@@ -53,11 +53,10 @@ describe('QuickRecordPage', () => {
     fireEvent.change(screen.getByLabelText('인슐린 제품'), { target: { value: '캐니슐린' } });
     fireEvent.change(screen.getByLabelText('실제 투여량'), { target: { value: '2' } });
     fireEvent.click(screen.getByRole('button', { name: '기록 저장' }));
-    expect(await screen.findByText(/일정 연결 없음/)).toBeInTheDocument();
-    expect(onSubmit).toHaveBeenCalledWith(
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({ eventType: 'insulin', doseAmount: '2', doseUnit: 'U', insulinProductLabel: '캐니슐린' }),
       null,
-    );
+    ));
   });
 
   it('applies the saved per-pet product when profile data arrives after the form mounts', () => {
@@ -70,7 +69,7 @@ describe('QuickRecordPage', () => {
   it('keeps insulin help and occurrence details collapsed until requested', () => {
     render(<QuickRecordPage {...props} />);
     fireEvent.click(screen.getByRole('radio', { name: /인슐린/ }));
-    expect(screen.getByText('추가 정보 · 일정 및 도움말').closest('details')).not.toHaveAttribute('open');
+    expect(screen.getByText('추가 정보 · 도움말').closest('details')).not.toHaveAttribute('open');
     fireEvent.click(screen.getByText('처음 인슐린을 준비하는 보호자 도움말'));
     expect(screen.getByText(/기포가 보이거나 눈금의 실제 양을 확신할 수 없다면/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'UC Davis 수의대 보호자 안내' })).toHaveAttribute('target', '_blank');

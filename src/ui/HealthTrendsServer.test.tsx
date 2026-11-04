@@ -7,8 +7,9 @@ vi.mock('../lib/supabase', () => ({
     let columns = '';
     const query = {
       select(value: string) { columns = value; return query; },
-      eq() { return query; }, order() { return query; }, in() { return query; },
+      eq() { return query; }, is() { return query; }, order() { return query; }, in() { return query; },
       gte() { return query; }, lt() { return query; },
+      maybeSingle() { return Promise.resolve({ data: null, error: null }); },
       range() {
         const event: Record<string, unknown> = {
           id: 'synthetic-event', event_type: 'glucose',

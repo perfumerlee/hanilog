@@ -116,7 +116,7 @@ jobs:
             rm -f "$env_file"
           }
           trap cleanup EXIT
-          npx --no-install supabase functions serve --no-verify-jwt --env-file "$env_file" notification-worker manage-push-subscription > "$function_log" 2>&1 &
+          npx --no-install supabase functions serve --no-verify-jwt --env-file "$env_file" > "$function_log" 2>&1 &
           functions_pid=$!
           ready=false
           for attempt in $(seq 1 45); do
