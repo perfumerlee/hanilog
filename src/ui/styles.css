@@ -390,6 +390,9 @@ button, a, input, select, textarea, summary { scroll-margin: 1rem; }
 .glucose-share-list li > span { display: grid; gap: .15rem; font-size: .78rem; }
 .glucose-share-list small, .share-care-times time { color: var(--muted); font-size: .7rem; }
 .glucose-tools-message { overflow-wrap: anywhere; }
+.share-link-result { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: .5rem; }
+.share-link-result .field-label { min-width: 0; }
+.share-link-result input { font-size: .8rem; }
 .public-glucose-share { padding-bottom: calc(1.5rem + env(safe-area-inset-bottom)); }
 .share-target-summary strong { color: #356d47; font-size: 1.35rem; font-variant-numeric: tabular-nums; }
 .share-target-summary p, .share-target-summary small { display: block; color: var(--muted); line-height: 1.5; }
@@ -404,6 +407,7 @@ button, a, input, select, textarea, summary { scroll-margin: 1rem; }
   .timeline-filter-chips { gap: .28rem; }
   .timeline-filter-chip { padding-inline: .48rem; font-size: .7rem; }
   .daily-graph-date .button-secondary { padding-inline: .55rem; }
+  .share-link-result { grid-template-columns: 1fr; }
 }
 .chart-caption { margin: .35rem .2rem .7rem; color: var(--muted); font-size: .76rem; line-height: 1.45; }
 .trend-empty { min-height: 150px; display: grid; align-content: center; justify-items: start; gap: .5rem; padding: .8rem .2rem; }

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { measuredLineSegments, type GlucoseSample } from '../lib/health-trends';
-import { callGlucoseShare, type GlucoseSharePayload } from '../lib/glucose-share';
+import { callGlucoseShare, GlucoseShareRequestError, type GlucoseSharePayload } from '../lib/glucose-share';
 import { supabase } from '../lib/supabase';
 
 type ShareSample = GlucoseSample & { value: number };
@@ -22,7 +22,14 @@ export function GlucoseSharePage() {
     }
     void callGlucoseShare<{ share: GlucoseSharePayload }>(supabase, { action: 'resolve', token })
       .then((response) => { if (active) { setResult({ token, share: response.share }); setSelectedId(response.share.measurements.at(-1)?.id ?? ''); } })
-      .catch(() => { if (active) setResult({ token, error: '공유 링크가 만료되었거나 취소되었거나 현재 열 수 없습니다. 링크를 만든 보호자에게 새 링크를 요청해 주세요.' }); });
+      .catch((error: unknown) => {
+        if (!active) return;
+        const code = error instanceof GlucoseShareRequestError ? error.code : '';
+        const unavailable = code === 'SHARE_FUNCTION_NOT_DEPLOYED' || code === 'SHARE_SCHEMA_UNAVAILABLE' || code === 'SHARE_SERVICE_UNAVAILABLE';
+        setResult({ token, error: unavailable
+          ? '혈당 공유 서버가 아직 준비되지 않았거나 일시적으로 응답하지 않습니다. 링크를 만든 보호자에게 확인을 요청해 주세요.'
+          : '공유 링크가 만료되었거나 취소되었거나 현재 열 수 없습니다. 링크를 만든 보호자에게 새 링크를 요청해 주세요.' });
+      });
     return () => { active = false; };
   }, [token]);
 

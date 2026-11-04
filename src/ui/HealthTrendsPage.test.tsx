@@ -13,7 +13,7 @@ describe('HealthTrendsPage', () => {
       performer_id: 'synthetic-user', value: { observed_value: 140 + index, measurement_condition: '합성 예시 조건' },
       unit: 'mg/dL', source: 'USER_ENTERED', occurrence_id: null,
     }));
-    render(<MemoryRouter><HealthTrendsPage pet={{ id: 'synthetic-pet', name: '합성 반려견', timezone: 'Asia/Seoul' }}
+    render(<MemoryRouter initialEntries={['/trends?view=period']}><HealthTrendsPage pet={{ id: 'synthetic-pet', name: '합성 반려견', timezone: 'Asia/Seoul' }}
       userId="synthetic-user" online demoEvents={events} /></MemoryRouter>);
     expect(screen.getByRole('heading', { name: '합성 반려견의 혈당 기록' })).toBeInTheDocument();
     expect(screen.getByRole('group', { name: '추세 기간' })).toBeInTheDocument();
@@ -36,13 +36,13 @@ describe('HealthTrendsPage', () => {
     expect(screen.queryByText(/mg\/dL$/)).not.toBeInTheDocument();
   });
 
-  it('opens the selected day view directly and keeps target/share tools compact until requested', () => {
+  it('opens day view by default and keeps target/share tools compact until requested', () => {
     const events = [{
       id: 'today-synthetic', occurred_at: new Date().toISOString(), event_type: 'glucose',
       recorded_at: new Date().toISOString(), actor_id: 'synthetic-user', performer_id: 'synthetic-user',
       value: { observed_value: 164 }, unit: 'mg/dL', source: 'synthetic', occurrence_id: null,
     }];
-    render(<MemoryRouter initialEntries={['/trends?view=day']}><HealthTrendsPage
+    render(<MemoryRouter initialEntries={['/trends']}><HealthTrendsPage
       pet={{ id: 'synthetic-pet', name: '합성 반려견', timezone: 'Asia/Seoul' }}
       userId="synthetic-user" online demoEvents={events} /></MemoryRouter>);
     expect(screen.getByRole('button', { name: '하루 보기' })).toHaveAttribute('aria-pressed', 'true');

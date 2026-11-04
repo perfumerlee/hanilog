@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { callGlucoseShare, createShareToken, glucoseShareUrl, type GlucoseShareRange } from '../lib/glucose-share';
+import { callGlucoseShare, createShareToken, glucoseShareUrl, GlucoseShareRequestError, type GlucoseShareRange } from '../lib/glucose-share';
 import { supabase } from '../lib/supabase';
 import { localDateKey } from '../lib/health-trends';
 
@@ -29,6 +29,16 @@ export function GlucoseCareTools({ petId, petName, timezone, canEdit, demo = fal
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState('');
   const [now] = useState(() => Date.now());
+
+  async function copyNewLink() {
+    if (!newLink) return;
+    try {
+      await navigator.clipboard.writeText(newLink);
+      setMessage('공유 링크를 복사했습니다. 문자나 메신저에 직접 붙여 넣어 보내세요.');
+    } catch {
+      setMessage('자동 복사가 안 됐습니다. 아래 링크를 선택해 복사해 주세요.');
+    }
+  }
 
   async function loadShares() {
     if (!supabase || demo || !canEdit) return;
@@ -73,12 +83,16 @@ export function GlucoseCareTools({ petId, petName, timezone, canEdit, demo = fal
       if (!result.share?.id) throw new Error('SHARE_CREATE_FAILED');
       const link = glucoseShareUrl(token);
       setNewLink(link);
-      try { await navigator.clipboard.writeText(link); setMessage(`${petName}의 선택 기간 혈당 링크를 복사했습니다. 링크를 받은 사람은 만료 전까지 읽을 수 있습니다.`); }
-      catch { setMessage('링크를 만들었습니다. 아래 주소를 직접 복사해 주세요. 링크를 받은 사람은 만료 전까지 읽을 수 있습니다.'); }
+      try { await navigator.clipboard.writeText(link); setMessage(`${petName}의 혈당 공유 링크를 복사했습니다. 문자나 메신저에 직접 붙여 넣어 보내세요.`); }
+      catch { setMessage('공유 링크를 만들었습니다. 아래 복사 버튼을 눌러 전달해 주세요.'); }
       await loadShares();
     } catch (error) {
-      setMessage(error instanceof Error && error.message === 'ACCESS_DENIED' ? '이 반려동물의 공유 링크를 만들 권한이 없습니다.'
-        : '공유 링크를 만들지 못했습니다. 운영 서버 migration과 glucose-share 함수 적용 상태를 확인해 주세요.');
+      const code = error instanceof GlucoseShareRequestError ? error.code : error instanceof Error ? error.message : '';
+      setMessage(code === 'ACCESS_DENIED' ? '이 반려동물의 공유 링크를 만들 권한이 없습니다.'
+        : code === 'SHARE_FUNCTION_NOT_DEPLOYED' ? '공유 기능 서버가 아직 운영 환경에 적용되지 않았습니다. 서버 배포가 필요합니다.'
+          : code === 'SHARE_SCHEMA_UNAVAILABLE' ? '공유 기능의 데이터베이스 설정이 아직 운영 환경에 적용되지 않았습니다.'
+            : code === 'SHARE_SERVICE_UNAVAILABLE' ? '공유 서버가 일시적으로 응답하지 않습니다. 잠시 후 다시 시도해 주세요.'
+              : '공유 링크를 만들지 못했습니다. 연결 상태와 공유 기능 서버 설정을 확인해 주세요.');
     } finally { setPending(false); }
   }
 
@@ -141,7 +155,10 @@ export function GlucoseCareTools({ petId, petName, timezone, canEdit, demo = fal
         <label className="check-row"><input type="checkbox" checked={includeCareTimes} onChange={(event) => setIncludeCareTimes(event.target.checked)} />같은 기간의 식사·인슐린 기록 시각도 포함</label>
         <label className="check-row share-access-ack"><input type="checkbox" checked={acknowledgeBearerLink} required onChange={(event) => setAcknowledgeBearerLink(event.target.checked)} />링크만 가진 사람도 만료 전까지 열람할 수 있음을 확인했습니다.</label>
         <button type="submit" className="button-primary" disabled={pending}>{pending ? '안전한 링크 생성 중…' : '링크 만들고 복사'}</button>
-        {newLink && <label className="field-label full-field">공유 링크<input readOnly value={newLink} onFocus={(event) => event.currentTarget.select()} /></label>}
+        {newLink && <div className="share-link-result">
+          <label className="field-label full-field">공유 링크<input readOnly value={newLink} onFocus={(event) => event.currentTarget.select()} /></label>
+          <button type="button" className="button-secondary" onClick={() => void copyNewLink()}>링크 복사</button>
+        </div>}
       </form>}
       {shares.some((item) => !item.revoked_at && Date.parse(item.expires_at) > now) && <ul className="glucose-share-list">
         {shares.filter((item) => !item.revoked_at && Date.parse(item.expires_at) > now).map((item) => <li key={item.id}>

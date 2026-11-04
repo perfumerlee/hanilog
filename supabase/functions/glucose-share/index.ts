@@ -11,6 +11,7 @@ const cors = (origin: string | null) => ({
 const jsonHeaders = (origin: string | null) => ({ ...cors(origin), 'Content-Type': 'application/json',
   'Cache-Control': 'no-store, private', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer' });
 const hex = (bytes: Uint8Array) => [...bytes].map((value) => value.toString(16).padStart(2, '0')).join('');
+const schemaUnavailable = (error: { code?: string } | null) => Boolean(error && ['42883', '42P01', '42703'].includes(error.code ?? ''));
 
 async function readBoundedJson(request: Request, maxBytes = 4096) {
   const declared = Number(request.headers.get('content-length'));
@@ -108,22 +109,22 @@ Deno.serve(async (request) => {
         p_pet_id: pet_id, p_token_hash: token_hash, p_from_date: from_date, p_to_date: to_date,
         p_expires_at: expires_at, p_include_care_times: include_care_times,
       });
-      if (error) return Response.json({ error: error.code === '42501' ? 'ACCESS_DENIED' : 'SHARE_CREATE_FAILED' },
-        { status: error.code === '42501' ? 403 : 400, headers });
+      if (error) return Response.json({ error: schemaUnavailable(error) ? 'SHARE_SCHEMA_UNAVAILABLE' : error.code === '42501' ? 'ACCESS_DENIED' : 'SHARE_CREATE_FAILED' },
+        { status: schemaUnavailable(error) ? 503 : error.code === '42501' ? 403 : 400, headers });
       return Response.json({ share: Array.isArray(data) ? data[0] : data }, { headers });
     }
     if (payload.action === 'list') {
       if (typeof payload.pet_id !== 'string' || !/^[0-9a-f-]{36}$/i.test(payload.pet_id)) return Response.json({ error: 'INVALID_REQUEST' }, { status: 400, headers });
       const { data, error } = await client.rpc('list_my_glucose_share_links', { p_pet_id: payload.pet_id });
-      if (error) return Response.json({ error: error.code === '42501' ? 'ACCESS_DENIED' : 'SHARE_LIST_FAILED' },
-        { status: error.code === '42501' ? 403 : 400, headers });
+      if (error) return Response.json({ error: schemaUnavailable(error) ? 'SHARE_SCHEMA_UNAVAILABLE' : error.code === '42501' ? 'ACCESS_DENIED' : 'SHARE_LIST_FAILED' },
+        { status: schemaUnavailable(error) ? 503 : error.code === '42501' ? 403 : 400, headers });
       return Response.json({ shares: data ?? [] }, { headers });
     }
     if (payload.action === 'revoke') {
       if (typeof payload.share_id !== 'string' || !/^[0-9a-f-]{36}$/i.test(payload.share_id)) return Response.json({ error: 'INVALID_REQUEST' }, { status: 400, headers });
       const { error } = await client.rpc('revoke_glucose_share_link', { p_share_id: payload.share_id });
-      if (error) return Response.json({ error: error.code === '42501' ? 'ACCESS_DENIED' : 'SHARE_REVOKE_FAILED' },
-        { status: error.code === '42501' ? 403 : 400, headers });
+      if (error) return Response.json({ error: schemaUnavailable(error) ? 'SHARE_SCHEMA_UNAVAILABLE' : error.code === '42501' ? 'ACCESS_DENIED' : 'SHARE_REVOKE_FAILED' },
+        { status: schemaUnavailable(error) ? 503 : error.code === '42501' ? 403 : 400, headers });
       return Response.json({ revoked: true }, { headers });
     }
     return Response.json({ error: 'INVALID_ACTION' }, { status: 400, headers });

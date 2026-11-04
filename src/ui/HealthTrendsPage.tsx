@@ -55,7 +55,8 @@ function toSample(event: RawEvent, revision?: Revision): GlucoseSample | null {
 export function HealthTrendsPage({ pet, userId, online, demoEvents }: Props) {
   const [searchParams] = useSearchParams();
   const [period, setPeriod] = useState<TrendPeriod>('30d');
-  const [displayMode, setDisplayMode] = useState<'period' | 'day'>(() => searchParams.get('view') === 'day' ? 'day' : 'period');
+  // Day view is the primary workflow; an explicit query parameter can still open period trends.
+  const [displayMode, setDisplayMode] = useState<'period' | 'day'>(() => searchParams.get('view') === 'period' ? 'period' : 'day');
   const [events, setEvents] = useState<RawEvent[]>(demoEvents ?? []);
   const [revisions, setRevisions] = useState<Revision[]>([]);
   const [loading, setLoading] = useState(!demoEvents);
@@ -199,7 +200,6 @@ export function HealthTrendsPage({ pet, userId, online, demoEvents }: Props) {
         <div><span className="eyebrow">직전 측정 비교</span><strong>{delta === null ? '비교할 기록 없음' : `${delta > 0 ? '+' : ''}${delta} mg/dL`}</strong>
           <small>{delta === null || !previous ? '건강 상태의 개선·악화를 의미하지 않습니다' : `직전 측정 ${dateTime(previous.occurredAt, pet.timezone)} · 해석이 아닌 값 차이`}</small></div>
       </section>
-      {glucoseCareTools}
       <section className="panel trends-panel">
         <div className="trends-heading"><div><p className="eyebrow">실제 측정값</p><h2>{displayMode === 'day' ? `${selectedDay} 시간대별 혈당` : '시간에 따른 기록'}</h2></div>
           <Link className="button-link trends-add" to="/record?event=glucose">혈당 기록 추가</Link></div>
@@ -222,15 +222,15 @@ export function HealthTrendsPage({ pet, userId, online, demoEvents }: Props) {
           {periods.map((item) => <button type="button" key={item.id} className={period === item.id ? 'period-chip selected' : 'period-chip'}
             aria-pressed={period === item.id} onClick={() => { setPeriod(item.id); setSelectedId(null); }}>{item.label}</button>)}
         </div>}
-        {displayedSamples.length === 0 ? <div className="trend-empty"><h3>{displayMode === 'day' ? '선택한 날짜에 혈당 기록이 없습니다' : '선택한 기간에 호환 가능한 혈당 기록이 없습니다'}</h3>
+        {displayedSamples.length === 0 && <div className="trend-empty"><h3>{displayMode === 'day' ? '선택한 날짜에 혈당 기록이 없습니다' : '선택한 기간에 호환 가능한 혈당 기록이 없습니다'}</h3>
           <p>기록이 없는 구간은 빈 상태로 유지합니다. 측정값을 생성하거나 보간하지 않습니다.</p>
-          {allSamples.length === 0 && <Link to="/record?event=glucose" className="text-link">실제로 측정한 값 기록하기</Link>}</div>
-          : <>
+          {allSamples.length === 0 && <Link to="/record?event=glucose" className="text-link">실제로 측정한 값 기록하기</Link>}</div>}
+        {(displayedSamples.length > 0 || (displayMode === 'day' && activeTargetRange !== null)) && <>
             <GlucoseScatterChart samples={displayedSamples} actualSegments={actualSegments} trendSegments={displayMode === 'period' && showTrend ? derivedSegments : []}
-              timezone={pet.timezone} selectedId={selected?.id ?? null} onSelect={setSelectedId} mode={displayMode} targetRange={targetRange} />
+              timezone={pet.timezone} selectedId={selected?.id ?? null} onSelect={setSelectedId} mode={displayMode} targetRange={activeTargetRange} />
             <p className="chart-caption">{displayMode === 'day' ? 'X축은 반려동물 생활 시간대의 00:00~24:00입니다. 6시간 이내 실제 측정값만 직선 연결하며 그 사이 값은 측정값이 아닙니다.'
               : 'X축은 실제 측정 시각에 비례합니다. 얇은 실선은 7일 이내의 실제 측정값끼리만 직선 연결하며 그 사이 값은 측정값이 아닙니다.'}
-              {targetRange ? ` 초록색 영역은 ${targetRange.source_label} 안내 목표 범위(${targetRange.lower_mg_dl}–${targetRange.upper_mg_dl} mg/dL) 참고 표시입니다.` : ' 수의사 안내 목표 범위가 등록되지 않았습니다.'}
+              {activeTargetRange ? ` 초록색 영역은 ${activeTargetRange.source_label} 안내 목표 범위(${activeTargetRange.lower_mg_dl}–${activeTargetRange.upper_mg_dl} mg/dL) 참고 표시입니다.` : ' 수의사 안내 목표 범위가 등록되지 않았습니다. 목표 범위를 등록하면 그래프 안에 초록색 띠로 표시됩니다.'}
               {showTrend ? ' 점선은 선택한 기간별 중앙값으로 계산한 참고 추세이며 임상 판단이 아닙니다.' : ''} 단위: mg/dL</p>
             {displayMode === 'period' && showTrend && derivedSegments.length === 0 && <p className="small-note" role="status">연결 가능한 구간이 부족해 계산 추세를 표시하지 않습니다. 미측정 구간을 가로질러 추세선을 그리지 않습니다.</p>}
             {selected && <section className="sample-detail" aria-live="polite">
@@ -253,6 +253,7 @@ export function HealthTrendsPage({ pet, userId, online, demoEvents }: Props) {
             </section>}
           </>}
       </section>
+      {glucoseCareTools}
       {displayMode === 'period' && (period === '1y' || period === 'all') && <section className="panel monthly-panel"><h2>월별 실제 검사 횟수</h2>
         {monthly.length ? <ul className="monthly-counts">{monthly.map((item) => <li key={item.month}><span>{item.month}</span><strong>{item.count}회</strong></li>)}</ul>
           : <p>선택한 기간의 월별 기록이 없습니다.</p>}
@@ -329,7 +330,8 @@ function GlucoseScatterChart({ samples, actualSegments, trendSegments, timezone,
         <line x1={left} x2={width - right} y1={yFor(value)} y2={yFor(value)} stroke="#dce7df" strokeDasharray="4 6" />
         <text x={left - 10} y={yFor(value) + 5} textAnchor="end" className="chart-axis-label">{Number(value.toFixed(1))}</text>
       </g>)}
-      {targetRange && <text x={left + 8} y={yFor(targetRange.upper_mg_dl) + 16} className="target-band-label">수의사 안내 목표 범위</text>}
+      {targetRange && <text x={left + 8} y={yFor(targetRange.upper_mg_dl) + 16} className="target-band-label">
+        수의사 안내 범위 {targetRange.lower_mg_dl}–{targetRange.upper_mg_dl} mg/dL</text>}
       {xTicks.map((minute) => <g key={minute}><line x1={xPositionForMinute(minute)} x2={xPositionForMinute(minute)} y1={height - bottom} y2={height - bottom + 5} stroke="#8da295" />
         <text x={xPositionForMinute(minute)} y={height - 14} textAnchor={minute === 0 ? 'start' : minute === 1440 ? 'end' : 'middle'} className="chart-axis-label">{String(Math.floor(minute / 60)).padStart(2, '0')}:00</text></g>)}
       <line x1={left} x2={width - right} y1={height - bottom} y2={height - bottom} stroke="#8da295" />

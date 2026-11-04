@@ -22,6 +22,13 @@ export type GlucoseSharePayload = {
 };
 export type GlucoseShareAction = 'create' | 'list' | 'revoke' | 'resolve';
 
+export class GlucoseShareRequestError extends Error {
+  constructor(readonly code: string, readonly status?: number) {
+    super(code);
+    this.name = 'GlucoseShareRequestError';
+  }
+}
+
 export function createShareToken(): { token: string; tokenHash: Promise<string> } {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
   const token = btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
@@ -37,7 +44,22 @@ export function glucoseShareUrl(token: string): string {
 
 export async function callGlucoseShare<T>(client: SupabaseClient, body: Record<string, unknown>): Promise<T> {
   const { data, error } = await client.functions.invoke('glucose-share', { body });
-  if (error) throw new Error('GLUCOSE_SHARE_REQUEST_FAILED');
+  if (error) {
+    const context = error.context;
+    const status = context instanceof Response ? context.status : undefined;
+    let responseCode: unknown;
+    if (context instanceof Response) {
+      try {
+        const payload: unknown = await context.clone().json();
+        if (payload && typeof payload === 'object' && 'error' in payload) responseCode = payload.error;
+      } catch { /* A gateway error may not have a JSON response. */ }
+    }
+    const code = typeof responseCode === 'string' && /^[A-Z][A-Z0-9_]{2,63}$/.test(responseCode)
+      ? responseCode
+      : status === 404 ? 'SHARE_FUNCTION_NOT_DEPLOYED'
+        : status && status >= 500 ? 'SHARE_SERVICE_UNAVAILABLE' : 'SHARE_REQUEST_FAILED';
+    throw new GlucoseShareRequestError(code, status);
+  }
   if (!data || typeof data !== 'object') throw new Error('GLUCOSE_SHARE_RESPONSE_INVALID');
   if (typeof data.error === 'string') throw new Error(data.error);
   return data as T;
