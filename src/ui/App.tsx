@@ -177,7 +177,7 @@ export function App() {
   }, []);
 
   const publicShareRoute = location.pathname.startsWith('/glucose-share/');
-  if (!sessionReady && !publicShareRoute) return <main className="center-card" aria-live="polite">세션을 확인하고 있습니다…</main>;
+  if (!sessionReady && !publicShareRoute) return <DataLoadingPage title="로그인 상태를 확인하고 있어요" />;
 
   const requestedInvitePath = (location.state as { from?: unknown } | null)?.from;
   const postLoginPath = typeof requestedInvitePath === 'string' && requestedInvitePath.startsWith('/invite') ? requestedInvitePath : '/';
@@ -283,7 +283,7 @@ function DemoWorkspace() {
   const noOpForm = (event: FormEvent<HTMLFormElement>) => event.preventDefault();
   return <>
     <div className="workspace-layout">
-      <SessionNavigation key={`${location.pathname}${location.search}`} pathname={location.pathname} />
+      <SessionNavigation key={`${location.pathname}${location.search}`} pathname={location.pathname} search={location.search} />
       <div className="workspace-content">
         <div className="notice notice-warning demo-banner" role="status">
           <strong>DEMO 모드 · 합성 정보만 사용</strong>
@@ -299,7 +299,7 @@ function DemoWorkspace() {
         </div>
         <Routes>
           <Route path="/login" element={<DemoLogin />} />
-          <Route path="/" element={<DashboardPage pet={pet} petsCount={demoPetList.length} households={demoHouseholds}
+          <Route path="/" element={location.search !== '?profile=1' ? <Navigate to="/record" replace /> : <DashboardPage profileOnly pet={pet} petsCount={demoPetList.length} households={demoHouseholds}
             selectedHouseholdId={demoHouseholds[0].id} setSelectedHouseholdId={() => undefined}
             events={petEvents.filter((event) => localDateKey(event.occurred_at, pet.timezone) === date)} allEvents={petEvents}
             revisions={demoRevisions} userId={demoUserId}
@@ -946,9 +946,13 @@ function Workspace({ userId, online }: { userId: string; online: boolean }) {
     ? events.filter((item) => localDateKey(item.occurred_at, selectedPet.timezone) === todayForTimezone(selectedPet.timezone))
     : [], [events, selectedPet, dataReady]);
 
+  if (online && (loadingPets || (selectedPet && (loadingEvents || loadedPetId !== selectedPet.id)))) {
+    return <DataLoadingPage title="반려동물 기록을 불러오고 있어요" />;
+  }
+
   return (
     <div className="workspace-layout">
-      <SessionNavigation key={`${location.pathname}${location.search}`} pathname={location.pathname} />
+      <SessionNavigation key={`${location.pathname}${location.search}`} pathname={location.pathname} search={location.search} />
       <div className="workspace-content">
       <div className="workspace-bar">
         {pets.length > 0 ? <div className="pet-switcher">
@@ -981,7 +985,7 @@ function Workspace({ userId, online }: { userId: string; online: boolean }) {
       </p>}
       <Routes>
         <Route path="/invite" element={<InvitationAcceptPage />} />
-        <Route path="/" element={selectedPet && !loadingPets && location.search !== '?profile=1' ? <Navigate to="/record" replace /> : <DashboardPage
+        <Route path="/" element={selectedPet && !loadingPets && location.search !== '?profile=1' ? <Navigate to="/record" replace /> : <DashboardPage profileOnly={location.search === '?profile=1'}
           pet={selectedPet} petsCount={pets.length} households={households} selectedHouseholdId={selectedHouseholdId} setSelectedHouseholdId={setSelectedHouseholdId}
           onRenameHousehold={renameHousehold}
           events={todayEvents} allEvents={dataReady ? events : []} revisions={dataReady ? revisions : []}
@@ -999,7 +1003,7 @@ function Workspace({ userId, online }: { userId: string; online: boolean }) {
           : <TimelinePage pet={selectedPet} events={dataReady ? events : []} revisions={dataReady ? revisions : []} userId={userId}
             dateFilter={dateFilter} setDateFilter={setDateFilter} loading={loadingEvents} onSaveExerciseEnd={saveExerciseEnd} onReviseEvent={reviseTimelineEvent} onCorrectTime={correctTimelineTime} />} />
         <Route path="/trends" element={!selectedPet ? <SetupPrompt loading={loadingPets} accessMessage={accessMessage} />
-          : online && !dataReady ? <main className="page-container trends-loading-page" role="status" aria-live="polite"><div className="loading-spinner" aria-hidden="true" /><h1>건강 기록을 불러오고 있어요</h1><p>서버에서 최신 기록을 확인하고 있습니다.</p></main> : <HealthTrendsPage key={`${selectedPet.id}:${online}:${dataReady}`} pet={selectedPet} userId={userId} online={online && dataReady} />} />
+          : online && !dataReady ? <DataLoadingPage title="혈당 기록을 불러오고 있어요" /> : <HealthTrendsPage key={`${selectedPet.id}:${online}:${dataReady}`} pet={selectedPet} userId={userId} online={online && dataReady} />} />
         <Route path="/care" element={<Navigate to="/timeline" replace />} />
         <Route path="/shared" element={<SharedCarePage key={households.map((item) => item.id).join(':')} households={households} pets={pets} userId={userId} onRenameHousehold={renameHousehold} />} />
         <Route path="/notifications" element={<NotificationsPage key={`${userId}:${selectedPetId}:${pets.map((pet) => pet.id).join(':')}`} pets={pets} userId={userId} online={online} />} />
@@ -1018,7 +1022,14 @@ function Workspace({ userId, online }: { userId: string; online: boolean }) {
   );
 }
 
-function SessionNavigation({ pathname }: { pathname: string }) {
+function DataLoadingPage({ title }: { title: string }) {
+  return <main className="page-container trends-loading-page" role="status" aria-live="polite" aria-busy="true">
+    <div className="loading-spinner" aria-hidden="true" /><h1>{title}</h1>
+    <p>서버에서 최신 정보를 확인하고 있습니다.</p>
+  </main>;
+}
+
+function SessionNavigation({ pathname, search }: { pathname: string; search: string }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const secondaryItems = [
     { to: '/?profile=1', label: '반려동물 설정', icon: '🐾' },
@@ -1038,12 +1049,14 @@ function SessionNavigation({ pathname }: { pathname: string }) {
     return () => window.removeEventListener('resize', resetAtDesktop);
   }, [pathname]);
   const linkFor = (item: { to: string; label: string; icon: string }) => {
-      const active = item.to === '/' ? pathname === '/' : pathname.startsWith(item.to);
+      const active = item.to.startsWith('/?') ? pathname === '/' && search === item.to.slice(1)
+        : item.to === '/' ? pathname === '/' : pathname.startsWith(item.to);
       return <NavLink key={item.to} to={item.to} className={`${active ? 'nav-item active' : 'nav-item'}${item.to === '/record' ? ' nav-record' : ''}`} aria-current={active ? 'page' : undefined}>
         <span className="nav-icon" aria-hidden="true">{item.icon}</span><span>{item.label}</span>
       </NavLink>;
   };
-  const activeSecondary = secondaryItems.some((item) => pathname.startsWith(item.to));
+  const activeSecondary = secondaryItems.some((item) => item.to.startsWith('/?')
+    ? pathname === '/' && search === item.to.slice(1) : pathname.startsWith(item.to));
   return <nav className={`app-nav${moreOpen ? ' is-open' : ''}`} aria-label="주요 메뉴">
     <div className="nav-primary">{primaryItems.map(linkFor)}
       <button type="button" className={`nav-more-toggle${activeSecondary ? ' active' : ''}`} aria-expanded={moreOpen}
@@ -1071,6 +1084,7 @@ function SetupPrompt({ loading, accessMessage = '' }: { loading: boolean; access
 }
 
 function DashboardPage(props: {
+  profileOnly?: boolean;
   pet: Pet | null; petsCount: number; households: { id: string; name: string; role: string }[];
   selectedHouseholdId: string; setSelectedHouseholdId: (id: string) => void;
   onRenameHousehold: (householdId: string, name: string) => Promise<boolean>;
@@ -1177,6 +1191,14 @@ function DashboardPage(props: {
     </section>
   </main>;
   if (!pet) return <SetupPrompt loading={loading} />;
+
+  if (props.profileOnly) return <main className="page-container profile-page">
+    <section className="page-heading"><p className="eyebrow">반려동물 설정</p><h1>{pet.name}의 프로필</h1></section>
+    <PetProfileEditor key={pet.id} name={pet.name} petId={onPetProfileSaved ? pet.id : undefined}
+      avatarId={isPetAvatarId(pet.profile_avatar_id) ? pet.profile_avatar_id : 'dog-1'}
+      photoPath={onPetProfileSaved ? pet.profile_photo_object_path ?? null : null} revision={pet.profile_revision ?? 0}
+      canEdit={pet.profileCanEdit ?? false} onProfileSaved={onPetProfileSaved} />
+  </main>;
 
   const localToday = todayForTimezone(pet.timezone);
   const daily = events.filter((event) => localDateKey(event.occurred_at, pet.timezone) === localToday
