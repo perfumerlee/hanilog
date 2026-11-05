@@ -937,7 +937,7 @@ function Workspace({ userId, online }: { userId: string; online: boolean }) {
         </button>
       </div>
       {accessMessage && <div role="alert" className="notice notice-warning">{accessMessage}</div>}
-      {dataMessage && <div role="status" className="notice notice-warning">{dataMessage}</div>}
+      {dataMessage && !loadingPets && !loadingEvents && <div role="status" className="notice notice-warning">{dataMessage}</div>}
       {recordNotice && <div role={recordNotice.kind === 'error' || recordNotice.kind === 'unverified' ? 'alert' : 'status'}
         className={`notice ${recordNotice.kind === 'success' ? 'notice-success' : 'notice-warning'}`}>{recordNotice.text}</div>}
       {!online && recordNotice?.kind !== 'unverified' && <div role="status" className="notice notice-warning">
@@ -968,7 +968,7 @@ function Workspace({ userId, online }: { userId: string; online: boolean }) {
           : <TimelinePage pet={selectedPet} events={dataReady ? events : []} revisions={dataReady ? revisions : []} userId={userId}
             dateFilter={dateFilter} setDateFilter={setDateFilter} loading={loadingEvents} onSaveExerciseEnd={saveExerciseEnd} />} />
         <Route path="/trends" element={!selectedPet ? <SetupPrompt loading={loadingPets} accessMessage={accessMessage} />
-          : <HealthTrendsPage key={`${selectedPet.id}:${online}:${dataReady}`} pet={selectedPet} userId={userId} online={online && dataReady} />} />
+          : online && !dataReady ? <main className="page-container trends-loading-page" role="status" aria-live="polite"><div className="loading-spinner" aria-hidden="true" /><h1>건강 기록을 불러오고 있어요</h1><p>서버에서 최신 기록을 확인하고 있습니다.</p></main> : <HealthTrendsPage key={`${selectedPet.id}:${online}:${dataReady}`} pet={selectedPet} userId={userId} online={online && dataReady} />} />
         <Route path="/care" element={<Navigate to="/timeline" replace />} />
         <Route path="/shared" element={<SharedCarePage key={households.map((item) => item.id).join(':')} households={households} pets={pets} userId={userId} onRenameHousehold={renameHousehold} />} />
         <Route path="/notifications" element={<NotificationsPage key={`${userId}:${selectedPetId}:${pets.map((pet) => pet.id).join(':')}`} pets={pets} userId={userId} online={online} />} />

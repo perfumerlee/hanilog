@@ -677,3 +677,10 @@ button, a, input, select, textarea, summary { scroll-margin: 1rem; }
 .public-glucose-share .day-navigation { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: end; margin-block: 16px; }
 .public-glucose-share .day-navigation button { min-height: 44px; }
 .public-glucose-share .day-navigation input { width: 100%; min-width: 0; }
+
+.trends-loading-page { min-height: min(65vh, 620px); display: flex; flex-direction: column; justify-content: center; align-items: center; gap: .7rem; text-align: center; }
+.trends-loading-page h1 { margin: .25rem 0 0; font-size: clamp(1.25rem, 3vw, 1.7rem); }
+.trends-loading-page p { margin: 0; color: var(--muted); }
+.loading-spinner { width: 42px; height: 42px; border: 4px solid #dce7dd; border-top-color: var(--green); border-radius: 50%; animation: loading-spin .8s linear infinite; }
+@keyframes loading-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .loading-spinner { animation: none; } }
