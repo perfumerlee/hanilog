@@ -51,7 +51,7 @@ try {
     { width: 1440, height: 900 },
     { width: 1920, height: 1080 },
   ];
-  const routes = ['/', '/record', '/trends', '/timeline', '/care', '/shared', '/notifications'];
+  const routes = ['/', '/?profile=1', '/record', '/trends', '/timeline', '/care', '/shared', '/notifications'];
 
   for (const viewport of viewports) {
     await page.setViewportSize(viewport);
@@ -93,30 +93,35 @@ try {
         assert.ok(metrics.navRight <= metrics.contentLeft,
           `Sidebar overlaps content at ${viewport.width}px on ${route}: ${JSON.stringify(metrics)}`);
         assert.equal(metrics.desktopMoreVisible, false, 'Desktop must show the full route navigation, not the mobile More control.');
-        assert.equal(metrics.visibleSecondaryLinks, 3, 'All secondary routes must be visible in the desktop sidebar.');
+        assert.equal(metrics.visibleSecondaryLinks, 4, 'All secondary routes must be visible in the desktop sidebar.');
       } else {
         assert.equal(metrics.navPosition, 'fixed', `Mobile/tablet navigation should be the bottom bar on ${route}.`);
-        assert.equal(metrics.mobileVisiblePrimaryLinks, 4, 'Mobile must expose four primary routes plus one More control.');
+        assert.equal(metrics.mobileVisiblePrimaryLinks, 2, 'Mobile must expose Blood Glucose and the centered Quick Record route.');
         assert.equal(metrics.visibleSecondaryLinks, 0, 'Secondary mobile routes must stay inside the closed More menu.');
         assert.ok(metrics.navTop >= viewport.height - 100, `Mobile bottom navigation expanded unexpectedly: ${JSON.stringify(metrics)}`);
       }
 
       if (route === '/trends' && [375, 390, 430, 768, 820, 1024, 1180, 1440].includes(viewport.width)) {
+        await page.getByRole('button', { name: '기간 추세' }).click();
         await page.getByRole('button', { name: '90일' }).click();
         const chart = page.locator('.glucose-chart');
         assert.ok(await page.locator('.chart-point').count() >= 80, '90-day Demo chart should retain the actual dense measurement samples.');
-        assert.ok(await page.locator('.actual-series-line').count() > 0, 'Actual measurements should be joined by straight segments.');
+        assert.ok(await page.locator('.actual-series-line').count() > 0, 'Actual measurements should be joined in measured segments.');
         const pathGeometry = await page.locator('.actual-series-line').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('d')));
-        assert.ok(pathGeometry.every((path) => path && !/[CQST]/.test(path)), 'Measured series must use straight M/L segments, without spline or curve commands.');
+        assert.ok(pathGeometry.some((path) => path?.includes('C')), 'Measured series should use curves only between actual measurements.');
         const geometryMatches = await chart.evaluate((svg) => {
           const pointPairs = new Set([...svg.querySelectorAll('.chart-point')].map((point) => `${point.getAttribute('cx')},${point.getAttribute('cy')}`));
           return [...svg.querySelectorAll('.actual-series-line')].every((path) => {
-            const pairs = (path.getAttribute('d') ?? '').replace(/[ML]/g, ' ').trim().split(/\s+/).map(Number);
-            for (let index = 0; index < pairs.length; index += 2) if (!pointPairs.has(`${pairs[index]},${pairs[index + 1]}`)) return false;
+            const commands = (path.getAttribute('d') ?? '').match(/[MCL][^MCL]*/g) ?? [];
+            for (const command of commands) {
+              const numbers = command.slice(1).trim().split(/\s+/).map(Number);
+              const point = `${numbers.at(-2)},${numbers.at(-1)}`;
+              if (!pointPairs.has(point)) return false;
+            }
             return true;
           });
         });
-        assert.equal(geometryMatches, true, 'Every measured line vertex must exactly pass through a rendered actual measurement point.');
+        assert.equal(geometryMatches, true, 'Every curve endpoint must exactly pass through an actual measurement point.');
         await page.screenshot({ path: resolve(screenshotsDir, `${viewport.width}x${viewport.height}-trends-default.png`), fullPage: false });
         const selectedPoint = page.locator('.chart-point').last();
         const expectedValue = await selectedPoint.evaluate((node) => node.parentElement?.querySelector('title')?.textContent?.match(/([\d.]+) mg\/dL/)?.[1]);
@@ -130,7 +135,7 @@ try {
         assert.equal(await page.locator('.derived-trend-line').count(), 0, 'Turning off the trend must remove only the derived line.');
       }
 
-      if (route === '/') {
+      if (route === '/?profile=1') {
         const file = `${viewport.width}x${viewport.height}-dashboard.png`;
         await page.screenshot({ path: resolve(screenshotsDir, file), fullPage: true });
         if ([375, 390, 430, 768, 820, 1024, 1180, 1440].includes(viewport.width)) {
@@ -179,8 +184,8 @@ try {
     if (viewport.width < 900) {
       await page.goto(`${origin}/#/`, { waitUntil: 'domcontentloaded' });
       await page.getByRole('button', { name: '더 보기' }).click();
-      assert.equal(await page.locator('.nav-secondary .nav-item:visible').count(), 3,
-        'More must reveal Timeline, Shared Care and Notifications routes.');
+      assert.equal(await page.locator('.nav-secondary .nav-item:visible').count(), 4,
+        'More must reveal Profile, Timeline, Shared Care and Notifications routes.');
       await page.locator('.nav-secondary a[href="#/timeline"]').click();
       await page.waitForURL('**/#/timeline');
       await page.waitForFunction(() => globalThis.document.querySelector('.nav-more-toggle')?.getAttribute('aria-expanded') === 'false');
@@ -190,7 +195,7 @@ try {
 
     if (viewport.width >= 900) {
       await page.goto(`${origin}/#/`, { waitUntil: 'domcontentloaded' });
-      assert.equal(await page.locator('.app-nav .nav-item:visible').count(), 7,
+      assert.equal(await page.locator('.app-nav .nav-item:visible').count(), 6,
         'Desktop sidebar must expose every supported route.');
     }
     log(`PASS layout ${viewport.width}x${viewport.height}`);

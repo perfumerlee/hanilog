@@ -188,7 +188,7 @@ export function HealthTrendsPage({ pet, userId, online, demoEvents }: Props) {
     }} />;
 
   return <main className="page-container trends-page">
-    <section className="page-heading"><p className="eyebrow">건강 추세</p><h1>{pet.name}의 혈당 기록</h1>
+    <section className="page-heading"><p className="eyebrow">혈당기록</p><h1>{pet.name}의 혈당 기록</h1>
       <p>실제 측정값과 수의사에게서 안내받은 혈당 안정범위를 확인합니다. 그래프는 치료 효과나 투여 적정성을 판단하지 않습니다.</p></section>
     {currentMessage && <div className={demo ? 'notice notice-success' : 'notice notice-warning'} role={demo ? 'status' : 'alert'}>{currentMessage}</div>}
     {!online && !demo && <div className="notice notice-warning" role="status">UNVERIFIED · 마지막으로 본 값은 현재 최신 기록으로 확인되지 않았습니다.</div>}
@@ -314,7 +314,22 @@ export function GlucoseScatterChart({ samples, actualSegments, trendSegments, ti
   const xPositionForMinute = (minute: number) => left + minute / 1440 * (width - left - right);
   const pathsFor = <T extends { occurredAt: string; value: number }>(segments: T[][]) => segments.map((segment) =>
     segment.length > 1 ? `M ${xFor(Date.parse(segment[0].occurredAt))} ${yFor(segment[0].value)} ${segment.slice(1).map((point) => `L ${xFor(Date.parse(point.occurredAt))} ${yFor(point.value)}`).join(' ')}` : '').filter(Boolean);
-  const actualPaths = pathsFor(actualSegments);
+  const actualPaths = actualSegments.map((segment) => {
+    if (segment.length < 2) return '';
+    const points = segment.map((point) => ({ x: xFor(Date.parse(point.occurredAt)), y: yFor(point.value) }));
+    if (points.some((point, index) => index > 0 && point.x <= points[index - 1].x)) return pathsFor([segment])[0];
+    const slopes = points.slice(1).map((point, index) => (point.y - points[index].y) / (point.x - points[index].x));
+    const tangents = points.map((_, index) => {
+      if (index === 0) return slopes[0];
+      if (index === points.length - 1) return slopes.at(-1)!;
+      if (slopes[index - 1] * slopes[index] <= 0) return 0;
+      return Math.sign(slopes[index]) * Math.min(Math.abs(slopes[index - 1]), Math.abs(slopes[index]));
+    });
+    return `M ${points[0].x} ${points[0].y} ` + points.slice(1).map((point, index) => {
+      const previous = points[index]; const dx = point.x - previous.x;
+      return `C ${previous.x + dx / 3} ${previous.y + tangents[index] * dx / 3} ${point.x - dx / 3} ${point.y - tangents[index + 1] * dx / 3} ${point.x} ${point.y}`;
+    }).join(' ');
+  }).filter(Boolean);
   const trendPaths = pathsFor(trendSegments);
   const [tooltipId, setTooltipId] = useState<string | null>(null);
   const selectPoint = (id: string) => { onSelect(id); setTooltipId(id); };

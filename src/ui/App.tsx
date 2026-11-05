@@ -911,6 +911,37 @@ function Workspace({ userId, online }: { userId: string; online: boolean }) {
     return true;
   }
 
+  async function reviseTimelineEvent(eventId: string, expectedRevision: number, kind: 'CORRECT' | 'VOID', patch: Record<string, unknown>): Promise<boolean> {
+    if (!supabase || !online || !selectedPet) return false;
+    const { error } = await supabase.rpc('revise_health_event', {
+      p_event_id: eventId, p_expected_revision: expectedRevision, p_revision_kind: kind,
+      p_patch: patch, p_reason_code: kind === 'VOID' ? 'USER_ENTRY_VOIDED' : 'USER_ENTRY_CORRECTED',
+      p_idempotency_key: crypto.randomUUID(),
+    });
+    if (error) {
+      setRecordNotice({ kind: 'error', text: error.code === '40001' ? '다른 보호자가 먼저 수정했습니다. 새로 조회한 뒤 다시 시도해 주세요.' : userFacingError(error) });
+      return false;
+    }
+    await refreshPetData(selectedPet.id);
+    setRecordNotice({ kind: 'success', text: kind === 'VOID' ? '기록을 무효화했습니다. 감사 이력은 보존됩니다.' : '정정 내용을 서버에 저장했습니다.' });
+    return true;
+  }
+
+  async function correctTimelineTime(eventId: string, expectedRevision: number, occurredAt: string): Promise<boolean> {
+    if (!supabase || !online || !selectedPet) return false;
+    const { error } = await supabase.rpc('correct_health_event_time', {
+      p_event_id: eventId, p_expected_revision: expectedRevision, p_occurred_at: occurredAt,
+      p_idempotency_key: crypto.randomUUID(),
+    });
+    if (error) {
+      setRecordNotice({ kind: 'error', text: error.code === '40001' ? '다른 보호자가 먼저 수정했습니다. 최신 기록을 확인해 주세요.' : userFacingError(error) });
+      return false;
+    }
+    await refreshPetData(selectedPet.id);
+    setRecordNotice({ kind: 'success', text: '실제 발생 시각을 정정했습니다. 이전 시각은 감사 이력에 보존됩니다.' });
+    return true;
+  }
+
   const todayEvents = useMemo(() => selectedPet && dataReady
     ? events.filter((item) => localDateKey(item.occurred_at, selectedPet.timezone) === todayForTimezone(selectedPet.timezone))
     : [], [events, selectedPet, dataReady]);
@@ -950,7 +981,7 @@ function Workspace({ userId, online }: { userId: string; online: boolean }) {
       </p>}
       <Routes>
         <Route path="/invite" element={<InvitationAcceptPage />} />
-        <Route path="/" element={<DashboardPage
+        <Route path="/" element={selectedPet && !loadingPets && location.search !== '?profile=1' ? <Navigate to="/record" replace /> : <DashboardPage
           pet={selectedPet} petsCount={pets.length} households={households} selectedHouseholdId={selectedHouseholdId} setSelectedHouseholdId={setSelectedHouseholdId}
           onRenameHousehold={renameHousehold}
           events={todayEvents} allEvents={dataReady ? events : []} revisions={dataReady ? revisions : []}
@@ -966,7 +997,7 @@ function Workspace({ userId, online }: { userId: string; online: boolean }) {
         <Route path="/timeline" element={!selectedPet
           ? <SetupPrompt loading={loadingPets} accessMessage={accessMessage} />
           : <TimelinePage pet={selectedPet} events={dataReady ? events : []} revisions={dataReady ? revisions : []} userId={userId}
-            dateFilter={dateFilter} setDateFilter={setDateFilter} loading={loadingEvents} onSaveExerciseEnd={saveExerciseEnd} />} />
+            dateFilter={dateFilter} setDateFilter={setDateFilter} loading={loadingEvents} onSaveExerciseEnd={saveExerciseEnd} onReviseEvent={reviseTimelineEvent} onCorrectTime={correctTimelineTime} />} />
         <Route path="/trends" element={!selectedPet ? <SetupPrompt loading={loadingPets} accessMessage={accessMessage} />
           : online && !dataReady ? <main className="page-container trends-loading-page" role="status" aria-live="polite"><div className="loading-spinner" aria-hidden="true" /><h1>건강 기록을 불러오고 있어요</h1><p>서버에서 최신 기록을 확인하고 있습니다.</p></main> : <HealthTrendsPage key={`${selectedPet.id}:${online}:${dataReady}`} pet={selectedPet} userId={userId} online={online && dataReady} />} />
         <Route path="/care" element={<Navigate to="/timeline" replace />} />
@@ -990,14 +1021,14 @@ function Workspace({ userId, online }: { userId: string; online: boolean }) {
 function SessionNavigation({ pathname }: { pathname: string }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const secondaryItems = [
+    { to: '/?profile=1', label: '반려동물 설정', icon: '🐾' },
     { to: '/timeline', label: '기록 모아보기', icon: '◷' },
     { to: '/shared', label: '함께 돌봄', icon: '♡' },
     { to: '/notifications', label: '알림', icon: '♧' },
   ];
   const primaryItems = [
-    { to: '/', label: '오늘', icon: '⌂' },
+    { to: '/trends', label: '혈당기록', icon: '⌁' },
     { to: '/record', label: '빠른 기록', icon: '+' },
-    { to: '/trends', label: '건강 추세', icon: '⌁' },
   ];
   useEffect(() => {
     const resetAtDesktop = () => {
@@ -1008,7 +1039,7 @@ function SessionNavigation({ pathname }: { pathname: string }) {
   }, [pathname]);
   const linkFor = (item: { to: string; label: string; icon: string }) => {
       const active = item.to === '/' ? pathname === '/' : pathname.startsWith(item.to);
-      return <NavLink key={item.to} to={item.to} className={active ? 'nav-item active' : 'nav-item'} aria-current={active ? 'page' : undefined}>
+      return <NavLink key={item.to} to={item.to} className={`${active ? 'nav-item active' : 'nav-item'}${item.to === '/record' ? ' nav-record' : ''}`} aria-current={active ? 'page' : undefined}>
         <span className="nav-icon" aria-hidden="true">{item.icon}</span><span>{item.label}</span>
       </NavLink>;
   };
@@ -1260,6 +1291,12 @@ export function QuickRecordPage(props: {
   const initialEventType = eventOptions.find((option) => option.type === props.presetEventType)?.type ?? 'glucose';
   const [eventType, setEventType] = useState<EventType>(initialEventType);
   const [occurredLocal, setOccurredLocal] = useState(localDateTimeNow());
+  const manuallyChosenTime = useRef(false);
+  const [currentLocal, setCurrentLocal] = useState(localDateTimeNow());
+  useEffect(() => {
+    const timer = window.setInterval(() => { const current = localDateTimeNow(); setCurrentLocal(current); if (!manuallyChosenTime.current) setOccurredLocal(current); }, 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
   const [numericValue, setNumericValue] = useState('');
   const [unit, setUnit] = useState('');
   const [note, setNote] = useState('');
@@ -1401,6 +1438,7 @@ export function QuickRecordPage(props: {
   return <main className="page-container record-page">
     <section className="page-heading"><p className="eyebrow">빠른 기록</p><h1>{pet.name}의 하루를 남겨요</h1>
       <p>관찰한 일을 골라 기록하세요. 선택만으로 저장되지는 않아요.</p></section>
+    <div className="record-current-time" role="status">지금 {currentLocal.replace('T', ' ')} · 기록 시각 {occurredLocal.replace('T', ' ')} <button type="button" className="text-button" onClick={() => { manuallyChosenTime.current = false; setOccurredLocal(localDateTimeNow()); }}>지금 시각 사용</button></div>
     {props.demoOnly && <div className="notice notice-warning" role="status">DEMO · 제출한 내용은 이 탭의 메모리에만 표시되며 서버에 저장되지 않습니다.</div>}
     {activityMessage && <p className="activity-message" role="status">{activityMessage}</p>}
     {activeExercise && <section className="activity-session-bar" aria-label="진행 중인 운동 및 산책 기록">
@@ -1519,9 +1557,9 @@ export function QuickRecordPage(props: {
           </label></>}
           <details className="record-details full-field" key={eventType}>
             <summary>상세 입력 · 시각과 메모</summary><div className="form-grid">
-          {eventType !== 'exercise' && <RecordDateStrip value={occurredLocal} onChange={setOccurredLocal} />}
+          {eventType !== 'exercise' && <RecordDateStrip value={occurredLocal} onChange={(value) => { manuallyChosenTime.current = true; setOccurredLocal(value); }} />}
           {eventType !== 'exercise' && <label className="field-label">실제 발생 시각
-            <input aria-label="실제 발생 시각" type="datetime-local" required value={occurredLocal} onChange={(event) => setOccurredLocal(event.target.value)} />
+            <input aria-label="실제 발생 시각" type="datetime-local" required value={occurredLocal} onChange={(event) => { manuallyChosenTime.current = true; setOccurredLocal(event.target.value); }} />
             <small>기기 시간대 기준 · 서버에는 UTC로 저장</small>
           </label>}
             {eventType === 'glucose' && <>            <label className="field-label">측정 출처 (선택)<input maxLength={120} value={measurementSource} onChange={(event) => setMeasurementSource(event.target.value)} placeholder="예: 혈당계, 병원 검사" /></label>
@@ -1551,8 +1589,10 @@ export function TimelinePage(props: {
   pet: Pet; events: HealthEvent[]; revisions: EventRevision[]; userId: string;
   dateFilter: string; setDateFilter: (value: string) => void; loading: boolean;
   onSaveExerciseEnd?: (eventId: string, endedAt: string, expectedRevision: number, durationSeconds: number) => Promise<boolean>;
+  onReviseEvent?: (eventId: string, expectedRevision: number, kind: 'CORRECT' | 'VOID', patch: Record<string, unknown>) => Promise<boolean>;
+  onCorrectTime?: (eventId: string, expectedRevision: number, occurredAt: string) => Promise<boolean>;
 }) {
-  const { pet, events, revisions, userId, dateFilter, setDateFilter, loading, onSaveExerciseEnd } = props;
+  const { pet, events, revisions, userId, dateFilter, setDateFilter, loading, onSaveExerciseEnd, onReviseEvent, onCorrectTime } = props;
   const [searchParams, setSearchParams] = useSearchParams();
   const visibleTypes = useMemo(() => {
     const serialized = searchParams.get('types');
@@ -1622,6 +1662,8 @@ export function TimelinePage(props: {
           {event.event_type === 'exercise' && onSaveExerciseEnd && latest?.revision_kind !== 'VOID' &&
             <ExerciseEndEditor event={event} value={effectiveValue} revision={latest?.revision_no ?? 0}
               onSave={onSaveExerciseEnd} />}
+          {onReviseEvent && latest?.revision_kind !== 'VOID' && <TimelineCorrectionEditor event={event} value={effectiveValue}
+            revision={latest?.revision_no ?? 0} onSave={onReviseEvent} onCorrectTime={onCorrectTime} />}
           <p className="event-timestamp">서버 입력 {dateTimeInTimezone(event.recorded_at, pet.timezone)}</p>
           <details><summary>기록 상세와 이력</summary>
             <dl className="detail-list"><div><dt>기록 ID</dt><dd>{event.id}</dd></div>
@@ -1643,6 +1685,74 @@ export function TimelinePage(props: {
     })}</ol>}
     <p className="timeline-footnote">이 화면에는 서버 조회로 확인된 기록만 표시됩니다. 제출 중 입력이나 오프라인 초안은 서버 확정 기록으로 보이지 않습니다.</p>
   </main>;
+}
+
+function TimelineCorrectionEditor({ event, value, revision, onSave, onCorrectTime }: {
+  event: HealthEvent; value: Record<string, unknown>; revision: number;
+  onSave: (eventId: string, revision: number, kind: 'CORRECT' | 'VOID', patch: Record<string, unknown>) => Promise<boolean>;
+  onCorrectTime?: (eventId: string, revision: number, occurredAt: string) => Promise<boolean>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [amount, setAmount] = useState(String(value.observed_value ?? value.administered_dose_value ?? ''));
+  const [note, setNote] = useState(String(value.note ?? ''));
+  const [condition, setCondition] = useState(String(value.measurement_condition ?? ''));
+  const [source, setSource] = useState(String(value.measurement_source ?? ''));
+  const [insulinProduct, setInsulinProduct] = useState(String(value.insulin_product_label ?? ''));
+  const [meal, setMeal] = useState(String(value.meal_status ?? ''));
+  const [elimination, setElimination] = useState(String(value.observation_type ?? ''));
+  const [occurredLocal, setOccurredLocal] = useState(() => {
+    const date = new Date(event.occurred_at);
+    return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+  });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const numeric = event.event_type === 'glucose' || event.event_type === 'insulin' || event.event_type === 'weight' || event.event_type === 'water';
+  async function save() {
+    const parsed = Number(amount);
+    if (numeric && (!Number.isFinite(parsed) || parsed <= 0)) { setError('기록값은 0보다 큰 숫자로 입력해 주세요.'); return; }
+    if (event.event_type === 'insulin' && !insulinProduct.trim()) { setError('인슐린 제품명을 입력해 주세요.'); return; }
+    setBusy(true); setError('');
+    const patchValue = { ...value, note: note.trim(), ...(numeric ? event.event_type === 'insulin'
+      ? { administered_dose_value: parsed, insulin_product_label: insulinProduct.trim() } : { observed_value: parsed } : {}),
+      ...(event.event_type === 'glucose' ? { measurement_condition: condition, measurement_source: source.trim() } : {}),
+      ...(event.event_type === 'meal' ? { meal_status: meal } : {}),
+      ...(event.event_type === 'elimination' ? { observation_type: elimination } : {}) };
+    const success = await onSave(event.id, revision, 'CORRECT', { value: patchValue });
+    setBusy(false); if (success) setOpen(false); else setError('정정을 저장하지 못했습니다. 최신 기록을 확인해 주세요.');
+  }
+  async function voidEvent() {
+    if (!window.confirm('이 기록을 무효화할까요? 원본과 감사 이력은 보존됩니다.')) return;
+    setBusy(true); setError('');
+    const success = await onSave(event.id, revision, 'VOID', {});
+    setBusy(false); if (!success) setError('기록을 무효화하지 못했습니다. 최신 기록을 확인해 주세요.');
+  }
+  async function saveTime() {
+    const parsed = new Date(occurredLocal);
+    if (!Number.isFinite(parsed.getTime())) { setError('발생 시각을 확인해 주세요.'); return; }
+    if (!onCorrectTime) return;
+    setBusy(true); setError('');
+    const success = await onCorrectTime(event.id, revision, parsed.toISOString());
+    setBusy(false); if (success) setOpen(false); else setError('시각을 수정하지 못했습니다. 서버 적용 상태와 최신 기록을 확인해 주세요.');
+  }
+  return <div className="timeline-correction">
+    <button type="button" className="text-button" aria-expanded={open} onClick={() => setOpen(!open)}>수정·삭제</button>
+    {open && <div className="timeline-correction-fields">
+      {numeric && <label className="field-label">기록값<input type="number" inputMode="decimal" step="any" value={amount} onChange={(input) => setAmount(input.target.value)} /></label>}
+      {event.event_type === 'glucose' && <><label className="field-label">측정 조건<select value={condition} onChange={(input) => setCondition(input.target.value)}>
+        <option value="">미기록</option>{GLUCOSE_MEASUREMENT_CONDITIONS.map((choice) => <option key={choice.value} value={choice.value}>{choice.label}</option>)}</select></label>
+        <label className="field-label">측정 출처<input maxLength={120} value={source} onChange={(input) => setSource(input.target.value)} /></label></>}
+      {event.event_type === 'insulin' && <label className="field-label">인슐린 제품<input maxLength={120} value={insulinProduct} onChange={(input) => setInsulinProduct(input.target.value)} /></label>}
+      {event.event_type === 'meal' && <label className="field-label">식사 상태<select value={meal} onChange={(input) => setMeal(input.target.value)}><option value="ATE">섭취 확인</option><option value="PARTIAL">일부 섭취</option><option value="REFUSED">식사 거부</option></select></label>}
+      {event.event_type === 'elimination' && <label className="field-label">배변·배뇨 유형<select value={elimination} onChange={(input) => setElimination(input.target.value)}><option value="URINATION">배뇨</option><option value="BOWEL_MOVEMENT">배변</option><option value="BOTH">배변·배뇨 모두</option></select></label>}
+      <label className="field-label">메모<input maxLength={1000} value={note} onChange={(input) => setNote(input.target.value)} /></label>
+      {onCorrectTime && <label className="field-label">실제 발생 시각 · 이 기기의 시간대<input type="datetime-local" value={occurredLocal} onChange={(input) => setOccurredLocal(input.target.value)} /></label>}
+      <p className="small-note">시각·기록값·메모는 각각 정정됩니다. 한 항목을 저장한 뒤 다른 항목을 바꾸려면 최신 기록을 다시 확인해 주세요. 원본과 감사 이력은 남습니다.</p>
+      {error && <p role="alert" className="inline-error">{error}</p>}
+      <div className="timeline-correction-actions"><button type="button" className="button-secondary" disabled={busy} onClick={() => void save()}>값·메모 저장</button>
+        {onCorrectTime && <button type="button" className="button-secondary" disabled={busy} onClick={() => void saveTime()}>시각 저장</button>}
+        <button type="button" className="text-button" disabled={busy} onClick={() => void voidEvent()}>기록 무효화</button></div>
+    </div>}
+  </div>;
 }
 
 function effectiveEventValue(value: Record<string, unknown>, revisions: EventRevision[]) {

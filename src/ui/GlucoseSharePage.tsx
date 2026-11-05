@@ -50,7 +50,9 @@ export function GlucoseSharePage() {
       revisionKind: item.revision_kind === 'CORRECT' ? 'CORRECT' as const : undefined }))
     .filter((item) => Number.isFinite(item.value)), [share]);
   const latest = [...samples].sort((a, b) => Date.parse(a.occurredAt) - Date.parse(b.occurredAt)).at(-1);
-  const day = chosenDay || (share && latest ? localDateKey(latest.occurredAt, share.timezone) : share?.to_date ?? '');
+  const todayInPetTimezone = share ? localDateKey(new Date().toISOString(), share.timezone) : '';
+  const day = chosenDay || (share && share.from_date <= todayInPetTimezone && todayInPetTimezone <= share.to_date
+    ? todayInPetTimezone : share && latest ? localDateKey(latest.occurredAt, share.timezone) : share?.to_date ?? '');
   const daily = share ? samplesForLocalDay(samples, day, share.timezone) : [];
   const careTimes = share?.care_times.filter((item) => localDateKey(item.occurred_at, share.timezone) === day) ?? [];
   const selected = daily.find((item) => item.id === selectedId) ?? daily.at(-1) ?? null;

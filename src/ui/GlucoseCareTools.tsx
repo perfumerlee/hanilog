@@ -26,6 +26,8 @@ export function GlucoseCareTools({ petId, petName, timezone, canEdit, demo = fal
   const [expiresDays, setExpiresDays] = useState('1');
   const [shares, setShares] = useState<GlucoseShareRange[]>([]);
   const [newLink, setNewLink] = useState('');
+  const [activeLinks, setActiveLinks] = useState<Record<string, string>>({});
+  const [recipientPhone, setRecipientPhone] = useState('');
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState('');
   const [now] = useState(() => Date.now());
@@ -76,12 +78,13 @@ export function GlucoseCareTools({ petId, petName, timezone, canEdit, demo = fal
     try {
       const { token, tokenHash } = createShareToken();
       const result = await callGlucoseShare<{ share: GlucoseShareRange }>(supabase, {
-        action: 'create', pet_id: petId, token_hash: await tokenHash, from_date: fromDate, to_date: toDate,
+        action: 'create', pet_id: petId, token_hash: await tokenHash, from_date: fromDate, to_date: toDate < today(timezone) ? today(timezone) : toDate,
         expires_days: Number(expiresDays), include_care_times: includeCareTimes,
       });
       if (!result.share?.id) throw new Error('SHARE_CREATE_FAILED');
       const link = glucoseShareUrl(token);
       setNewLink(link);
+      setActiveLinks((current) => ({ ...current, [result.share.id]: link }));
       try { await navigator.clipboard.writeText(link); setMessage(`${petName}의 혈당 공유 링크를 복사했습니다. 문자나 메신저에 직접 붙여 넣어 보내세요.`); }
       catch { setMessage('공유 링크를 만들었습니다. 아래 복사 버튼을 눌러 전달해 주세요.'); }
       await loadShares();
@@ -103,6 +106,41 @@ export function GlucoseCareTools({ petId, petName, timezone, canEdit, demo = fal
       setMessage('공유 링크를 취소했습니다. 이후 새 요청은 거부됩니다.'); await loadShares();
     } catch { setMessage('링크를 취소하지 못했습니다. 연결과 권한을 확인해 주세요.'); }
     finally { setPending(false); }
+  }
+
+  async function copyOrRenew(item: GlucoseShareRange) {
+    const existing = activeLinks[item.id];
+    if (existing) {
+      setNewLink(existing);
+      try { await navigator.clipboard.writeText(existing); setMessage('공유 링크를 다시 복사했습니다.'); }
+      catch { setMessage('자동 복사가 안 됐습니다. 표시된 링크를 직접 복사해 주세요.'); }
+      return;
+    }
+    if (!supabase || pending) return;
+    setPending(true); setMessage('');
+    try {
+      const { token, tokenHash } = createShareToken();
+      const result = await callGlucoseShare<{ share: GlucoseShareRange }>(supabase, {
+        action: 'create', pet_id: petId, token_hash: await tokenHash, from_date: item.from_date,
+        to_date: item.to_date < today(timezone) ? today(timezone) : item.to_date,
+        expires_days: 1, include_care_times: item.include_care_times,
+      });
+      const link = glucoseShareUrl(token);
+      setActiveLinks((current) => ({ ...current, [result.share.id]: link }));
+      setNewLink(link);
+      try { await navigator.clipboard.writeText(link); setMessage('새 링크를 발급하고 복사했습니다. 이전 링크도 만료 전까지 유효합니다.'); }
+      catch { setMessage('새 링크를 발급했습니다. 아래 링크를 직접 복사해 주세요.'); }
+      await loadShares();
+    } catch { setMessage('새 링크를 발급하지 못했습니다. 연결과 권한을 확인해 주세요.'); }
+    finally { setPending(false); }
+  }
+
+  function composeText(link: string) {
+    const phone = recipientPhone.replace(/[\s()-]/g, '');
+    if (!/^\+?\d{8,15}$/.test(phone)) { setMessage('받는 분의 전화번호를 확인해 주세요.'); return; }
+    const body = `${petName}의 혈당기록\n${link}`;
+    window.location.href = `sms:${phone}?body=${encodeURIComponent(body)}`;
+    setMessage('문자 앱에서 내용을 확인한 뒤 직접 전송해 주세요. 앱에서는 실제 전송 여부를 확인할 수 없습니다.');
   }
 
   return <section className="panel glucose-care-tools">
@@ -157,12 +195,16 @@ export function GlucoseCareTools({ petId, petName, timezone, canEdit, demo = fal
         {newLink && <div className="share-link-result">
           <label className="field-label full-field">공유 링크<input readOnly value={newLink} onFocus={(event) => event.currentTarget.select()} /></label>
           <button type="button" className="button-secondary" onClick={() => void copyNewLink()}>링크 복사</button>
+          <label className="field-label full-field">받는 분 전화번호 (기기에 저장되지 않음)<input type="tel" inputMode="tel" autoComplete="off" value={recipientPhone} onChange={(event) => setRecipientPhone(event.target.value)} placeholder="전화번호 입력" /></label>
+          <button type="button" className="button-secondary" onClick={() => composeText(newLink)}>문자 앱에서 보내기</button>
         </div>}
       </form>}
       {shares.some((item) => !item.revoked_at && Date.parse(item.expires_at) > now) && <ul className="glucose-share-list">
         {shares.filter((item) => !item.revoked_at && Date.parse(item.expires_at) > now).map((item) => <li key={item.id}>
           <span>{item.from_date} ~ {item.to_date}<small>만료 {new Date(item.expires_at).toLocaleString('ko-KR')}</small></span>
-          <button type="button" className="text-button" disabled={pending} onClick={() => void revoke(item.id)}>링크 취소</button>
+          <div className="share-list-actions"><button type="button" className="text-button" disabled={pending} onClick={() => void copyOrRenew(item)}>{activeLinks[item.id] ? '다시 복사' : '새 링크 발급·복사'}</button>
+          {activeLinks[item.id] && <button type="button" className="text-button" onClick={() => { setNewLink(activeLinks[item.id]); setMessage('아래에 받는 분 번호를 입력하고 문자 앱을 여세요.'); }}>문자로 보내기</button>}
+          <button type="button" className="text-button" disabled={pending} onClick={() => void revoke(item.id)}>링크 취소</button></div>
         </li>)}
       </ul>}
       {demo && <small>DEMO에서는 공유 링크가 생성되지 않습니다.</small>}
