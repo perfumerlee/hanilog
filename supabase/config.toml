@@ -37,3 +37,12 @@ static_files = ["./functions/pet-profile-media/magick.wasm"]
 
 [functions.glucose-share]
 verify_jwt = false
+
+[storage.buckets.pet-photo-incoming]
+public = false
+file_size_limit = "1MB"
+allowed_mime_types = ["image/jpeg"]
+
+[functions.pet-photo-finalize]
+verify_jwt = true
+static_files = ["./functions/pet-profile-media/magick.wasm"]

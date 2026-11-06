@@ -40,7 +40,7 @@ jobs:
           HANILOG_DEPLOY_TARGET: production
           PAGES_BASE_PATH: hanilog
           VITE_DEMO_MODE: 'false'
-          VITE_PET_PROFILE_PHOTO_UPLOAD_ENABLED: 'false'
+          VITE_PET_PROFILE_PHOTO_UPLOAD_ENABLED: 'true'
           VITE_SUPABASE_URL: https://lfbcxtaqpnbvxpsoywtg.supabase.co
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.HANILOG_PRODUCTION_PUBLISHABLE_KEY }}
 
@@ -55,7 +55,7 @@ jobs:
           HANILOG_DEPLOY_TARGET: production
           PAGES_BASE_PATH: hanilog
           VITE_DEMO_MODE: 'false'
-          VITE_PET_PROFILE_PHOTO_UPLOAD_ENABLED: 'false'
+          VITE_PET_PROFILE_PHOTO_UPLOAD_ENABLED: 'true'
           VITE_SUPABASE_URL: https://lfbcxtaqpnbvxpsoywtg.supabase.co
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.HANILOG_PRODUCTION_PUBLISHABLE_KEY }}
 

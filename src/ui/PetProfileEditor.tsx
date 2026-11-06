@@ -39,6 +39,8 @@ export function PetProfileEditor({
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [removePhoto, setRemovePhoto] = useState(false);
+  const [saveStage, setSaveStage] = useState('');
   const canvas = useRef<HTMLCanvasElement>(null);
   const request = useRef(0);
   const gallery = useRef<HTMLInputElement>(null);
@@ -97,7 +99,7 @@ export function PetProfileEditor({
   }
 
   async function choose(file?: File) {
-    if (import.meta.env.MODE === 'production' || (import.meta.env.MODE !== 'demo' && import.meta.env.VITE_PET_PROFILE_PHOTO_UPLOAD_ENABLED !== 'true')) {
+    if (!photoUploadEnabled) {
       setMessage('사진 업로드는 현재 점검 중이라 잠시 중지했어요. 기본 아바타를 사용해 주세요.');
       return;
     }
@@ -127,12 +129,15 @@ export function PetProfileEditor({
       setMessage(!navigator.onLine ? '오프라인에서는 프로필을 저장할 수 없어요. 연결 후 다시 시도해 주세요.' : '현재 계정에는 프로필 변경 권한이 없어요.');
       return;
     }
-    setBusy(true); setMessage('서버에서 권한을 확인하고 프로필을 저장하고 있어요…');
+    setBusy(true); setMessage(''); setSaveStage('저장 준비 중…');
     try {
-      const saved = await persistPetProfile(supabase, { petId, avatarId: avatar.id, revision, photoPath, photo: pendingPhoto });
+      const saved = await persistPetProfile(supabase, {
+        petId, avatarId: avatar.id, revision: baseRevision, photoPath, photo: pendingPhoto,
+        ...(removePhoto ? { removePhoto: true } : {}),
+      }, (stage) => setSaveStage({ preparing: '권한 확인 중…', uploading: '사진 전송 중…', processing: '사진 처리 중…', confirming: '저장 결과 확인 중…' }[stage]));
       await onProfileSaved?.(saved);
       setBaseRevision(saved.revision);
-      setPendingPhoto(null); setDirty(false);
+      setPendingPhoto(null); setRemovePhoto(false); setDirty(false);
       setMessage(saved.cleanupPending
         ? '프로필은 저장됐어요. 이전 사진 정리는 연결 상태를 확인한 뒤 다시 처리됩니다.'
         : '프로필 저장을 서버에서 확인했어요.');
@@ -140,14 +145,14 @@ export function PetProfileEditor({
       setMessage(error instanceof Error && error.message.includes('409')
         ? '다른 보호자가 먼저 바꿨어요. 최신 프로필을 불러온 뒤 다시 저장해 주세요.'
         : error instanceof Error ? error.message : '프로필을 저장하지 못했어요. 기존 사진은 유지됩니다.');
-    } finally { setBusy(false); }
+    } finally { setBusy(false); setSaveStage(''); }
   }
 
   const visible = PET_AVATARS.filter((item) => (filter === '전체' || `${item.family} ${item.label}`.includes(filter))
     && `${item.family} ${item.label} 강아지 믹스견`.includes(query.trim()));
   const persistent = Boolean(petId && supabase);
   const photoUploadEnabled = import.meta.env.MODE === 'demo'
-    || (import.meta.env.MODE !== 'production' && import.meta.env.VITE_PET_PROFILE_PHOTO_UPLOAD_ENABLED === 'true');
+    || import.meta.env.VITE_PET_PROFILE_PHOTO_UPLOAD_ENABLED === 'true';
   return <section className="pet-journal-profile" aria-label="반려동물 프로필">
     <div className="profile-heading">
       <img className="profile-portrait" src={(dirty ? photo : photoPath ? photo : '') || displayedAvatar.src} alt={`${name || '반려동물'} 프로필`} />
@@ -155,7 +160,8 @@ export function PetProfileEditor({
       {!onboarding && <Link className="button-link" to="/record">기록 추가</Link>}
     </div>
     <details className="profile-editor">
-      <summary>사진·아바타 바꾸기</summary>
+      <summary>대표사진·아바타 바꾸기</summary>
+      <p>사진을 선택하고 위치를 맞춘 뒤 저장해 주세요.</p>
       <p className="profile-preview-notice" role="note">{onboarding
         ? '선택한 프로필은 반려동물 등록을 마치면 서버에 저장됩니다.'
         : persistent ? '저장 버튼을 누르기 전에는 미리보기입니다. 서버 저장 상태는 완료 안내로 확인해 주세요.'
@@ -169,9 +175,9 @@ export function PetProfileEditor({
           <button type="button" className="secondary-action" disabled={busy || !canEdit} onClick={() => {
             request.current++;
             const nextAvatar = PET_AVATARS[0];
-            setPhotoUrl(''); setPendingPhoto(null); setSource(null); setAvatar(nextAvatar); setDirty(true);
+            setPhotoUrl(''); setPendingPhoto(null); setSource(null); setAvatar(nextAvatar); setRemovePhoto(true); if (!dirty) setBaseRevision(revision); setDirty(true);
             notifyDraft(nextAvatar.id, null); setMessage(persistent ? '기본 아바타 미리보기예요. 저장을 완료해야 서버에 반영됩니다.' : '기본 아바타 미리보기로 돌아왔어요.');
-          }}>기본 아바타로 복귀</button>
+          }}>사진 삭제 · 기본 아바타로</button>
         </div> : <p role="note">사진 업로드는 현재 점검 중이라 잠시 중지했어요. 기본 아바타 선택과 저장은 계속 사용할 수 있어요.</p>}
         {photoUploadEnabled && <>
         <input ref={gallery} type="file" hidden accept="image/jpeg,image/png,image/webp" aria-label="사진 파일 선택" onChange={(event) => { void choose(event.target.files?.[0]); event.target.value = ''; }} />
@@ -179,7 +185,7 @@ export function PetProfileEditor({
         <p className="small-note">사진을 여기에 끌어 놓아도 돼요. JPG·PNG·WebP, 입력 최대 10MB. 서버에는 512×512 JPG로 저장합니다.</p>
         </>}
       </div>
-      {busy && <p role="status">{persistent ? '프로필을 처리하고 있어요…' : '사진을 준비하고 있어요…'}</p>}
+      {busy && <p role="status" aria-live="polite">{saveStage || '사진을 준비하고 있어요…'}</p>}
       {remoteChanged && <p role="status">다른 보호자가 프로필을 바꿨어요. 저장 전에 최신 상태를 확인해 주세요.</p>}
       {message && <p role="status">{message}</p>}
       {source && <div className="profile-crop">
@@ -193,7 +199,8 @@ export function PetProfileEditor({
           canvas.current.toBlob((blob) => {
             if (!blob) { setMessage('사진을 준비하지 못했어요. 다시 시도해 주세요.'); return; }
             const nextUrl = URL.createObjectURL(blob);
-            setPhotoUrl(nextUrl); setPendingPhoto(blob); setSource(null); setDirty(true);
+            if (blob.size > 1024 * 1024) { URL.revokeObjectURL(nextUrl); setMessage('사진 크기를 줄인 후 다시 선택해 주세요.'); return; }
+            setPhotoUrl(nextUrl); setPendingPhoto(blob); setRemovePhoto(false); setSource(null); if (!dirty) setBaseRevision(revision); setDirty(true);
             notifyDraft(avatar.id, blob);
             setMessage(persistent ? '사진 미리보기에 적용했어요. 저장 버튼을 눌러야 서버에 올라갑니다.' : '이 화면의 미리보기에 적용했어요. 서버에는 저장되지 않아요.');
           }, 'image/jpeg', .85);
@@ -203,12 +210,17 @@ export function PetProfileEditor({
       <label>아바타 검색<input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="예: 갈색, 처진 귀, 믹스견" /></label>
       <label>특징으로 찾기<select value={filter} onChange={(event) => setFilter(event.target.value)}>{['전체', '스피츠형', '리트리버형', '믹스견', '푸들형', '크림', '갈색', '검정', '하양', '선 귀', '처진 귀', '짝귀', '둥근 귀', '둥근 체형', '날씬한 체형'].map((item) => <option key={item}>{item}</option>)}</select></label>
       <div className="avatar-grid" aria-label="아바타 선택">{visible.map((item) => <button type="button" key={item.id} disabled={busy || !canEdit} aria-label={item.label} aria-pressed={!photo && displayedAvatar.id === item.id} onClick={() => {
-        setPhotoUrl(''); setPendingPhoto(null); setSource(null); setAvatar(item); setDirty(true);
+        setPhotoUrl(''); setPendingPhoto(null); setSource(null); setAvatar(item); setRemovePhoto(Boolean(photoPath) && photoUploadEnabled); if (!dirty) setBaseRevision(revision); setDirty(true);
         notifyDraft(item.id, null);
         setMessage(persistent ? `${item.label} 미리보기예요. 저장 버튼을 눌러 서버에 반영해 주세요.` : `${item.label} 아바타를 미리보기에 적용했어요.`);
       }}><img src={item.src} alt="" loading="lazy" /><span>{item.coat}<br />{item.ears}<br />{item.shape}</span></button>)}</div>
       {!visible.length && <p role="status">맞는 아바타가 없어요. 다른 특징으로 찾아보세요.</p>}
       {persistent && dirty && <button type="button" disabled={busy || !canEdit || remoteChanged} onClick={() => void saveProfile()}>{busy ? '저장 중…' : '프로필 저장'}</button>}
+      {dirty && <button type="button" className="secondary-action" disabled={busy} onClick={() => {
+        request.current++; setPhotoUrl(''); setPendingPhoto(null); setSource(null); setRemovePhoto(false); setDirty(false); setMessage('변경을 취소했어요.');
+        setAvatar(PET_AVATARS.find((item) => item.id === savedAvatarId) ?? PET_AVATARS[0]);
+        notifyDraft(savedAvatarId, null);
+      }}>변경 취소</button>}
       {persistent && !canEdit && <p role="note">현재 계정은 프로필을 볼 수 있지만 수정할 권한이 없어요.</p>}
     </details>
   </section>;

@@ -57,10 +57,10 @@ if (!key || key.startsWith('sb_secret_') || isServiceRoleJwt(key)) {
 }
 if (!(target === 'production' ? ['hanilog'] : ['hanilog', 'hanilog-staging']).includes(env('PAGES_BASE_PATH'))) throw new Error('Pages build refused: unexpected GitHub Pages base path.');
 if (env('VITE_DEMO_MODE') !== 'false') throw new Error('Pages build refused: Demo mode must not be used for the Staging deployment.');
-if (env('VITE_PET_PROFILE_PHOTO_UPLOAD_ENABLED') !== 'false') {
-  throw new Error('Pages build refused: profile photo upload must remain paused while the hosted 503 is unresolved.');
+if (!['true', 'false'].includes(env('VITE_PET_PROFILE_PHOTO_UPLOAD_ENABLED'))) {
+  throw new Error('Pages build refused: explicit profile photo setting required.');
 }
 
-console.log('Build inputs validated: HTTPS selected project URL, browser key present, Demo off, photo upload paused, /hanilog/ base.');
+console.log('Build inputs validated: HTTPS selected project URL, browser key present, Demo off, explicit photo setting, /hanilog/ base.');
 
 
