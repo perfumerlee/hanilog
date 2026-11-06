@@ -528,6 +528,7 @@ function Workspace({ userId, online }: { userId: string; online: boolean }) {
   const [events, setEvents] = useState<HealthEvent[]>([]);
   const [revisions, setRevisions] = useState<EventRevision[]>([]);
   const [syncAt, setSyncAt] = useState<string | null>(null);
+  const [healthRefreshVersion, setHealthRefreshVersion] = useState(0);
   const [loadingPets, setLoadingPets] = useState(true);
   const [loadingEvents, setLoadingEvents] = useState(false);
   const [accessMessage, setAccessMessage] = useState('');
@@ -552,7 +553,7 @@ function Workspace({ userId, online }: { userId: string; online: boolean }) {
   const setDateFilter = (value: string) => {
     if (selectedPet) setDateSelection({ petId: selectedPet.id, value });
   };
-  const dataReady = Boolean(selectedPetId && loadedPetId === selectedPetId && !loadingEvents);
+  const dataReady = Boolean(selectedPetId && loadedPetId === selectedPetId);
 
   useEffect(() => {
     try {
@@ -656,6 +657,7 @@ function Workspace({ userId, online }: { userId: string; online: boolean }) {
       ? '기록은 불러왔지만 일부 정정 이력을 확인하지 못했습니다.'
       : '');
     setSyncAt(new Date().toISOString());
+    setHealthRefreshVersion((version) => version + 1);
     setLoadingEvents(false);
     return true;
   }, []);
@@ -946,7 +948,7 @@ function Workspace({ userId, online }: { userId: string; online: boolean }) {
     ? events.filter((item) => localDateKey(item.occurred_at, selectedPet.timezone) === todayForTimezone(selectedPet.timezone))
     : [], [events, selectedPet, dataReady]);
 
-  if (online && (loadingPets || (selectedPet && (loadingEvents || loadedPetId !== selectedPet.id)))) {
+  if (online && ((loadingPets && pets.length === 0) || (selectedPet && loadedPetId !== selectedPet.id))) {
     return <DataLoadingPage title="반려동물 기록을 불러오고 있어요" />;
   }
 
@@ -1003,7 +1005,7 @@ function Workspace({ userId, online }: { userId: string; online: boolean }) {
           : <TimelinePage pet={selectedPet} events={dataReady ? events : []} revisions={dataReady ? revisions : []} userId={userId}
             dateFilter={dateFilter} setDateFilter={setDateFilter} loading={loadingEvents} onSaveExerciseEnd={saveExerciseEnd} onReviseEvent={reviseTimelineEvent} onCorrectTime={correctTimelineTime} />} />
         <Route path="/trends" element={!selectedPet ? <SetupPrompt loading={loadingPets} accessMessage={accessMessage} />
-          : online && !dataReady ? <DataLoadingPage title="혈당 기록을 불러오고 있어요" /> : <HealthTrendsPage key={`${selectedPet.id}:${online}:${dataReady}`} pet={selectedPet} userId={userId} online={online && dataReady} />} />
+          : online && !dataReady ? <DataLoadingPage title="혈당 기록을 불러오고 있어요" /> : <HealthTrendsPage key={selectedPet.id} pet={selectedPet} userId={userId} online={online && dataReady} refreshVersion={healthRefreshVersion} />} />
         <Route path="/care" element={<Navigate to="/timeline" replace />} />
         <Route path="/shared" element={<SharedCarePage key={households.map((item) => item.id).join(':')} households={households} pets={pets} userId={userId} onRenameHousehold={renameHousehold} />} />
         <Route path="/notifications" element={<NotificationsPage key={`${userId}:${selectedPetId}:${pets.map((pet) => pet.id).join(':')}`} pets={pets} userId={userId} online={online} />} />

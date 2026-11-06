@@ -22,6 +22,8 @@ describe('HealthTrendsPage', () => {
     expect(screen.getAllByText(/mg\/dL/).length).toBeGreaterThan(0);
     expect(screen.getByRole('link', { name: '혈당 기록 추가' })).toHaveAttribute('href', '/record?event=glucose');
     expect(document.querySelectorAll('.actual-series-line').length).toBeGreaterThan(0);
+    expect(document.querySelector('.glucose-point-tooltip')).toHaveTextContent('140 mg/dL');
+    expect(document.querySelectorAll('.chart-axis-label').length).toBeGreaterThan(13);
     expect(document.querySelectorAll('.derived-trend-line')).toHaveLength(0);
     fireEvent.click(screen.getByRole('checkbox', { name: '계산 추세 보기' }));
     expect(document.querySelectorAll('.derived-trend-line').length).toBeGreaterThan(0);
@@ -48,6 +50,7 @@ describe('HealthTrendsPage', () => {
     expect(screen.getByRole('button', { name: '하루 보기' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('heading', { name: /시간대별 혈당/ })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '164 mg/dL' })).toBeInTheDocument();
+    expect(document.querySelector('.glucose-point-tooltip')).toHaveTextContent('164 mg/dL');
     const shareDisclosure = screen.getByText('주치의와 혈당 공유').closest('details');
     expect(shareDisclosure).not.toHaveAttribute('open');
     fireEvent.click(shareDisclosure!.querySelector('summary')!);

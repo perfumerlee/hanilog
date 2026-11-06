@@ -16,7 +16,7 @@ type RawEvent = {
   value: Record<string, unknown>; unit: string | null; source?: string; occurrence_id: string | null; event_type: string;
 };
 type Revision = { event_id: string; revision_no: number; revision_kind: 'CORRECT' | 'VOID'; patch: Record<string, unknown> };
-type Props = { pet: TrendPet; userId: string; online: boolean; demoEvents?: RawEvent[] };
+type Props = { pet: TrendPet; userId: string; online: boolean; demoEvents?: RawEvent[]; refreshVersion?: number };
 
 const periods: { id: TrendPeriod; label: string }[] = [
   { id: '7d', label: '7일' }, { id: '30d', label: '30일' }, { id: '90d', label: '90일' },
@@ -52,7 +52,7 @@ function toSample(event: RawEvent, revision?: Revision): GlucoseSample | null {
   };
 }
 
-export function HealthTrendsPage({ pet, userId, online, demoEvents }: Props) {
+export function HealthTrendsPage({ pet, userId, online, demoEvents, refreshVersion }: Props) {
   const [searchParams] = useSearchParams();
   const [period, setPeriod] = useState<TrendPeriod>('30d');
   // Day view is the primary workflow; an explicit query parameter can still open period trends.
@@ -110,7 +110,7 @@ export function HealthTrendsPage({ pet, userId, online, demoEvents }: Props) {
       setMessage('서버 추세를 불러오지 못했습니다. 접근권한과 연결을 확인할 때까지 최신 데이터는 표시하지 않습니다.');
     });
     return () => { active = false; };
-  }, [demoEvents, online, pet.id]);
+  }, [demoEvents, online, pet.id, refreshVersion]);
 
   useEffect(() => {
     if (demo || !online || !supabase) return;
@@ -306,8 +306,16 @@ export function GlucoseScatterChart({ samples, actualSegments, trendSegments, ti
     : maxTime === minTime ? (width + left - right) / 2 : left + (time - minTime) / (maxTime - minTime) * (width - left - right);
   const yFor = (value: number) => height - bottom - (value - minValue) / (maxValue - minValue || 1) * (height - top - bottom);
   const tickValues = Array.from({ length: maxValue / 50 + 1 }, (_, index) => index * 50);
-  const startLabel = mode === 'day' ? '00:00' : new Intl.DateTimeFormat('ko-KR', { timeZone: timezone, month: 'numeric', day: 'numeric' }).format(new Date(minTime));
-  const endLabel = mode === 'day' ? '24:00' : new Intl.DateTimeFormat('ko-KR', { timeZone: timezone, month: 'numeric', day: 'numeric' }).format(new Date(maxTime));
+  const periodSpan = maxTime - minTime;
+  const periodTickCount = periodSpan > 0 ? Math.min(width < 470 ? 3 : width < 760 ? 4 : 6,
+    Math.max(2, Math.floor(periodSpan / 86_400_000) + 1)) : 1;
+  const periodFormatter = new Intl.DateTimeFormat('ko-KR', periodSpan < 2 * 86_400_000
+    ? { timeZone: timezone, month: 'numeric', day: 'numeric', hour: 'numeric' }
+    : { timeZone: timezone, month: 'numeric', day: 'numeric' });
+  const periodTicks = mode === 'period' ? Array.from({ length: periodTickCount }, (_, index) => {
+    const time = periodTickCount === 1 ? minTime : minTime + periodSpan * index / (periodTickCount - 1);
+    return { time, label: periodFormatter.format(new Date(time)) };
+  }).filter((tick, index, ticks) => index === 0 || tick.label !== ticks[index - 1].label) : [];
   const xTicks = mode === 'day' ? Array.from({ length: 25 }, (_, hour) => hour * 60) : [];
   const compactTimeLabels = width < 620;
   const timeLabelSize = Math.max(10, Math.min(15, width / 32));
@@ -331,9 +339,9 @@ export function GlucoseScatterChart({ samples, actualSegments, trendSegments, ti
     }).join(' ');
   }).filter(Boolean);
   const trendPaths = pathsFor(trendSegments);
-  const [tooltipId, setTooltipId] = useState<string | null>(null);
-  const selectPoint = (id: string) => { onSelect(id); setTooltipId(id); };
-  const tooltipSample = tooltipId === selectedId ? sorted.find((sample) => sample.id === tooltipId) : undefined;
+  const [dismissedId, setDismissedId] = useState<string | null>(null);
+  const selectPoint = (id: string) => { onSelect(id); setDismissedId(null); };
+  const tooltipSample = selectedId === dismissedId ? undefined : sorted.find((sample) => sample.id === selectedId);
   const tooltipWidth = 176;
   const tooltipHeight = 70;
   const tooltipPointX = tooltipSample ? xFor(Date.parse(tooltipSample.occurredAt)) : 0;
@@ -355,7 +363,7 @@ export function GlucoseScatterChart({ samples, actualSegments, trendSegments, ti
       if (nextDistance < distance) { distance = nextDistance; closest = sample; }
     }
     if (closest && distance <= 22) selectPoint(closest.id);
-    else setTooltipId(null);
+    else setDismissedId(selectedId);
   };
   return <div ref={chartRef} className="chart-scroll" role="group" aria-label="실제 혈당 측정값 산점도와 데이터 목록">
     <svg className="glucose-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${mode === 'day' ? '하루 시간대별' : '기간별'} 실제 측정 기록 ${sorted.length}건과 mg/dL 값. 측정점을 선택하면 상세 정보를 확인합니다.`}
@@ -385,15 +393,18 @@ export function GlucoseScatterChart({ samples, actualSegments, trendSegments, ti
       <line x1={left} x2={width - right} y1={height - bottom} y2={height - bottom} stroke="#8da295" />
       {actualPaths.map((path, index) => <path key={`actual-${index}`} d={path} className="actual-series-line" aria-hidden="true" />)}
       {trendPaths.map((path, index) => <path key={`trend-${index}`} d={path} className="derived-trend-line" aria-hidden="true" />)}
-      {mode === 'period' && <><text x={left} y={height - 14} className="chart-axis-label">{startLabel}</text>
-        <text x={width - right} y={height - 14} textAnchor="end" className="chart-axis-label">{endLabel}</text></>}
+      {mode === 'period' && periodTicks.map((tick, index) => <g key={`${tick.time}-${index}`}>
+        <line x1={xFor(tick.time)} x2={xFor(tick.time)} y1={height - bottom} y2={height - bottom + 7} stroke="#8da295" />
+        <text x={xFor(tick.time)} y={height - 14} textAnchor={index === 0 ? 'start' : index === periodTicks.length - 1 ? 'end' : 'middle'}
+          className="chart-axis-label">{tick.label}</text>
+      </g>)}
       {sorted.map((sample, index) => <g key={`${sample.id}-${index}`}>
         <circle cx={xFor(Date.parse(sample.occurredAt))} cy={yFor(sample.value)} r={sample.id === selectedId ? 8 : sorted.length > 120 ? 3.5 : sorted.length > 40 ? 5 : 7}
           className={sample.id === selectedId ? 'chart-point selected' : 'chart-point'}
           role="button" tabIndex={0} aria-label={dateTime(sample.occurredAt, timezone) + ' · ' + sample.value + ' mg/dL'}
           onClick={() => selectPoint(sample.id)} onKeyDown={(event) => {
             if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectPoint(sample.id); }
-            if (event.key === 'Escape') setTooltipId(null);
+            if (event.key === 'Escape') setDismissedId(selectedId);
           }} />
         <title>{dateTime(sample.occurredAt, timezone)} · {sample.value} mg/dL</title>
       </g>)}

@@ -12,6 +12,7 @@ it('opens latest measured local day, preserves values above 500, and filters lis
  render(<MemoryRouter initialEntries={['/share/'+'a'.repeat(43)]}><Routes><Route path="/share/:token" element={<GlucoseSharePage />} /></Routes></MemoryRouter>);
  await waitFor(() => expect(screen.getByLabelText('날짜')).toHaveValue('2026-11-03'));
  expect(screen.getByRole('heading',{name:'이날 측정값 (1건)'})).toBeInTheDocument();
+ expect(document.querySelector('.glucose-point-tooltip')).toHaveTextContent('550 mg/dL');
  expect(screen.getAllByText('550 mg/dL').length).toBeGreaterThan(0);
  fireEvent.click(document.querySelector('.chart-point')!);
  expect(screen.getByRole('status')).toHaveTextContent('550 mg/dL');
@@ -26,4 +27,10 @@ it('opens latest measured local day, preserves values above 500, and filters lis
  fireEvent.click(screen.getByRole('button',{name:'이전'}));
  expect(screen.getByText('이 날짜에 기록된 혈당 측정값이 없습니다.')).toBeInTheDocument();
  expect(screen.getByRole('button',{name:'이전'})).toBeDisabled();
+ fireEvent.click(screen.getByRole('button', { name: '기간 추세' }));
+ expect(screen.getByRole('heading', { name: '선택한 기간 측정값 (2건)' })).toBeInTheDocument();
+ expect(document.querySelectorAll('.chart-point')).toHaveLength(2);
+ expect(document.querySelectorAll('.chart-axis-label').length).toBeGreaterThan(13);
+ fireEvent.click(screen.getByRole('checkbox', { name: '계산 추세 보기' }));
+ expect(screen.getByRole('checkbox', { name: '계산 추세 보기' })).toBeChecked();
 });
