@@ -22,7 +22,7 @@ describe('HealthTrendsPage', () => {
     expect(measurementDetails).not.toHaveAttribute('open');
     fireEvent.click(measurementDetails!.querySelector('summary')!);
     expect(screen.getByText('측정 출처')).toBeInTheDocument();
-    expect(screen.getByText('측정 조건 · 합성 예시 조건')).toBeInTheDocument();
+    expect(document.querySelector('.share-selected-value')).toBeInTheDocument();
     expect(screen.getAllByText(/mg\/dL/).length).toBeGreaterThan(0);
     expect(screen.getByRole('link', { name: '혈당 기록 추가' })).toHaveAttribute('href', '/record?event=glucose');
     expect(document.querySelectorAll('.actual-series-line').length).toBeGreaterThan(0);
@@ -53,7 +53,7 @@ describe('HealthTrendsPage', () => {
       userId="synthetic-user" online demoEvents={events} /></MemoryRouter>);
     expect(screen.getByRole('button', { name: '하루 보기' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('heading', { name: /시간대별 혈당/ })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: '164 mg/dL' })).toBeInTheDocument();
+    expect(document.querySelector('.share-selected-value')).toHaveTextContent('164 mg/dL');
     expect(document.querySelector('.glucose-point-tooltip')).toHaveTextContent('164 mg/dL');
     expect(screen.getByText('이 날짜에 실제 기록된 측정 1건')).toBeInTheDocument();
     expect(screen.queryByText(/이 날짜의 식사·인슐린 기록/)).not.toBeInTheDocument();

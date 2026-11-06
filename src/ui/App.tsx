@@ -187,11 +187,12 @@ export function App() {
     <div className="app-shell">
       <header className="topbar">
         <Link to="/" className="brand"><img src={`${import.meta.env.BASE_URL}paw.svg`} alt="" /> HaniLog</Link>
+        {location.pathname.startsWith('/glucose-share/') && <span className="environment-badge">읽기 전용</span>}
         {stagingMode && <span className="environment-badge">STAGING · 합성 전용</span>}
         {demoMode && <span className="environment-badge">DEMO · 저장되지 않음</span>}
         {session && <button className="quiet-button" onClick={() => void supabase?.auth.signOut()}>로그아웃</button>}
       </header>
-      <PwaExperience />
+      {!location.pathname.startsWith('/glucose-share/') && <PwaExperience />}
       {!online && <div role="alert" className="offline-banner">서버 최신 상태를 확인할 수 없습니다. 기록은 서버 응답 전까지 확정되지 않습니다.</div>}
       <Routes>
         <Route path="/glucose-share/:token" element={<GlucoseSharePage />} />

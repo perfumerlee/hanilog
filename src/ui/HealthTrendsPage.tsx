@@ -64,6 +64,9 @@ export function HealthTrendsPage({ pet, userId, online, demoEvents, refreshVersi
   }, [pet.id, pet.profile_photo_object_path, online]);
   const [searchParams] = useSearchParams();
   const [period, setPeriod] = useState<TrendPeriod>('30d');
+ const [custom,setCustom]=useState(false);
+ const [from,setFrom]=useState('');
+ const [to,setTo]=useState('');
   // Day view is the primary workflow; an explicit query parameter can still open period trends.
   const [displayMode, setDisplayMode] = useState<'period' | 'day'>(() => searchParams.get('view') === 'period' ? 'period' : 'day');
   const [events, setEvents] = useState<RawEvent[]>(demoEvents ?? []);
@@ -151,10 +154,10 @@ export function HealthTrendsPage({ pet, userId, online, demoEvents, refreshVersi
   const allSamples = samplesAndExcluded.valid;
   const samples = useMemo<NumericGlucoseSample[]>(() => inPeriod(allSamples, period, now), [allSamples, period, now]);
   const dailySamples = useMemo(() => samplesForLocalDay(allSamples, selectedDay, pet.timezone), [allSamples, selectedDay, pet.timezone]);
-  const displayedSamples = displayMode === 'day' ? dailySamples : samples;
+  const displayedSamples = displayMode === 'day' ? dailySamples : custom ? allSamples.filter(item => { const day=localDateKey(item.occurredAt,pet.timezone); return from && to && from <= to && day >= from && day <= to; }) : samples;
   const actualSegments = useMemo(() => displayMode === 'day'
     ? measuredLineSegments(displayedSamples, 6 / 24) : measuredLineSegments(displayedSamples), [displayMode, displayedSamples]);
-  const derivedTrend = useMemo(() => trendPoints(samples, period, pet.timezone), [samples, period, pet.timezone]);
+  const derivedTrend = useMemo(() => trendPoints(displayedSamples, period, pet.timezone), [displayedSamples, period, pet.timezone]);
   const derivedSegments = useMemo(() => trendLineSegments(derivedTrend, period), [derivedTrend, period]);
   const trendSampleCount = derivedTrend.reduce((sum, point) => sum + point.count, 0);
   const newest = allSamples.at(-1);
@@ -206,23 +209,20 @@ export function HealthTrendsPage({ pet, userId, online, demoEvents, refreshVersi
           {displayMode === 'period' && showTrend && <span className="small-note">{period === '1y' || period === 'all' ? '월별 중앙값' : '7일 구간 중앙값'} · 실제 측정 {trendSampleCount}건 · 최소 3개 구간 필요</span>}
         </div>
         {displayMode === 'period' && <div className="period-picker" role="group" aria-label="추세 기간">
-          {periods.map((item) => <button type="button" key={item.id} className={period === item.id ? 'period-chip selected' : 'period-chip'}
-            aria-pressed={period === item.id} onClick={() => { setPeriod(item.id); setSelectedId(null); }}>{item.label}</button>)}
+          {periods.map((item) => <button type="button" key={item.id} className={!custom && period === item.id ? 'period-chip selected' : 'period-chip'}
+            aria-pressed={!custom && period === item.id} onClick={() => { setCustom(false); setPeriod(item.id); setSelectedId(null); }}>{item.label}</button>)}<button type="button" className={custom ? "period-chip selected" : "period-chip"} aria-pressed={custom} onClick={() => setCustom(true)}>기간 지정</button>
         </div>}
+        {displayMode === "period" && custom && <div className="custom-date-range"><label>시작일<input type="date" value={from} onChange={e=>setFrom(e.target.value)} /></label><label>종료일<input type="date" min={from} value={to} onChange={e=>setTo(e.target.value)} /></label>{to && from > to && <p role="alert">종료일을 확인해 주세요.</p>}</div>}
         {displayedSamples.length === 0 && <div className="trend-empty"><h3>{displayMode === 'day' ? '선택한 날짜에 혈당 기록이 없습니다' : '선택한 기간에 호환 가능한 혈당 기록이 없습니다'}</h3>
           <p>기록이 없는 구간은 빈 상태로 유지합니다. 측정값을 생성하거나 보간하지 않습니다.</p>
           {allSamples.length === 0 && <Link to="/record?event=glucose" className="text-link">실제로 측정한 값 기록하기</Link>}</div>}
         {(displayedSamples.length > 0 || (displayMode === 'day' && activeTargetRange !== null)) && <>
             <GlucoseScatterChart samples={displayedSamples} actualSegments={actualSegments} trendSegments={displayMode === 'period' && showTrend ? derivedSegments : []}
               timezone={pet.timezone} selectedId={selected?.id ?? null} onSelect={setSelectedId} mode={displayMode} targetRange={activeTargetRange} />
-            <p className="chart-caption">{displayMode === 'day' ? 'X축은 반려동물 생활 시간대의 00:00~24:00입니다. 6시간 이내 실제 측정값만 직선 연결하며 그 사이 값은 측정값이 아닙니다.'
-              : 'X축은 실제 측정 시각에 비례합니다. 얇은 실선은 7일 이내의 실제 측정값끼리만 직선 연결하며 그 사이 값은 측정값이 아닙니다.'}
-              {activeTargetRange ? ` 초록색 영역은 ${activeTargetRange.source_label} 혈당 안정범위(${activeTargetRange.lower_mg_dl}–${activeTargetRange.upper_mg_dl} mg/dL) 참고 표시입니다.` : ' 혈당 안정범위가 등록되지 않았습니다. 혈당 안정범위를 등록하면 그래프 안에 초록색 띠로 표시됩니다.'}
-              {showTrend ? ' 점선은 선택한 기간별 중앙값으로 계산한 참고 추세이며 임상 판단이 아닙니다.' : ''} 단위: mg/dL</p>
+
             {displayMode === 'period' && showTrend && derivedSegments.length === 0 && <p className="small-note" role="status">연결 가능한 구간이 부족해 계산 추세를 표시하지 않습니다. 미측정 구간을 가로질러 추세선을 그리지 않습니다.</p>}
             {selected && <section className="sample-detail" aria-live="polite">
-              <div><p className="eyebrow">선택한 측정</p><h3>{selected.value} mg/dL</h3><p>{dateTime(selected.occurredAt, pet.timezone)}</p></div>
-              <p>측정 조건 · {glucoseMeasurementConditionLabel(selected.condition)}</p>
+              <div className="share-selected-value"><strong>{selected.value} mg/dL</strong><span>{dateTime(selected.occurredAt, pet.timezone)} · {glucoseMeasurementConditionLabel(selected.condition)}</span></div>
               <details className="measurement-detail-extra"><summary>측정 상세 정보</summary><dl><div><dt>측정 출처</dt><dd>{selected.source ?? '미기록'}</dd></div>
                 <div><dt>실제 측정자</dt><dd>{actorName(selected.performerId, userId)}</dd></div>
                 <div><dt>기록자</dt><dd>{actorName(selected.actorId, userId)}</dd></div>
@@ -292,7 +292,7 @@ export function GlucoseScatterChart({ samples, actualSegments, trendSegments, ti
   const periodFormatter = new Intl.DateTimeFormat('ko-KR', periodSpan < 2 * 86_400_000
     ? { timeZone: timezone, month: 'numeric', day: 'numeric', hour: 'numeric' }
     : { timeZone: timezone, month: 'numeric', day: 'numeric' });
-  const periodTicks = mode === 'period' ? Array.from({ length: periodTickCount }, (_, index) => {
+  const periodTicks = mode === 'period' && times.length > 0 ? Array.from({ length: periodTickCount }, (_, index) => {
     const time = periodTickCount === 1 ? minTime : minTime + periodSpan * index / (periodTickCount - 1);
     return { time, label: periodFormatter.format(new Date(time)) };
   }).filter((tick, index, ticks) => index === 0 || tick.label !== ticks[index - 1].label) : [];

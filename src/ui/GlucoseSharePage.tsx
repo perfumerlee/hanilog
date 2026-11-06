@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { measuredLineSegments, localDateKey, samplesForLocalDay, shiftLocalDate, trendLineSegments, trendPoints, type GlucoseSample, type TrendPeriod } from '../lib/health-trends';
+import { measuredLineSegments, localDateKey, samplesForLocalDay, shiftLocalDate, type GlucoseSample, type TrendPeriod } from '../lib/health-trends';
 import { callGlucoseShare, GlucoseShareRequestError, type GlucoseSharePayload } from '../lib/glucose-share';
 import { supabase } from '../lib/supabase';
 import { PET_AVATARS } from '../lib/pet-profile';
@@ -25,7 +25,9 @@ export function GlucoseSharePage() {
   const [chosenDay, setChosenDay] = useState('');
   const [displayMode, setDisplayMode] = useState<'day' | 'period'>('day');
   const [period, setPeriod] = useState<TrendPeriod>('30d');
-  const [showTrend, setShowTrend] = useState(false);
+ const [custom,setCustom]=useState(false);
+ const [from,setFrom]=useState('');
+ const [to,setTo]=useState('');
   const [portrait, setPortrait] = useState<{ token: string; url: string } | null>(null);
 
   useEffect(() => {
@@ -83,16 +85,15 @@ export function GlucoseSharePage() {
   const cutoffDay = periodDays && anchorDay ? shiftLocalDate(anchorDay, 1 - periodDays) : share?.from_date ?? '';
   const periodSamples = share ? samples.filter((item) => localDateKey(item.occurredAt, share.timezone) >= cutoffDay
     && localDateKey(item.occurredAt, share.timezone) <= anchorDay) : [];
-  const displayedSamples = displayMode === 'day' ? daily : periodSamples;
+  const displayedSamples = displayMode === 'day' ? daily : custom ? samples.filter(item => { const day=localDateKey(item.occurredAt,share?.timezone ?? 'UTC'); return from && to && from <= to && day >= from && day <= to; }) : periodSamples;
   const selected = displayedSamples.find((item) => item.id === selectedId) ?? displayedSamples.at(-1) ?? null;
   const actualSegments = measuredLineSegments(displayedSamples, displayMode === 'day' ? 6 / 24 : 7);
-  const calculatedTrend = share && displayMode === 'period' && showTrend
-    ? trendLineSegments(trendPoints(periodSamples, period, share.timezone), period) : [];
+
 
   return <main className="page-container public-glucose-share">
     <header className="page-heading pet-photo-heading">{share && <img className="pet-heading-portrait" src={portrait?.token === token ? portrait.url : PET_AVATARS[0].src} alt={`${share.pet_name} 프로필`} />}<div><p className="eyebrow">HaniLog · 건강 기록 공유</p>
       <h1>{share ? `${share.pet_name}의 혈당 기록` : '혈당 기록 공유'}</h1>
-      {share && <p>{formatDate(share.from_date)} ~ {formatDate(share.to_date)} · 읽기 전용</p>}
+      {share && <p>{samples.length ? formatDate(localDateKey(samples.reduce((a,b)=>a.occurredAt < b.occurredAt ? a : b).occurredAt,share.timezone)) : '기록 없음'} ~ {formatDate(todayInPetTimezone)}</p>}
     </div></header>
     {loading && <p className="notice" role="status">공유 권한과 최신 기록을 확인하고 있습니다…</p>}
     {error && !loading && <section className="panel empty-panel"><h2>링크를 확인할 수 없습니다</h2><p>{error}</p></section>}
@@ -103,16 +104,17 @@ export function GlucoseSharePage() {
           <button type="button" className={displayMode === 'period' ? 'period-chip selected' : 'period-chip'} aria-pressed={displayMode === 'period'} onClick={() => { setDisplayMode('period'); setSelectedId(''); }}>기간 추세</button>
           <button type="button" className={displayMode === 'day' ? 'period-chip selected' : 'period-chip'} aria-pressed={displayMode === 'day'} onClick={() => { setDisplayMode('day'); setSelectedId(''); }}>하루 보기</button>
         </div>
-        {displayMode === 'period' && <><label className="trend-toggle"><input type="checkbox" checked={showTrend} onChange={(event) => setShowTrend(event.target.checked)} />계산 추세 보기</label>
+        {displayMode === 'period' && <>
           <div className="period-picker" role="group" aria-label="공유 추세 기간">{periods.map((item) => <button type="button" key={item.id}
-            className={period === item.id ? 'period-chip selected' : 'period-chip'} aria-pressed={period === item.id}
-            onClick={() => { setPeriod(item.id); setSelectedId(''); }}>{item.label}</button>)}</div></>}
+            className={!custom && period === item.id ? 'period-chip selected' : 'period-chip'} aria-pressed={!custom && period === item.id}
+            onClick={() => { setCustom(false); setPeriod(item.id); setSelectedId(''); }}>{item.label}</button>)}<button type="button" className={custom ? "period-chip selected" : "period-chip"} aria-pressed={custom} onClick={() => setCustom(true)}>기간 지정</button></div></>}
+        {displayMode === "period" && custom && <div className="custom-date-range"><label>시작일<input type="date" value={from} onChange={e=>setFrom(e.target.value)} /></label><label>종료일<input type="date" min={from} value={to} onChange={e=>setTo(e.target.value)} /></label>{to && from > to && <p role="alert">종료일을 확인해 주세요.</p>}</div>}
         {displayMode === 'day' && <div className="day-navigation">
           <button type="button" disabled={day <= share.from_date} onClick={() => setChosenDay(shiftLocalDate(day, -1))}>이전</button>
           <label className="field-label">날짜<input type="date" value={day} min={share.from_date} max={share.to_date} onChange={(event) => { if (event.target.value >= share.from_date && event.target.value <= share.to_date) setChosenDay(event.target.value); }} /></label>
           <button type="button" disabled={day >= share.to_date} onClick={() => setChosenDay(shiftLocalDate(day, 1))}>다음</button>
         </div>}
-        <GlucoseScatterChart samples={displayedSamples} actualSegments={actualSegments} trendSegments={calculatedTrend} timezone={share.timezone} targetRange={share.target_range} onSelect={setSelectedId} selectedId={selected?.id ?? null} mode={displayMode} />
+        <GlucoseScatterChart samples={displayedSamples} actualSegments={actualSegments} trendSegments={[]} timezone={share.timezone} targetRange={share.target_range} onSelect={setSelectedId} selectedId={selected?.id ?? null} mode={displayMode} />
         {!displayedSamples.length && <p className="trend-empty">{displayMode === 'day' ? '이 날짜에' : '선택한 기간에'} 기록된 혈당 측정값이 없습니다.</p>}
         {selected && <div className="share-selected-value" aria-live="polite"><strong>{selected.value} mg/dL</strong>
           <span>{formatTime(selected.occurredAt, share.timezone)} · {glucoseMeasurementConditionLabel(selected.condition)}</span></div>}
@@ -129,8 +131,9 @@ export function GlucoseSharePage() {
             <span><small>{glucoseMeasurementConditionLabel(sample.condition)}{sample.revisionKind ? ' · 정정된 값' : ''}</small></span>
           </button>
         </li>)}</ol> : <p>표시할 실제 측정값이 없습니다.</p>}
+        <p className="timeline-footnote">공유 링크 만료 · {formatTime(share.expires_at,share.timezone)}</p>
       </section>
-      <p className="timeline-footnote">공유 링크는 {new Date(share.expires_at).toLocaleString('ko-KR')}에 만료됩니다. 보호자가 링크를 취소하면 다시 열 수 없습니다.</p>
+
     </>}
   </main>;
 }

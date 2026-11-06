@@ -717,3 +717,6 @@ button, a, input, select, textarea, summary { scroll-margin: 1rem; }
 .loading-spinner { width: 42px; height: 42px; border: 4px solid #dce7dd; border-top-color: var(--green); border-radius: 50%; animation: loading-spin .8s linear infinite; }
 @keyframes loading-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .loading-spinner { animation: none; } }
+
+.period-picker{grid-template-columns:repeat(6,minmax(0,1fr))}.custom-date-range{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem;margin:.6rem 0}.custom-date-range input{min-width:0;width:100%}.measurement-detail-extra>summary::after{content:"＋";margin-left:auto}.measurement-detail-extra[open]>summary::after{content:"−"}
+@media(max-width:599px){.period-picker{grid-template-columns:repeat(3,minmax(0,1fr))}.daily-graph-date,.day-navigation{display:grid;grid-template-columns:48px minmax(0,1fr) 48px;gap:.35rem;align-items:end}.daily-graph-date input,.day-navigation input{min-width:0;width:100%;font-size:16px;padding:.5rem}.daily-graph-date button,.day-navigation button{min-height:44px;padding:.35rem}}

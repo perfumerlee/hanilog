@@ -47,6 +47,9 @@ it('opens latest measured local day, preserves values above 500, and filters lis
  expect(screen.getByRole('heading', { name: '선택한 기간 측정값 (2건)' })).toBeInTheDocument();
  expect(document.querySelectorAll('.chart-point')).toHaveLength(2);
  expect(document.querySelectorAll('.chart-axis-label').length).toBeGreaterThan(13);
- fireEvent.click(screen.getByRole('checkbox', { name: '계산 추세 보기' }));
- expect(screen.getByRole('checkbox', { name: '계산 추세 보기' })).toBeChecked();
+ expect(screen.queryByRole('checkbox', { name: '계산 추세 보기' })).not.toBeInTheDocument();
+ fireEvent.click(screen.getByRole('button', { name: '기간 지정' }));
+ fireEvent.change(screen.getByLabelText('시작일'), { target: { value: '2026-11-03' } });
+ fireEvent.change(screen.getByLabelText('종료일'), { target: { value: '2026-11-03' } });
+ expect(document.querySelectorAll('.chart-point')).toHaveLength(1);
 });
