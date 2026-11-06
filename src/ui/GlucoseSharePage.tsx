@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { measuredLineSegments, localDateKey, samplesForLocalDay, shiftLocalDate, trendLineSegments, trendPoints, type GlucoseSample, type TrendPeriod } from '../lib/health-trends';
 import { callGlucoseShare, GlucoseShareRequestError, type GlucoseSharePayload } from '../lib/glucose-share';
 import { supabase } from '../lib/supabase';
+import { PET_AVATARS } from '../lib/pet-profile';
 
 import { GlucoseScatterChart } from './HealthTrendsPage';
 
@@ -24,6 +25,7 @@ export function GlucoseSharePage() {
   const [displayMode, setDisplayMode] = useState<'day' | 'period'>('day');
   const [period, setPeriod] = useState<TrendPeriod>('30d');
   const [showTrend, setShowTrend] = useState(false);
+  const [portrait, setPortrait] = useState<{ token: string; url: string } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -44,6 +46,17 @@ export function GlucoseSharePage() {
   }, [token]);
 
   const share = result?.token === token ? result.share ?? null : null;
+  useEffect(() => {
+    if (!share || !supabase?.functions?.invoke) return;
+    let active = true;
+    let url = '';
+    void supabase.functions.invoke<Blob>('glucose-share', { body: { action: 'photo', token } }).then(({ data, error }) => {
+      if (active && !error && data instanceof Blob && data.type === 'image/jpeg') {
+        url = URL.createObjectURL(data); setPortrait({ token, url });
+      }
+    }).catch(() => undefined);
+    return () => { active = false; if (url) URL.revokeObjectURL(url); };
+  }, [share, token]);
   const invalidToken = !supabase || !/^[A-Za-z0-9_-]{43}$/.test(token);
   const error = invalidToken ? '공유 링크를 열 수 없습니다. 링크가 올바른지 확인해 주세요.'
     : result?.token === token ? result.error ?? '' : '';
@@ -74,10 +87,10 @@ export function GlucoseSharePage() {
     ? trendLineSegments(trendPoints(periodSamples, period, share.timezone), period) : [];
 
   return <main className="page-container public-glucose-share">
-    <header className="page-heading"><p className="eyebrow">HaniLog · 건강 기록 공유</p>
+    <header className="page-heading pet-photo-heading">{share && <img className="pet-heading-portrait" src={portrait?.token === token ? portrait.url : PET_AVATARS[0].src} alt={`${share.pet_name} 프로필`} />}<div><p className="eyebrow">HaniLog · 건강 기록 공유</p>
       <h1>{share ? `${share.pet_name}의 혈당 기록` : '혈당 기록 공유'}</h1>
       {share && <p>{formatDate(share.from_date)} ~ {formatDate(share.to_date)} · 읽기 전용</p>}
-    </header>
+    </div></header>
     {loading && <p className="notice" role="status">공유 권한과 최신 기록을 확인하고 있습니다…</p>}
     {error && !loading && <section className="panel empty-panel"><h2>링크를 확인할 수 없습니다</h2><p>{error}</p></section>}
     {share && !loading && <>

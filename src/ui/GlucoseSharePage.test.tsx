@@ -15,6 +15,7 @@ afterEach(cleanup);
 it('opens latest measured local day, preserves values above 500, and filters list on date navigation', async () => {
  render(<MemoryRouter initialEntries={['/share/'+'a'.repeat(43)]}><Routes><Route path="/share/:token" element={<GlucoseSharePage />} /></Routes></MemoryRouter>);
  await waitFor(() => expect(screen.getByLabelText('날짜')).toHaveValue('2026-11-03'));
+ expect(screen.getByRole('img', { name: '합성 반려동물 프로필' })).toHaveAttribute('src', '/avatars/dog-1.svg');
  expect(screen.getByRole('heading',{name:'이날 측정값 (1건)'})).toBeInTheDocument();
  expect(document.querySelector('.glucose-point-tooltip')).toHaveTextContent('550 mg/dL');
  expect(screen.getByText('2.5 U')).toBeInTheDocument();

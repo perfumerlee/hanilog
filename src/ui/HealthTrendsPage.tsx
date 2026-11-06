@@ -7,9 +7,11 @@ import {
   type GlucoseSample, type NumericGlucoseSample, type TrendPeriod, type TrendPoint,
 } from '../lib/health-trends';
 import { supabase } from '../lib/supabase';
+import { downloadPetProfilePhoto } from '../lib/pet-profile-persistence';
+import { PET_AVATARS, isPetAvatarId } from '../lib/pet-profile';
 import { GlucoseCareTools } from './GlucoseCareTools';
 
-type TrendPet = { id: string; name: string; timezone: string; profileCanEdit?: boolean };
+type TrendPet = { id: string; name: string; timezone: string; profileCanEdit?: boolean; profile_avatar_id?: string | null; profile_photo_object_path?: string | null };
 type TargetRange = { id: string; lower_mg_dl: number; upper_mg_dl: number; source_label: string; effective_on: string };
 type RawEvent = {
   id: string; occurred_at: string; recorded_at: string; actor_id: string; performer_id: string | null;
@@ -53,6 +55,16 @@ function toSample(event: RawEvent, revision?: Revision): GlucoseSample | null {
 }
 
 export function HealthTrendsPage({ pet, userId, online, demoEvents, refreshVersion }: Props) {
+  const [portrait, setPortrait] = useState<{ path: string; url: string } | null>(null);
+  useEffect(() => {
+    if (!online || !supabase || !pet.profile_photo_object_path) return;
+    let active = true;
+    let url = '';
+    void downloadPetProfilePhoto(supabase, pet.profile_photo_object_path).then((blob) => {
+      if (active) { url = URL.createObjectURL(blob); setPortrait({ path: pet.profile_photo_object_path!, url }); }
+    }).catch(() => undefined);
+    return () => { active = false; if (url) URL.revokeObjectURL(url); };
+  }, [pet.id, pet.profile_photo_object_path, online]);
   const [searchParams] = useSearchParams();
   const [period, setPeriod] = useState<TrendPeriod>('30d');
   // Day view is the primary workflow; an explicit query parameter can still open period trends.
@@ -188,8 +200,8 @@ export function HealthTrendsPage({ pet, userId, online, demoEvents, refreshVersi
     }} />;
 
   return <main className="page-container trends-page">
-    <section className="page-heading"><p className="eyebrow">혈당기록</p><h1>{pet.name}의 혈당 기록</h1>
-      <p>실제 측정값과 수의사에게서 안내받은 혈당 안정범위를 확인합니다. 그래프는 치료 효과나 투여 적정성을 판단하지 않습니다.</p></section>
+    <section className="page-heading pet-photo-heading"><img className="pet-heading-portrait" src={online && portrait && portrait.path === pet.profile_photo_object_path ? portrait.url : PET_AVATARS.find((item) => item.id === (isPetAvatarId(pet.profile_avatar_id) ? pet.profile_avatar_id : 'dog-1'))!.src} alt={`${pet.name} 프로필`} /><div><p className="eyebrow">혈당기록</p><h1>{pet.name}의 혈당 기록</h1>
+      <p>실제 측정값과 수의사에게서 안내받은 혈당 안정범위를 확인합니다. 그래프는 치료 효과나 투여 적정성을 판단하지 않습니다.</p></div></section>
     {currentMessage && <div className={demo ? 'notice notice-success' : 'notice notice-warning'} role={demo ? 'status' : 'alert'}>{currentMessage}</div>}
     {!online && !demo && <div className="notice notice-warning" role="status">UNVERIFIED · 마지막으로 본 값은 현재 최신 기록으로 확인되지 않았습니다.</div>}
     {isLoading && <p className="load-state" role="status">서버의 혈당 기록과 정정 이력을 확인하고 있습니다…</p>}

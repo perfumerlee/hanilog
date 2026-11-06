@@ -76,7 +76,7 @@ Deno.serve(async (request) => {
   }
 
   try {
-    if (payload.action === 'resolve') {
+    if (payload.action === 'resolve' || payload.action === 'photo') {
       const token = payload.token;
       if (typeof token !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(token)) {
         return Response.json({ error: 'SHARE_LINK_INVALID_OR_EXPIRED' }, { status: 404, headers });
@@ -88,6 +88,22 @@ Deno.serve(async (request) => {
       const admin = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
       const { data, error } = await admin.rpc('resolve_glucose_share_link', { p_token_hash: tokenHash });
       if (error || !data) return Response.json({ error: 'SHARE_LINK_INVALID_OR_EXPIRED' }, { status: 404, headers });
+      if (payload.action === 'photo') {
+        const link = await admin.from('glucose_share_links').select('pet_id').eq('token_hash', tokenHash)
+          .is('revoked_at', null).gt('expires_at', new Date().toISOString()).maybeSingle();
+        if (link.error || !link.data) return Response.json({ error: 'SHARE_LINK_INVALID_OR_EXPIRED' }, { status: 404, headers });
+        const pet = await admin.from('pets').select('profile_photo_object_path').eq('id', link.data.pet_id).maybeSingle();
+        const path = pet.data?.profile_photo_object_path;
+        if (pet.error || !path || !new RegExp(`^${link.data.pet_id}/[0-9a-f]{32}[.]jpg$`).test(path)) {
+          return Response.json({ error: 'PHOTO_NOT_AVAILABLE' }, { status: 404, headers });
+        }
+        const image = await admin.storage.from('pet-profile-images').download(path);
+        if (image.error || !image.data || image.data.size > 1048576 || image.data.type !== 'image/jpeg') {
+          return Response.json({ error: 'PHOTO_NOT_AVAILABLE' }, { status: 404, headers });
+        }
+        return new Response(image.data, { status: 200, headers: { ...cors(origin), 'Content-Type': 'image/jpeg',
+          'Cache-Control': 'no-store, private, max-age=0', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer' } });
+      }
       return Response.json({ share: data }, { headers });
     }
 

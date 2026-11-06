@@ -59,6 +59,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .sync-caption { width: min(900px, calc(100% - 2rem)); margin: .4rem auto .3rem; color: var(--muted); font-size: .7rem; }
 .page-container { width: min(900px, calc(100% - 2rem)); margin: .6rem auto 1rem; flex: 1; }
 .page-heading { padding: 1.15rem .1rem .6rem; }
+.pet-photo-heading { display: flex; align-items: center; gap: .85rem; min-width: 0; }
+.pet-photo-heading > div { min-width: 0; }
+.pet-heading-portrait { width: 68px; height: 68px; flex: 0 0 68px; border-radius: 50%; object-fit: cover; background: var(--mint); border: 1px solid var(--line); }
+.pet-photo-heading > div > p:last-child { margin: 0; color: var(--muted); line-height: 1.55; font-size: .88rem; }
 .page-heading h1, .hero-card h1 { margin: .12rem 0 .45rem; font-size: clamp(1.55rem, 6vw, 2.1rem); line-height: 1.16; letter-spacing: -.055em; color: var(--ink); }
 .page-heading > p:last-child, .pet-intro > p:last-child { margin: 0; color: var(--muted); line-height: 1.55; font-size: .88rem; }
 .eyebrow { color: #59836a; text-transform: uppercase; letter-spacing: .12em; font-size: .68rem; font-weight: 900; margin: 0 0 .38rem; }
