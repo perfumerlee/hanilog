@@ -114,14 +114,13 @@ export function GlucoseSharePage() {
         </div>}
         <GlucoseScatterChart samples={displayedSamples} actualSegments={actualSegments} trendSegments={calculatedTrend} timezone={share.timezone} targetRange={share.target_range} onSelect={setSelectedId} selectedId={selected?.id ?? null} mode={displayMode} />
         {!displayedSamples.length && <p className="trend-empty">{displayMode === 'day' ? '이 날짜에' : '선택한 기간에'} 기록된 혈당 측정값이 없습니다.</p>}
-        <p className="chart-caption">생활 시간대 {share.timezone} · {displayMode === 'day' ? '00:00~24:00. 6시간' : '실제 측정 시각. 7일'} 이내 실제 측정값만 연결합니다. 중간 값은 측정값이 아닙니다. 초록색 혈당 안정범위는 설정된 참고 범위입니다.{showTrend && displayMode === 'period' ? ' 점선은 계산된 참고 추세이며 실제 측정값이나 임상 판단이 아닙니다.' : ''}</p>
         {selected && <div className="share-selected-value" aria-live="polite"><strong>{selected.value} mg/dL</strong>
           <span>{formatTime(selected.occurredAt, share.timezone)} · {glucoseMeasurementConditionLabel(selected.condition)}</span></div>}
       </section>
       {displayMode === 'day' && careTimes.length > 0 && <section className="panel"><h2>이날의 식사·인슐린 기록</h2>
         <ul className="share-care-times">{careTimes.map((item, index) => <li key={`${item.event_type}-${item.occurred_at}-${index}`}>
           <span>{item.event_type === 'meal' ? '식사' : '인슐린'}<strong>{typeof item.amount === 'number' && Number.isFinite(item.amount) ? `${item.amount}${item.unit ? ` ${item.unit}` : ' (단위 미기록)'}` : share.include_care_values ? '수치 미기록' : '수치 미공유'}</strong></span><time>{formatTime(item.occurred_at, share.timezone)}</time>
-        </li>)}</ul><small>공유자가 선택한 정보만 표시됩니다. 시각과 수치는 관련성이나 투여 적정성 판단이 아닙니다.</small>
+        </li>)}</ul>
       </section>}
       <section className="panel measurement-list"><h2>{displayMode === 'day' ? '이날' : '선택한 기간'} 측정값 ({displayedSamples.length}건)</h2>
         {displayedSamples.length ? <ol>{[...displayedSamples].reverse().map((sample) => <li key={sample.id}>

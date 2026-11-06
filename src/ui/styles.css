@@ -44,6 +44,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .workspace-layout { width: 100%; min-width: 0; }
 .workspace-content { width: 100%; min-width: 0; }
 .topbar { min-height: 62px; padding: .7rem 1rem; display: flex; gap: .75rem; align-items: center; background: rgba(255,254,250,.94); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 5; backdrop-filter: blur(16px); }
+.topbar > .quiet-button { margin-left: auto; }
 .brand { display: inline-flex; align-items: center; gap: .45rem; color: var(--green-dark); text-decoration: none; font-weight: 900; font-size: 1.08rem; letter-spacing: -.04em; white-space: nowrap; }
 .brand img { width: 27px; height: 27px; }
 .environment-badge { border: 1px solid #b5d1bd; border-radius: 999px; background: #e8f2e9; color: #245944; padding: .32rem .55rem; font-size: .65rem; font-weight: 850; letter-spacing: .04em; white-space: nowrap; }
@@ -238,6 +239,11 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .invite-pets { min-width: 0; margin: 0; padding: .8rem; border: 1px solid var(--line); border-radius: 16px; }
 .invite-pets legend { padding: 0 .3rem; color: var(--ink); font-size: .82rem; font-weight: 850; }
 .member-list, .invite-list, .care-occurrence-list { list-style: none; margin: 0; padding: 0; }
+.household-pet-list { list-style: none; display: flex; flex-wrap: wrap; gap: .65rem; margin: .85rem 0 0; padding: 0; }
+.household-pet-list li { display: flex; align-items: center; gap: .55rem; min-height: 52px; padding: .3rem .7rem .3rem .3rem; border: 1px solid var(--line); border-radius: 999px; font-size: .86rem; }
+.household-pet-portrait { width: 42px; height: 42px; flex: 0 0 42px; object-fit: cover; border-radius: 50%; background: var(--mint); }
+.shared-care-detail > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--ink); font-size: .95rem; font-weight: 800; }
+.shared-care-detail[open] > summary { margin-bottom: .7rem; }
 .member-list > li, .invite-list > li { display: grid; gap: .5rem; padding: .8rem 0; border-bottom: 1px solid #edf0e9; }
 .member-heading, .grant-row, .routine-config-row, .care-occurrence-head { display: flex; align-items: center; justify-content: space-between; gap: .6rem; }
 .member-heading code { color: var(--muted); font-size: .68rem; }
@@ -437,6 +443,8 @@ button, a, input, select, textarea, summary { scroll-margin: 1rem; }
 .sample-detail h3 { margin: 0; color: var(--green-dark); font-size: 1.4rem; }
 .sample-detail p { margin: .2rem 0; color: var(--muted); font-size: .82rem; }
 .sample-detail dl { margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; }
+.measurement-detail-extra > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-weight: 750; color: var(--green-dark); }
+.measurement-detail-extra[open] > summary { margin-bottom: .5rem; }
 .sample-detail dl div { min-width: 0; padding: .5rem; border-radius: 11px; background: #f4f7f2; }
 .sample-detail dt { color: var(--muted); font-size: .7rem; }
 .sample-detail dd { margin: .15rem 0 0; overflow-wrap: anywhere; font-size: .8rem; font-weight: 700; }
@@ -447,6 +455,8 @@ button, a, input, select, textarea, summary { scroll-margin: 1rem; }
 .sample-row > span { min-width: 0; display: grid; gap: .2rem; }
 .sample-row > span:last-child { text-align: right; }
 .sample-row strong { font-size: .9rem; }
+.measurement-list .sample-row { min-height: 52px; }
+.measurement-list .sample-row time { color: var(--muted); font-size: .74rem; text-align: right; font-variant-numeric: tabular-nums; }
 .sample-row small { color: var(--muted); font-size: .74rem; line-height: 1.35; overflow-wrap: anywhere; }
 .monthly-counts li { min-height: 44px; display: flex; justify-content: space-between; align-items: center; }
 .monthly-counts span, .monthly-panel > p:not(.small-note), .measurement-list > p { color: var(--muted); font-size: .84rem; }

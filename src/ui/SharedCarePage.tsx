@@ -2,9 +2,10 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { householdInvalidationChannel } from '../lib/realtime';
+import { PetProfilePortrait } from './PetProfilePortrait';
 
 type Household = { id: string; name: string; role?: string };
-type Pet = { id: string; household_id: string; name: string };
+type Pet = { id: string; household_id: string; name: string; profile_avatar_id?: string | null; profile_photo_object_path?: string | null };
 type Membership = { id: string; user_id: string; role: string; status: string; created_at: string };
 type Grant = { id: string; pet_id: string; user_id: string; access_role: 'CAREGIVER' | 'READ_ONLY'; status: string };
 type Invitation = { id: string; invitee_email: string; membership_role: string; pet_ids: string[]; status: string; expires_at: string };
@@ -150,34 +151,33 @@ export function SharedCarePage({ households, pets, userId, onRenameHousehold }: 
   }
 
   return <main className="page-container">
-    <section className="page-heading"><p className="eyebrow">함께 돌봄 관리</p><h1>가족 공간과 보호자</h1>
-      <p>가족 공간 이름과 반려동물별 공동 보호자 접근을 관리합니다.</p></section>
+    <section className="page-heading"><p className="eyebrow">가족 공간</p><h1>가족 공간과 보호자</h1></section>
     {notice && <div role="status" className="notice notice-warning">{notice}</div>}
     {inviteUrl && <section className="panel"><h2>초대 링크</h2><label className="field-label">한 번 표시되는 링크<input readOnly value={inviteUrl} onFocus={(event) => event.currentTarget.select()} /></label>
       <p className="small-note">이 링크는 초대 대상 이메일로 로그인한 사용자만 수락할 수 있고, 만료 또는 사용 후 재사용할 수 없습니다. 링크 전달 채널의 안전성은 보호자가 확인하세요.</p></section>}
     {!households.length ? <section className="panel empty-panel"><h2>가족 공간이 없습니다</h2><p>먼저 오늘 화면에서 가족 공간과 반려동물을 등록해 주세요.</p><Link className="button-link" to="/">오늘 화면으로 이동</Link></section> : <>
-      <section className="panel"><label className="field-label">관리 Household<select value={householdId} onChange={(event) => { setSelectedHouseholdId(event.target.value); setPetIds([]); setInviteUrl(''); }}>
+      <section className="panel"><label className="field-label">가족 공간<select value={householdId} onChange={(event) => { setSelectedHouseholdId(event.target.value); setPetIds([]); setInviteUrl(''); }}>
         {households.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}
-      </select></label></section>
-      <section className="panel" id="household-settings"><div className="section-heading"><h2>가족 공간 이름</h2></div>
+      </select></label><ul className="household-pet-list">{householdPets.map((pet) => <li key={pet.id}><PetProfilePortrait pet={pet} className="household-pet-portrait" /><strong>{pet.name}</strong></li>)}</ul></section>
+      <details className="panel shared-care-detail" id="household-settings"><summary>가족 공간 이름 수정</summary>
         {canManage ? <form className="stack" onSubmit={(event) => void renameSelectedHousehold(event)}>
           <label className="field-label">현재 이름<input required maxLength={120} value={householdName} onChange={(event) => setHouseholdNameDraft({ householdId, name: event.target.value })} /></label>
           <p className="small-note">이름 변경은 이 가족 공간을 사용하는 모든 보호자에게 표시됩니다.</p>
           <button type="submit" disabled={busy || !householdName.trim() || householdName.trim() === selectedHousehold?.name}>{busy ? '저장 중…' : '가족 공간 이름 저장'}</button>
         </form> : <p className="small-note">현재 가족 공간 이름: {selectedHousehold?.name ?? '확인 중'} · 이름 변경은 주 보호자만 할 수 있습니다.</p>}
-      </section>
-      <section className="panel"><div className="section-heading"><h2>보호자 초대</h2><span className="small-note">Primary caregiver가 발급</span></div>
+      </details>
+      <details className="panel shared-care-detail"><summary>보호자 초대</summary>
         <form className="stack" onSubmit={(event) => void createInvite(event)}>
           <label className="field-label">초대받을 이메일<input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></label>
           <label className="field-label">역할<select value={role} onChange={(event) => setRole(event.target.value as typeof role)}><option value="CAREGIVER">공동 보호자 · 기록 가능</option><option value="READ_ONLY">읽기 전용</option></select></label>
-          <fieldset className="invite-pets"><legend>접근을 허용할 Pet</legend>{householdPets.map((pet) => <label className="check-row" key={pet.id}>
+          <fieldset className="invite-pets"><legend>접근을 허용할 반려동물</legend>{householdPets.map((pet) => <label className="check-row" key={pet.id}>
             <input type="checkbox" checked={petIds.includes(pet.id)} onChange={(event) => setPetIds((current) => event.target.checked ? [...current, pet.id] : current.filter((id) => id !== pet.id))} />{pet.name}
           </label>)}</fieldset>
           <button disabled={busy || !canManage || !petIds.length}>{busy ? '처리 중…' : '초대 링크 발급'}</button>
           {!canManage && <p className="small-note">초대·권한 변경은 주 보호자만 할 수 있습니다. 현재 로그인한 역할에서 확인되지 않았습니다.</p>}
         </form>
-      </section>
-      <section className="panel"><div className="section-heading"><h2>현재 멤버</h2><button type="button" className="secondary-action" onClick={() => void refresh()} disabled={loading}>새로 확인</button></div>
+      </details>
+      <details className="panel shared-care-detail"><summary>보호자 {members.length}명 · 권한 관리</summary><button type="button" className="secondary-action" onClick={() => void refresh()} disabled={loading}>새로 확인</button>
         <p className="small-note" role="status">권한 변경 실시간 {realtimeStatus === 'connected' ? '연결됨' : realtimeStatus === 'connecting' ? '연결 확인 중' : '끊김 · 주기적으로 서버 재확인'}</p>
         {loading ? <p role="status">서버에서 권한을 확인하고 있습니다…</p> : <ul className="member-list">{members.map((member) => <li key={member.id}>
           <div className="member-heading"><strong>{member.role === 'PRIMARY_CAREGIVER' ? '주 보호자' : member.role === 'READ_ONLY' ? '읽기 전용' : '공동 보호자'}</strong><code>{member.user_id === userId ? '나' : member.user_id.slice(0, 8)}</code></div>
@@ -196,11 +196,11 @@ export function SharedCarePage({ households, pets, userId, onRenameHousehold }: 
           {member.role !== 'PRIMARY_CAREGIVER' && member.user_id !== userId && <button className="danger-button" type="button" disabled={busy || !canManage} onClick={() => void revokeMember(member)}>Household 멤버십 철회</button>}
         </li>)}{!members.length && <li>현재 멤버를 확인하지 못했습니다.</li>}</ul>}
         <p className="small-note">사용자 표시는 개인정보 최소화를 위해 계정 UUID 일부만 사용합니다. 권한 변경은 서버에서 다시 검사되고 감사됩니다.</p>
-      </section>
-      <section className="panel"><div className="section-heading"><h2>초대 상태</h2><span className="small-note">링크의 토큰은 표시하지 않음</span></div>
+      </details>
+      <details className="panel shared-care-detail"><summary>초대 상태</summary>
         {invitations.length ? <ul className="invite-list">{invitations.map((item) => <li key={item.id}><strong>{item.invitee_email}</strong><span>{item.membership_role === 'READ_ONLY' ? '읽기 전용' : '공동 보호자'} · {item.status}</span><small>만료 {new Date(item.expires_at).toLocaleString()}</small>
           {item.status === 'PENDING' && <button type="button" className="danger-button" disabled={busy || !canManage} onClick={() => void revokeInvitation(item.id)}>초대 철회</button>}</li>)}</ul> : <p className="small-note">초대가 없거나 현재 역할에서 목록을 볼 권한이 없습니다.</p>}
-      </section>
+      </details>
     </>}
   </main>;
 }

@@ -23,6 +23,7 @@ import { authCallbackPurpose, authFailureMessage, authLinkErrorMessage, authRedi
 import { detectBrowserTimezone, formatTimezoneLabel, timezoneOptionsFor } from '../lib/timezone';
 import { RecordChoices, RecordDateStrip } from './RecordControls';
 import { PetProfileEditor } from './PetProfileEditor';
+import { PetProfilePortrait } from './PetProfilePortrait';
 import { persistPetProfile } from '../lib/pet-profile-persistence';
 import { isPetAvatarId, type PetAvatarId } from '../lib/pet-profile';
 
@@ -206,7 +207,7 @@ export function App() {
               ? <Workspace userId={session.user.id} online={online} />
               : <Navigate to="/login" replace state={{ from: `${location.pathname}${location.search}` }} />} />
       </Routes>
-      <footer>HaniLog는 실제 돌봄을 기록합니다. 치료·투여의 적정성을 승인하거나 처방을 바꾸지 않습니다.</footer>
+      <footer>HaniLog는 실제 돌봄을 기록합니다.</footer>
     </div>
   );
 }
@@ -357,8 +358,9 @@ function createDemoEvents(): HealthEvent[] {
 }
 
 function DemoSharedCarePage() {
-  return <main className="page-container"><section className="page-heading"><p className="eyebrow">함께 돌봄 · DEMO</p><h1>공동 보호자</h1>
-    <p>합성 계정 예시입니다. 초대나 실제 권한 변경은 실행되지 않습니다.</p></section><section className="panel"><h2>데모 공동 돌봄 가정</h2>
+  return <main className="page-container"><section className="page-heading"><p className="eyebrow">DEMO · 합성 정보</p><h1>가족 공간과 보호자</h1>
+    <p>초대나 실제 권한 변경은 실행되지 않습니다.</p></section><section className="panel"><h2>데모 공동 돌봄 가정</h2>
+      <ul className="household-pet-list">{demoPetList.map((pet) => <li key={pet.id}><PetProfilePortrait pet={pet} className="household-pet-portrait" /><strong>{pet.name}</strong></li>)}</ul>
       <ul className="member-list"><li><div className="member-heading"><strong>보호자 A · 주 보호자</strong><span>예시 사용자</span></div></li>
         <li><div className="member-heading"><strong>보호자 B · 공동 보호자</strong><span>예시 사용자</span></div></li></ul>
       <button type="button" disabled>초대 링크 발급 (데모 비활성)</button><p className="small-note">실제 Household 접근은 서버에서 검증되어야 합니다.</p></section></main>;
@@ -366,7 +368,7 @@ function DemoSharedCarePage() {
 
 function DemoNotificationsPage() {
   const [enabled, setEnabled] = useState(false);
-  return <main className="page-container"><section className="page-heading"><p className="eyebrow">알림 설정 · DEMO</p><h1>알림 전달 미연결</h1>
+  return <main className="page-container"><section className="page-heading"><p className="eyebrow">DEMO · 전달 미연결</p><h1>알림 및 전달 설정</h1>
     <p>외부 Push와 이메일은 발송되지 않습니다.</p></section><section className="panel stack"><div className="notice notice-warning" role="status">공급자 연결 없음 · 알림 확인은 실제 수행을 뜻하지 않습니다.</div>
       <label className="check-row"><input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} />화면 예시 설정 {enabled ? 'ON' : 'OFF'} (저장되지 않음)</label>
       <ul className="glance-list"><li className="glance-row"><div><strong>일정 안내</strong><small>일반 케어 안내 문구 예시</small></div></li>
@@ -1032,17 +1034,17 @@ function SessionNavigation({ pathname, search }: { pathname: string; search: str
   const [moreOpen, setMoreOpen] = useState(false);
   const desktopItems = [
     { to: '/trends', label: '혈당기록', icon: '⌁' },
-    { to: '/timeline', label: '기록 모아보기', icon: '◷' },
+    { to: '/timeline', label: '하루 타임머신', icon: '◷' },
     { to: '/record', label: '빠른 기록', icon: '+' },
     { to: '/?profile=1', label: '반려동물 설정', icon: '🐾' },
-    { to: '/shared', label: '함께 돌봄', icon: '♡' },
-    { to: '/notifications', label: '알림', icon: '♧' },
+    { to: '/shared', label: '가족 공간과 보호자', icon: '♡' },
+    { to: '/notifications', label: '알림 및 전달 설정', icon: '♧' },
   ];
   const secondaryItems = [
     { to: '/?profile=1', label: '반려동물 설정', icon: '🐾' },
-    { to: '/timeline', label: '기록 모아보기', icon: '◷' },
-    { to: '/shared', label: '함께 돌봄', icon: '♡' },
-    { to: '/notifications', label: '알림', icon: '♧' },
+    { to: '/timeline', label: '하루 타임머신', icon: '◷' },
+    { to: '/shared', label: '가족 공간과 보호자', icon: '♡' },
+    { to: '/notifications', label: '알림 및 전달 설정', icon: '♧' },
   ];
   const primaryItems = [
     { to: '/trends', label: '혈당기록', icon: '⌁' },
@@ -1636,8 +1638,8 @@ export function TimelinePage(props: {
   const filteredEvents = dailyEvents.filter((event) => visibleTypes.has(event.event_type));
 
   return <main className="page-container timeline-page">
-    <section className="page-heading"><p className="eyebrow">건강 기록</p><h1>하루 타임라인</h1>
-      <p>{pet.name}의 실제 발생 시각을 {formatTimezoneLabel(pet.timezone)} 기준으로 보여줍니다.</p></section>
+    <section className="page-heading pet-photo-heading"><PetProfilePortrait pet={pet} /><div><p className="eyebrow">건강 기록</p><h1>하루 타임머신</h1>
+      <p>{pet.name}의 기록 · {dateFilter}</p></div></section>
     <div className="timeline-filter"><label htmlFor="timeline-date">날짜 선택</label>
       <input id="timeline-date" type="date" value={dateFilter} onChange={(event) => {
         const date = event.target.value;
@@ -1680,22 +1682,21 @@ export function TimelinePage(props: {
         <time className="timeline-time" dateTime={event.occurred_at}>{timeInTimezone(event.occurred_at, pet.timezone)}</time>
         <span className="event-icon" aria-hidden="true">{icon}</span>
         <article className="timeline-card">
-          <div className="timeline-card-heading"><div><h2>{eventLabels[event.event_type] ?? event.event_type}</h2>
-              <span className="actor-name">{actorLabel(event.actor_id, userId)}</span></div>
-            <span className={latest?.revision_kind === 'VOID' ? 'event-status void' : latest ? 'event-status corrected' : 'event-status confirmed'}>
-              {latest?.revision_kind === 'VOID' ? '무효 처리' : latest ? '정정 이력 있음' : '서버 확정'}
-            </span></div>
+          <div className="timeline-card-heading"><h2>{eventLabels[event.event_type] ?? event.event_type}</h2>
+            {latest && <span className={latest.revision_kind === 'VOID' ? 'event-status void' : 'event-status corrected'}>
+              {latest.revision_kind === 'VOID' ? '무효 처리' : '정정 이력 있음'}
+            </span>}</div>
           <p className="event-value">{formatEventValue(event, effectiveValue)}</p>
-          <p className="event-timestamp">실제 발생 {dateTimeInTimezone(event.occurred_at, pet.timezone)}</p>
-          {event.event_type === 'exercise' && typeof effectiveValue.activity_ended_at === 'string' &&
-            <p className="event-timestamp">종료 {dateTimeInTimezone(effectiveValue.activity_ended_at, pet.timezone)}</p>}
-          {event.event_type === 'exercise' && onSaveExerciseEnd && latest?.revision_kind !== 'VOID' &&
-            <ExerciseEndEditor event={event} value={effectiveValue} revision={latest?.revision_no ?? 0}
-              onSave={onSaveExerciseEnd} />}
-          {onReviseEvent && latest?.revision_kind !== 'VOID' && <TimelineCorrectionEditor event={event} value={effectiveValue}
-            revision={latest?.revision_no ?? 0} onSave={onReviseEvent} onCorrectTime={onCorrectTime} />}
-          <p className="event-timestamp">서버 입력 {dateTimeInTimezone(event.recorded_at, pet.timezone)}</p>
-          <details><summary>기록 상세와 이력</summary>
+          <details><summary>상세 정보·수정</summary>
+            <p className="event-timestamp">실제 발생 {dateTimeInTimezone(event.occurred_at, pet.timezone)}</p>
+            {event.event_type === 'exercise' && typeof effectiveValue.activity_ended_at === 'string' &&
+              <p className="event-timestamp">종료 {dateTimeInTimezone(effectiveValue.activity_ended_at, pet.timezone)}</p>}
+            {event.event_type === 'exercise' && onSaveExerciseEnd && latest?.revision_kind !== 'VOID' &&
+              <ExerciseEndEditor event={event} value={effectiveValue} revision={latest?.revision_no ?? 0}
+                onSave={onSaveExerciseEnd} />}
+            {onReviseEvent && latest?.revision_kind !== 'VOID' && <TimelineCorrectionEditor event={event} value={effectiveValue}
+              revision={latest?.revision_no ?? 0} onSave={onReviseEvent} onCorrectTime={onCorrectTime} />}
+            <p className="event-timestamp">기록자 {actorLabel(event.actor_id, userId)} · 서버 입력 {dateTimeInTimezone(event.recorded_at, pet.timezone)}</p>
             <dl className="detail-list"><div><dt>기록 ID</dt><dd>{event.id}</dd></div>
               <div><dt>기록자 ID</dt><dd>{event.actor_id}</dd></div>
               <div><dt>실제 수행자</dt><dd>{event.performer_id ? actorLabel(event.performer_id, userId) : '지정되지 않음'}</dd></div>

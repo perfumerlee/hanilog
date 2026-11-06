@@ -18,7 +18,11 @@ describe('HealthTrendsPage', () => {
     expect(screen.getByRole('heading', { name: '합성 반려견의 혈당 기록' })).toBeInTheDocument();
     expect(screen.getByRole('group', { name: '추세 기간' })).toBeInTheDocument();
     expect(screen.getByRole('img', { name: /기간별 실제 측정 기록 21건과 mg\/dL 값/ })).toBeInTheDocument();
-    expect(screen.getByText('측정 조건')).toBeInTheDocument();
+    const measurementDetails = screen.getByText('측정 상세 정보').closest('details');
+    expect(measurementDetails).not.toHaveAttribute('open');
+    fireEvent.click(measurementDetails!.querySelector('summary')!);
+    expect(screen.getByText('측정 출처')).toBeInTheDocument();
+    expect(screen.getByText('측정 조건 · 합성 예시 조건')).toBeInTheDocument();
     expect(screen.getAllByText(/mg\/dL/).length).toBeGreaterThan(0);
     expect(screen.getByRole('link', { name: '혈당 기록 추가' })).toHaveAttribute('href', '/record?event=glucose');
     expect(document.querySelectorAll('.actual-series-line').length).toBeGreaterThan(0);

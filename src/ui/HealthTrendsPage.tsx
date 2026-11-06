@@ -247,15 +247,15 @@ export function HealthTrendsPage({ pet, userId, online, demoEvents, refreshVersi
             {displayMode === 'period' && showTrend && derivedSegments.length === 0 && <p className="small-note" role="status">연결 가능한 구간이 부족해 계산 추세를 표시하지 않습니다. 미측정 구간을 가로질러 추세선을 그리지 않습니다.</p>}
             {selected && <section className="sample-detail" aria-live="polite">
               <div><p className="eyebrow">선택한 측정</p><h3>{selected.value} mg/dL</h3><p>{dateTime(selected.occurredAt, pet.timezone)}</p></div>
-              <dl><div><dt>측정 출처</dt><dd>{selected.source ?? '미기록'}</dd></div>
-                <div><dt>측정 조건</dt><dd>{glucoseMeasurementConditionLabel(selected.condition)}</dd></div>
+              <p>측정 조건 · {glucoseMeasurementConditionLabel(selected.condition)}</p>
+              <details className="measurement-detail-extra"><summary>측정 상세 정보</summary><dl><div><dt>측정 출처</dt><dd>{selected.source ?? '미기록'}</dd></div>
                 <div><dt>실제 측정자</dt><dd>{actorName(selected.performerId, userId)}</dd></div>
                 <div><dt>기록자</dt><dd>{actorName(selected.actorId, userId)}</dd></div>
                 <div><dt>서버 기록 시각</dt><dd>{dateTime(selected.recordedAt, pet.timezone)}</dd></div>
                 {selected.revisionKind && <div><dt>이력</dt><dd>정정 이력이 반영된 값</dd></div>}
                 {selected.note && <div><dt>메모</dt><dd>{selected.note}</dd></div>}
-              </dl>
-              <Link className="text-link" to={`/timeline?date=${encodeURIComponent(localDateKey(selected.occurredAt, pet.timezone))}`}>하루 타임라인 열기 · {dateOnly(selected.occurredAt, pet.timezone)}</Link>
+              </dl></details>
+              <Link className="button-link" to={`/timeline?date=${encodeURIComponent(localDateKey(selected.occurredAt, pet.timezone))}`}>하루 타임머신 열기</Link>
               {sameDay.length > 1 && <p className="small-note">이 날짜에 실제 기록된 측정 {sameDay.length}건 · 모든 측정 시각은 아래 목록에 표시됩니다.</p>}
               {dayContext.length > 0 && <div className="day-context"><h4>{selectedSampleDay}의 식사·인슐린 기록</h4>
                 <ul>{dayContext.map((event) => <li key={event.id}><span>{timeOnly(event.occurred_at, pet.timezone)} · {event.event_type === 'meal' ? '식사 기록' : '인슐린 사실 기록'}</span>
@@ -277,8 +277,7 @@ export function HealthTrendsPage({ pet, userId, online, demoEvents, refreshVersi
         {displayedSamples.length ? <ol>{[...displayedSamples].reverse().map((sample) => <li key={sample.id}>
           <button type="button" className={selected?.id === sample.id ? 'sample-row active' : 'sample-row'} onClick={() => setSelectedId(sample.id)}
             aria-label={`${dateTime(sample.occurredAt, pet.timezone)}, ${sample.value} mg/dL, 측정 상세 선택`}>
-            <span><strong>{sample.value} mg/dL</strong><small>{dateTime(sample.occurredAt, pet.timezone)}</small></span>
-            <span><small>실제 측정자 {actorName(sample.performerId, userId)}</small><small>기록자 {actorName(sample.actorId, userId)}</small></span>
+            <strong>{sample.value} mg/dL</strong><time dateTime={sample.occurredAt}>{dateTime(sample.occurredAt, pet.timezone)}</time>
           </button>
         </li>)}</ol> : <p>선택한 기간에 측정값이 없습니다.</p>}
       </section>
@@ -286,7 +285,6 @@ export function HealthTrendsPage({ pet, userId, online, demoEvents, refreshVersi
         <p>저장 단위가 mg/dL인지 확인되지 않았거나 값 형식이 호환되지 않아 변환 없이 제외했습니다.</p>
         <ul>{excluded.slice(-20).reverse().map((item) => <li key={item.id}>{dateTime(item.occurredAt, pet.timezone)} · 저장 단위 {item.unit ?? '미기록'} · 그래프 미표시</li>)}</ul>
       </details>}
-      <p className="timeline-footnote">혈액검사 항목은 검사법과 단위에 따라 별도로 관리해야 하며 이 혈당 그래프에 섞지 않습니다. 자동 진단이나 투약 판단은 제공하지 않습니다.</p>
     </>}
   </main>;
 }
