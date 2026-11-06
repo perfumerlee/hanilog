@@ -101,7 +101,9 @@ Deno.serve(async (request) => {
         if (image.error || !image.data || image.data.size > 1048576 || image.data.type !== 'image/jpeg') {
           return Response.json({ error: 'PHOTO_NOT_AVAILABLE' }, { status: 404, headers });
         }
-        return new Response(image.data, { status: 200, headers: { ...cors(origin), 'Content-Type': 'image/jpeg',
+        // functions-js treats image/jpeg as text. Send binary so its client returns a Blob;
+        // the browser wraps the verified bytes as image/jpeg before creating an object URL.
+        return new Response(image.data, { status: 200, headers: { ...cors(origin), 'Content-Type': 'application/octet-stream',
           'Cache-Control': 'no-store, private, max-age=0', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer' } });
       }
       return Response.json({ share: data }, { headers });

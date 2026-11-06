@@ -4,6 +4,7 @@ import { measuredLineSegments, localDateKey, samplesForLocalDay, shiftLocalDate,
 import { callGlucoseShare, GlucoseShareRequestError, type GlucoseSharePayload } from '../lib/glucose-share';
 import { supabase } from '../lib/supabase';
 import { PET_AVATARS } from '../lib/pet-profile';
+import { glucoseMeasurementConditionLabel } from '../lib/event-entry';
 
 import { GlucoseScatterChart } from './HealthTrendsPage';
 
@@ -51,8 +52,8 @@ export function GlucoseSharePage() {
     let active = true;
     let url = '';
     void supabase.functions.invoke<Blob>('glucose-share', { body: { action: 'photo', token } }).then(({ data, error }) => {
-      if (active && !error && data instanceof Blob && data.type === 'image/jpeg') {
-        url = URL.createObjectURL(data); setPortrait({ token, url });
+      if (active && !error && data instanceof Blob && data.type === 'application/octet-stream' && data.size <= 1048576) {
+        url = URL.createObjectURL(new Blob([data], { type: 'image/jpeg' })); setPortrait({ token, url });
       }
     }).catch(() => undefined);
     return () => { active = false; if (url) URL.revokeObjectURL(url); };
@@ -74,7 +75,9 @@ export function GlucoseSharePage() {
   const day = chosenDay || (share && share.from_date <= todayInPetTimezone && todayInPetTimezone <= share.to_date
     ? todayInPetTimezone : share && latest ? localDateKey(latest.occurredAt, share.timezone) : share?.to_date ?? '');
   const daily = share ? samplesForLocalDay(samples, day, share.timezone) : [];
-  const careTimes = share?.care_times.filter((item) => localDateKey(item.occurred_at, share.timezone) === day) ?? [];
+  const careTimes = (share?.care_times.filter((item) => localDateKey(item.occurred_at, share.timezone) === day) ?? [])
+    .sort((a, b) => Date.parse(a.occurred_at) - Date.parse(b.occurred_at)
+      || (a.event_type === 'meal' ? -1 : 1) - (b.event_type === 'meal' ? -1 : 1));
   const anchorDay = share && todayInPetTimezone < share.to_date ? todayInPetTimezone : share?.to_date ?? '';
   const periodDays = periods.find((item) => item.id === period)?.days;
   const cutoffDay = periodDays && anchorDay ? shiftLocalDate(anchorDay, 1 - periodDays) : share?.from_date ?? '';
@@ -94,9 +97,8 @@ export function GlucoseSharePage() {
     {loading && <p className="notice" role="status">공유 권한과 최신 기록을 확인하고 있습니다…</p>}
     {error && !loading && <section className="panel empty-panel"><h2>링크를 확인할 수 없습니다</h2><p>{error}</p></section>}
     {share && !loading && <>
-      <div className="notice notice-warning" role="note">보호자가 선택한 기간의 읽기 전용 정보입니다. 이 화면은 진단이나 투여 지시를 제공하지 않습니다.</div>
       <section className="panel trends-panel">
-        <div className="section-heading"><div><p className="eyebrow">실제 측정값 · mg/dL</p><h2>{displayMode === 'day' ? '하루 혈당 그래프' : '기간 혈당 추세'}</h2></div></div>
+        <div className="section-heading"><h2>{displayMode === 'day' ? '하루 혈당 그래프' : '기간 혈당 추세'}</h2></div>
         <div className="trend-display-toggle" role="group" aria-label="공유 혈당 그래프 보기">
           <button type="button" className={displayMode === 'period' ? 'period-chip selected' : 'period-chip'} aria-pressed={displayMode === 'period'} onClick={() => { setDisplayMode('period'); setSelectedId(''); }}>기간 추세</button>
           <button type="button" className={displayMode === 'day' ? 'period-chip selected' : 'period-chip'} aria-pressed={displayMode === 'day'} onClick={() => { setDisplayMode('day'); setSelectedId(''); }}>하루 보기</button>
@@ -114,7 +116,7 @@ export function GlucoseSharePage() {
         {!displayedSamples.length && <p className="trend-empty">{displayMode === 'day' ? '이 날짜에' : '선택한 기간에'} 기록된 혈당 측정값이 없습니다.</p>}
         <p className="chart-caption">생활 시간대 {share.timezone} · {displayMode === 'day' ? '00:00~24:00. 6시간' : '실제 측정 시각. 7일'} 이내 실제 측정값만 연결합니다. 중간 값은 측정값이 아닙니다. 초록색 혈당 안정범위는 설정된 참고 범위입니다.{showTrend && displayMode === 'period' ? ' 점선은 계산된 참고 추세이며 실제 측정값이나 임상 판단이 아닙니다.' : ''}</p>
         {selected && <div className="share-selected-value" aria-live="polite"><strong>{selected.value} mg/dL</strong>
-          <span>{formatTime(selected.occurredAt, share.timezone)} · {selected.condition ?? '측정 조건 미기록'}</span></div>}
+          <span>{formatTime(selected.occurredAt, share.timezone)} · {glucoseMeasurementConditionLabel(selected.condition)}</span></div>}
       </section>
       {displayMode === 'day' && careTimes.length > 0 && <section className="panel"><h2>이날의 식사·인슐린 기록</h2>
         <ul className="share-care-times">{careTimes.map((item, index) => <li key={`${item.event_type}-${item.occurred_at}-${index}`}>
@@ -125,7 +127,7 @@ export function GlucoseSharePage() {
         {displayedSamples.length ? <ol>{[...displayedSamples].reverse().map((sample) => <li key={sample.id}>
           <button type="button" className={selected?.id === sample.id ? 'sample-row active' : 'sample-row'} onClick={() => setSelectedId(sample.id)}>
             <span><strong>{sample.value} mg/dL</strong><small>{formatTime(sample.occurredAt, share.timezone)}</small></span>
-            <span><small>{sample.condition ?? '측정 조건 미기록'}</small><small>{sample.revisionKind ? '정정된 값' : '실제 측정값'}</small></span>
+            <span><small>{glucoseMeasurementConditionLabel(sample.condition)}{sample.revisionKind ? ' · 정정된 값' : ''}</small></span>
           </button>
         </li>)}</ol> : <p>표시할 실제 측정값이 없습니다.</p>}
       </section>
