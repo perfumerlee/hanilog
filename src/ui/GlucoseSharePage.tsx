@@ -103,10 +103,10 @@ export function GlucoseSharePage() {
         {selected && <div className="share-selected-value" aria-live="polite"><strong>{selected.value} mg/dL</strong>
           <span>{formatTime(selected.occurredAt, share.timezone)} · {selected.condition ?? '측정 조건 미기록'}</span></div>}
       </section>
-      {displayMode === 'day' && careTimes.length > 0 && <section className="panel"><h2>이날의 식사·인슐린 기록 시각</h2>
+      {displayMode === 'day' && careTimes.length > 0 && <section className="panel"><h2>이날의 식사·인슐린 기록</h2>
         <ul className="share-care-times">{careTimes.map((item, index) => <li key={`${item.event_type}-${item.occurred_at}-${index}`}>
-          <span>{item.event_type === 'meal' ? '식사 기록' : '인슐린 기록'}</span><time>{formatTime(item.occurred_at, share.timezone)}</time>
-        </li>)}</ul><small>투여량과 수행자 정보는 공유되지 않습니다. 시각 표시는 관련성이나 투여 적정성 판단이 아닙니다.</small>
+          <span>{item.event_type === 'meal' ? '식사' : '인슐린'}<strong>{typeof item.amount === 'number' && Number.isFinite(item.amount) ? `${item.amount}${item.unit ? ` ${item.unit}` : ' (단위 미기록)'}` : share.include_care_values ? '수치 미기록' : '수치 미공유'}</strong></span><time>{formatTime(item.occurred_at, share.timezone)}</time>
+        </li>)}</ul><small>공유자가 선택한 정보만 표시됩니다. 시각과 수치는 관련성이나 투여 적정성 판단이 아닙니다.</small>
       </section>}
       <section className="panel measurement-list"><h2>{displayMode === 'day' ? '이날' : '선택한 기간'} 측정값 ({displayedSamples.length}건)</h2>
         {displayedSamples.length ? <ol>{[...displayedSamples].reverse().map((sample) => <li key={sample.id}>

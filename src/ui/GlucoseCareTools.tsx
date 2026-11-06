@@ -22,6 +22,7 @@ export function GlucoseCareTools({ petId, petName, timezone, canEdit, demo = fal
   const [fromDate, setFromDate] = useState(() => dayShift(today(timezone), -29));
   const [toDate, setToDate] = useState(() => today(timezone));
   const [includeCareTimes, setIncludeCareTimes] = useState(false);
+  const [includeCareValues, setIncludeCareValues] = useState(false);
   const [acknowledgeBearerLink, setAcknowledgeBearerLink] = useState(false);
   const [expiresDays, setExpiresDays] = useState('1');
   const [shares, setShares] = useState<GlucoseShareRange[]>([]);
@@ -79,7 +80,7 @@ export function GlucoseCareTools({ petId, petName, timezone, canEdit, demo = fal
       const { token, tokenHash } = createShareToken();
       const result = await callGlucoseShare<{ share: GlucoseShareRange }>(supabase, {
         action: 'create', pet_id: petId, token_hash: await tokenHash, from_date: fromDate, to_date: toDate < today(timezone) ? today(timezone) : toDate,
-        expires_days: Number(expiresDays), include_care_times: includeCareTimes,
+        expires_days: Number(expiresDays), include_care_times: includeCareTimes, include_care_values: includeCareTimes && includeCareValues,
       });
       if (!result.share?.id) throw new Error('SHARE_CREATE_FAILED');
       const link = glucoseShareUrl(token);
@@ -123,7 +124,7 @@ export function GlucoseCareTools({ petId, petName, timezone, canEdit, demo = fal
       const result = await callGlucoseShare<{ share: GlucoseShareRange }>(supabase, {
         action: 'create', pet_id: petId, token_hash: await tokenHash, from_date: item.from_date,
         to_date: item.to_date < today(timezone) ? today(timezone) : item.to_date,
-        expires_days: 1, include_care_times: item.include_care_times,
+        expires_days: 1, include_care_times: item.include_care_times, include_care_values: item.include_care_values === true,
       });
       const link = glucoseShareUrl(token);
       setActiveLinks((current) => ({ ...current, [result.share.id]: link }));
@@ -189,7 +190,8 @@ export function GlucoseCareTools({ petId, petName, timezone, canEdit, demo = fal
             <option value="1">24시간</option><option value="3">3일</option><option value="7">7일</option>
           </select></label>
         </div>
-        <label className="check-row"><input type="checkbox" checked={includeCareTimes} onChange={(event) => setIncludeCareTimes(event.target.checked)} />같은 기간의 식사·인슐린 기록 시각도 포함</label>
+        <label className="check-row"><input type="checkbox" checked={includeCareTimes} onChange={(event) => { setIncludeCareTimes(event.target.checked); if (!event.target.checked) setIncludeCareValues(false); }} />같은 기간의 식사·인슐린 기록 시각도 포함</label>
+        {includeCareTimes && <label className="check-row"><input type="checkbox" checked={includeCareValues} onChange={(event) => setIncludeCareValues(event.target.checked)} />식사량과 인슐린 투여량·단위도 공유 (민감정보)</label>}
         <label className="check-row share-access-ack"><input type="checkbox" checked={acknowledgeBearerLink} required onChange={(event) => setAcknowledgeBearerLink(event.target.checked)} />링크만 가진 사람도 만료 전까지 열람할 수 있음을 확인했습니다.</label>
         <button type="submit" className="button-primary" disabled={pending}>{pending ? '안전한 링크 생성 중…' : '링크 만들고 복사'}</button>
         {newLink && <div className="share-link-result">
@@ -201,7 +203,7 @@ export function GlucoseCareTools({ petId, petName, timezone, canEdit, demo = fal
       </form>}
       {shares.some((item) => !item.revoked_at && Date.parse(item.expires_at) > now) && <ul className="glucose-share-list">
         {shares.filter((item) => !item.revoked_at && Date.parse(item.expires_at) > now).map((item) => <li key={item.id}>
-          <span>{item.from_date} ~ {item.to_date}<small>만료 {new Date(item.expires_at).toLocaleString('ko-KR')}</small></span>
+          <span>{item.from_date} ~ {item.to_date}<small>만료 {new Date(item.expires_at).toLocaleString('ko-KR')} · {item.include_care_values ? '식사·인슐린 수치 포함' : item.include_care_times ? '식사·인슐린 시각만' : '혈당만'}</small></span>
           <div className="share-list-actions"><button type="button" className="text-button" disabled={pending} onClick={() => void copyOrRenew(item)}>{activeLinks[item.id] ? '다시 복사' : '새 링크 발급·복사'}</button>
           {activeLinks[item.id] && <button type="button" className="text-button" onClick={() => { setNewLink(activeLinks[item.id]); setMessage('아래에 받는 분 번호를 입력하고 문자 앱을 여세요.'); }}>문자로 보내기</button>}
           <button type="button" className="text-button" disabled={pending} onClick={() => void revoke(item.id)}>링크 취소</button></div>

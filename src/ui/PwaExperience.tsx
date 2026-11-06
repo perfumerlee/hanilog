@@ -7,6 +7,7 @@ export function PwaExperience() {
   const [installed, setInstalled] = useState(false);
   const [updateReady, setUpdateReady] = useState(false);
   const [notice, setNotice] = useState('');
+  const [updateDismissed, setUpdateDismissed] = useState(() => sessionStorage.getItem('hanilog:pwa-update-dismissed') === '1');
 
   useEffect(() => {
     const install = (event: Event) => { event.preventDefault(); setInstallPrompt(event as InstallPromptEvent); };
@@ -42,12 +43,17 @@ export function PwaExperience() {
     const registration = await navigator.serviceWorker?.getRegistration();
     if (!registration?.waiting) { setUpdateReady(false); setNotice('적용할 업데이트를 찾지 못했습니다.'); return; }
     const worker = registration.waiting;
-    worker.postMessage({ type: 'SKIP_WAITING' });
     worker.addEventListener('statechange', () => { if (worker.state === 'activated') window.location.reload(); });
+    setUpdateReady(false);
+    setNotice('');
+    setUpdateDismissed(true);
+    sessionStorage.setItem('hanilog:pwa-update-dismissed', '1');
+    worker.postMessage({ type: 'SKIP_WAITING' });
   }
   const isIos = typeof navigator !== 'undefined' && /iPhone|iPad|iPod/.test(navigator.userAgent);
   const isAndroid = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent);
   const isStandalone = typeof window !== 'undefined' && (window.matchMedia('(display-mode: standalone)').matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone));
+  if (updateDismissed && !updateReady) return null;
   if (!installPrompt && !isIos && !isAndroid && !updateReady && !notice && !installed) return null;
   return <aside className="pwa-notice" aria-live="polite">
     {updateReady ? <><span>새 버전의 HaniLog를 사용할 수 있습니다.</span><button type="button" className="secondary-action" onClick={() => void applyUpdate()}>업데이트 적용</button></> : null}

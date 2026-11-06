@@ -187,10 +187,7 @@ export function App() {
       <header className="topbar">
         <Link to="/" className="brand"><img src={`${import.meta.env.BASE_URL}paw.svg`} alt="" /> HaniLog</Link>
         {stagingMode && <span className="environment-badge">STAGING · 합성 전용</span>}
-        {import.meta.env.MODE === 'production' && <span className="environment-badge">운영 환경</span>}
-        <span className={`connection ${demoMode ? 'offline' : online ? 'online' : 'offline'}`} role="status">
-          {demoMode ? 'DEMO · 서버 연결 및 저장 없음' : online ? '연결됨 · 서버 최신 상태는 새로고침으로 확인' : '오프라인 · 최신 상태 확인 불가'}
-        </span>
+        {demoMode && <span className="environment-badge">DEMO · 저장되지 않음</span>}
         {session && <button className="quiet-button" onClick={() => void supabase?.auth.signOut()}>로그아웃</button>}
       </header>
       <PwaExperience />
@@ -1033,6 +1030,14 @@ function DataLoadingPage({ title }: { title: string }) {
 
 function SessionNavigation({ pathname, search }: { pathname: string; search: string }) {
   const [moreOpen, setMoreOpen] = useState(false);
+  const desktopItems = [
+    { to: '/trends', label: '혈당기록', icon: '⌁' },
+    { to: '/timeline', label: '기록 모아보기', icon: '◷' },
+    { to: '/record', label: '빠른 기록', icon: '+' },
+    { to: '/?profile=1', label: '반려동물 설정', icon: '🐾' },
+    { to: '/shared', label: '함께 돌봄', icon: '♡' },
+    { to: '/notifications', label: '알림', icon: '♧' },
+  ];
   const secondaryItems = [
     { to: '/?profile=1', label: '반려동물 설정', icon: '🐾' },
     { to: '/timeline', label: '기록 모아보기', icon: '◷' },
@@ -1060,6 +1065,7 @@ function SessionNavigation({ pathname, search }: { pathname: string; search: str
   const activeSecondary = secondaryItems.some((item) => item.to.startsWith('/?')
     ? pathname === '/' && search === item.to.slice(1) : pathname.startsWith(item.to));
   return <nav className={`app-nav${moreOpen ? ' is-open' : ''}`} aria-label="주요 메뉴">
+    <div className="nav-desktop-list">{desktopItems.map(linkFor)}</div>
     <div className="nav-primary">{primaryItems.map(linkFor)}
       <button type="button" className={`nav-more-toggle${activeSecondary ? ' active' : ''}`} aria-expanded={moreOpen}
         aria-controls="nav-secondary-links" onClick={() => setMoreOpen((value) => !value)}>

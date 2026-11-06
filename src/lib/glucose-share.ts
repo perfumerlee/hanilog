@@ -8,6 +8,7 @@ export type GlucoseShareRange = {
   expires_at: string;
   revoked_at: string | null;
   include_care_times: boolean;
+  include_care_values?: boolean;
 };
 export type GlucoseSharePayload = {
   pet_name: string;
@@ -17,8 +18,9 @@ export type GlucoseSharePayload = {
   created_at: string;
   expires_at: string;
   target_range: null | { lower_mg_dl: number; upper_mg_dl: number; source_label: string; effective_on: string };
+  include_care_values?: boolean;
   measurements: { id: string; occurred_at: string; recorded_at: string; value: Record<string, unknown>; unit: string; revision_kind: string | null }[];
-  care_times: { event_type: 'meal' | 'insulin'; occurred_at: string }[];
+  care_times: { event_type: 'meal' | 'insulin'; occurred_at: string; amount?: number | null; unit?: string | null }[];
 };
 export type GlucoseShareAction = 'create' | 'list' | 'revoke' | 'resolve';
 

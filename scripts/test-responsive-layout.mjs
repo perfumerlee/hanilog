@@ -93,7 +93,7 @@ try {
         assert.ok(metrics.navRight <= metrics.contentLeft,
           `Sidebar overlaps content at ${viewport.width}px on ${route}: ${JSON.stringify(metrics)}`);
         assert.equal(metrics.desktopMoreVisible, false, 'Desktop must show the full route navigation, not the mobile More control.');
-        assert.equal(metrics.visibleSecondaryLinks, 4, 'All secondary routes must be visible in the desktop sidebar.');
+        assert.equal(metrics.visibleSecondaryLinks, 0, 'Mobile secondary routes must be hidden behind the desktop route list.');
       } else {
         assert.equal(metrics.navPosition, 'fixed', `Mobile/tablet navigation should be the bottom bar on ${route}.`);
         assert.equal(metrics.mobileVisiblePrimaryLinks, 2, 'Mobile must expose Blood Glucose and the centered Quick Record route.');
@@ -197,6 +197,16 @@ try {
       await page.goto(`${origin}/#/`, { waitUntil: 'domcontentloaded' });
       assert.equal(await page.locator('.app-nav .nav-item:visible').count(), 6,
         'Desktop sidebar must expose every supported route.');
+      assert.deepEqual(await page.locator('.nav-desktop-list .nav-item:visible').allTextContents(),
+        ['⌁혈당기록', '◷기록 모아보기', '+빠른 기록', '🐾반려동물 설정', '♡함께 돌봄', '♧알림'],
+        'Desktop sidebar order must match the caregiver workflow.');
+      await page.goto(`${origin}/#/record`, { waitUntil: 'domcontentloaded' });
+      const quickRecordColors = await page.locator('.nav-desktop-list .nav-record').evaluate((node) => ({
+        text: globalThis.window.getComputedStyle(node).color,
+        background: globalThis.window.getComputedStyle(node).backgroundColor,
+      }));
+      assert.equal(quickRecordColors.text, 'rgb(255, 255, 255)',
+        `Active desktop Quick Record must stay readable: ${JSON.stringify(quickRecordColors)}`);
     }
     log(`PASS layout ${viewport.width}x${viewport.height}`);
   }

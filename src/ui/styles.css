@@ -207,11 +207,16 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .load-state { color: var(--muted); text-align: center; padding: 1rem; font-size: .8rem; }
 .app-nav { position: fixed; z-index: 8; left: 0; right: 0; bottom: 0; padding: .35rem max(.3rem, env(safe-area-inset-left)) calc(.35rem + env(safe-area-inset-bottom)); border-top: 1px solid #e0e8df; background: rgba(255,254,250,.97); backdrop-filter: blur(18px); }
 .nav-primary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .12rem; align-items: center; }
+.nav-desktop-list { display: none; }
 .nav-record { width: 76px; height: 76px; justify-self: center; border-radius: 50%; background: var(--green); color: white; transform: translateY(-10px); box-shadow: 0 6px 18px rgba(22, 75, 55, .23); }
 .nav-record.active { background: var(--green-dark); color: white; }
 .nav-record .nav-icon { font-size: 1.65rem; }
 .record-current-time { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-bottom: .8rem; color: var(--green-dark); font-size: .85rem; }
 .share-list-actions, .timeline-correction-actions { display: flex; flex-wrap: wrap; gap: .4rem; }
+.share-care-times li { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+.share-care-times li span { display: flex; flex-wrap: wrap; align-items: baseline; gap: .5rem; }
+.share-care-times li strong { color: var(--green-dark); font-size: 1rem; font-variant-numeric: tabular-nums; }
+.share-care-times li time { flex-shrink: 0; color: var(--muted); font-size: .78rem; }
 .timeline-correction-fields { display: grid; gap: .5rem; margin-top: .5rem; }
 @media (min-width: 900px) { .nav-record { width: auto; height: auto; border-radius: 14px; transform: none; box-shadow: none; } }
 @media (max-width: 899px) {
@@ -626,7 +631,10 @@ button, a, input, select, textarea, summary { scroll-margin: 1rem; }
 }
 
 @media (min-width: 900px) {
-  .nav-secondary { display: contents; }
+  .app-nav .nav-primary, .app-nav .nav-secondary { display: none; }
+  .app-nav .nav-desktop-list { display: flex; flex-direction: column; gap: .25rem; width: 100%; }
+  .app-nav .nav-record, .app-nav .nav-record.active { background: var(--green); color: #fff; }
+  .app-nav .nav-record .nav-icon { color: #fff; }
 }
 
 /* Quick record: a date-led notebook, shared by Demo and authenticated UI. */
