@@ -5,6 +5,8 @@ insert into auth.users(id,aud,role,email,encrypted_password,email_confirmed_at,r
 values
   ('00000000-0000-4000-8000-000000000301','authenticated','authenticated','share-owner@example.test','',now(),'{}','{}',now(),now()),
   ('00000000-0000-4000-8000-000000000302','authenticated','authenticated','share-outsider@example.test','',now(),'{}','{}',now(),now());
+select is((select include_care_values from public.glucose_share_links limit 1),null::boolean,
+  'No share link has been created yet');
 
 set local role authenticated;
 select set_config('request.jwt.claims','{"sub":"00000000-0000-4000-8000-000000000301","role":"authenticated"}',true);
@@ -17,11 +19,9 @@ select public.record_health_event(current_setting('test.share_pet')::uuid,'insul
   '{"administered_dose_value":2.5,"administered_dose_unit":"U","insulin_product_label":"Synthetic","note":"must not appear"}'::jsonb,'U',
   '10000000-0000-4000-8000-000000000302'::uuid,'Asia/Seoul');
 
-select is((select include_care_values from public.glucose_share_links limit 1),null::boolean,
-  'No share link has been created yet');
 select public.create_glucose_share_link(current_setting('test.share_pet')::uuid,repeat('a',64),'2026-11-03','2026-11-03',now()+interval '1 day',true);
 select public.create_glucose_share_link_v2(current_setting('test.share_pet')::uuid,repeat('b',64),'2026-11-03','2026-11-03',now()+interval '1 day',true,true);
-select is((select count(*)::integer from public.glucose_share_links where include_care_values),1,
+select is((select count(*)::integer from public.list_my_glucose_share_links_v2(current_setting('test.share_pet')::uuid) where include_care_values),1,
   'Only the explicit new link shares care values');
 select throws_ok($$select public.create_glucose_share_link_v2(current_setting('test.share_pet')::uuid,repeat('c',64),'2026-11-03','2026-11-03',now()+interval '1 day',false,true)$$,
   '22023','GLUCOSE_SHARE_INVALID','Care values cannot be shared without opting into care times');
