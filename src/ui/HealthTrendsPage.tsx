@@ -30,9 +30,6 @@ const dateTime = (instant: string, timezone: string) => new Intl.DateTimeFormat(
 const dateOnly = (instant: string, timezone: string) => new Intl.DateTimeFormat('ko-KR', {
   timeZone: timezone, dateStyle: 'medium',
 }).format(new Date(instant));
-const timeOnly = (instant: string, timezone: string) => new Intl.DateTimeFormat('ko-KR', {
-  timeZone: timezone, hour: '2-digit', minute: '2-digit',
-}).format(new Date(instant));
 const actorName = (id: string | null | undefined, userId: string) => !id ? '미지정' : id === userId ? '나' : `공동 보호자 · ${id.slice(0, 8)}`;
 
 function toSample(event: RawEvent, revision?: Revision): GlucoseSample | null {
@@ -76,7 +73,6 @@ export function HealthTrendsPage({ pet, userId, online, demoEvents, refreshVersi
   const [message, setMessage] = useState(demoEvents ? 'DEMO · 합성 데이터이며 서버 조회가 아닙니다.' : '');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showTrend, setShowTrend] = useState(false);
-  const [relatedEvents, setRelatedEvents] = useState<RawEvent[]>([]);
   const [now] = useState(() => new Date());
   const [selectedDay, setSelectedDay] = useState(() => localDateKey(new Date().toISOString(), pet.timezone));
   const [targetRange, setTargetRange] = useState<TargetRange | null>(null);
@@ -165,32 +161,11 @@ export function HealthTrendsPage({ pet, userId, online, demoEvents, refreshVersi
   const previous = allSamples.at(-2);
   const selected = displayedSamples.find((item) => item.id === selectedId) ?? displayedSamples.at(-1) ?? null;
   const sameDay = selected ? allSamples.filter((item) => localDateKey(item.occurredAt, pet.timezone) === localDateKey(selected.occurredAt, pet.timezone)) : [];
-  const selectedSampleDay = selected ? localDateKey(selected.occurredAt, pet.timezone) : '';
   const monthly = useMemo(() => monthlyCounts(samples, pet.timezone), [samples, pet.timezone]);
   const gaps = useMemo(() => longGaps(samples, period === '7d' || period === '30d' ? 7 : period === '90d' ? 14 : 30), [samples, period]);
   const delta = newest && previous ? newest.value - previous.value : null;
   const excluded = samplesAndExcluded.excluded.filter((item) => period === 'all' || Date.parse(item.occurredAt) >= (period === '7d' ? now.getTime() - 7 * 86_400_000 : period === '30d' ? now.getTime() - 30 * 86_400_000 : period === '90d' ? now.getTime() - 90 * 86_400_000 : period === '1y' ? now.getTime() - 365 * 86_400_000 : 0));
 
-  useEffect(() => {
-    if (!selectedDay || demo || !online || !supabase) return;
-    let active = true;
-    const [year, month, day] = selectedDay.split('-').map(Number);
-    const midnight = Date.UTC(year, month - 1, day);
-    void supabase.from('health_events')
-      .select('id,event_type,occurred_at,recorded_at,actor_id,performer_id,value,unit,source,occurrence_id')
-      .eq('pet_id', pet.id).in('event_type', ['meal', 'insulin'])
-      .gte('occurred_at', new Date(midnight - 14 * 60 * 60 * 1000).toISOString())
-      .lt('occurred_at', new Date(midnight + 38 * 60 * 60 * 1000).toISOString())
-      .order('occurred_at', { ascending: true }).then(({ data, error }) => {
-        if (!active) return;
-        if (error) { setRelatedEvents([]); return; }
-        setRelatedEvents(((data ?? []) as RawEvent[]).filter((event) => localDateKey(event.occurred_at, pet.timezone) === selectedDay));
-      });
-    return () => { active = false; };
-  }, [selectedDay, demo, online, pet.id, pet.timezone]);
-  const dayContext = demoEvents
-    ? demoEvents.filter((event) => ['meal', 'insulin'].includes(event.event_type) && localDateKey(event.occurred_at, pet.timezone) === selectedDay)
-    : relatedEvents;
   const glucoseCareTools = <GlucoseCareTools petId={pet.id} petName={pet.name} timezone={pet.timezone} canEdit={pet.profileCanEdit === true} demo={demo} target={activeTargetRange}
     onTargetSaved={async () => {
       if (!supabase || demo) return;
@@ -256,12 +231,7 @@ export function HealthTrendsPage({ pet, userId, online, demoEvents, refreshVersi
                 {selected.note && <div><dt>메모</dt><dd>{selected.note}</dd></div>}
               </dl></details>
               <Link className="button-link" to={`/timeline?date=${encodeURIComponent(localDateKey(selected.occurredAt, pet.timezone))}`}>하루 타임머신 열기</Link>
-              {sameDay.length > 1 && <p className="small-note">이 날짜에 실제 기록된 측정 {sameDay.length}건 · 모든 측정 시각은 아래 목록에 표시됩니다.</p>}
-              {dayContext.length > 0 && <div className="day-context"><h4>{selectedSampleDay}의 식사·인슐린 기록</h4>
-                <ul>{dayContext.map((event) => <li key={event.id}><span>{timeOnly(event.occurred_at, pet.timezone)} · {event.event_type === 'meal' ? '식사 기록' : '인슐린 사실 기록'}</span>
-                  <small>수행자 {actorName(event.performer_id, userId)} · 기록자 {actorName(event.actor_id, userId)}</small></li>)}</ul>
-                <small>시각과 기록의 관계만 보여줍니다. 인슐린 용량 또는 혈당 변화의 의학적 예측을 제공하지 않습니다.</small>
-              </div>}
+              <p className="small-note">이 날짜에 실제 기록된 측정 {sameDay.length}건</p>
             </section>}
           </>}
       </section>

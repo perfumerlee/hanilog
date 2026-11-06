@@ -55,6 +55,8 @@ describe('HealthTrendsPage', () => {
     expect(screen.getByRole('heading', { name: /시간대별 혈당/ })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '164 mg/dL' })).toBeInTheDocument();
     expect(document.querySelector('.glucose-point-tooltip')).toHaveTextContent('164 mg/dL');
+    expect(screen.getByText('이 날짜에 실제 기록된 측정 1건')).toBeInTheDocument();
+    expect(screen.queryByText(/이 날짜의 식사·인슐린 기록/)).not.toBeInTheDocument();
     const shareDisclosure = screen.getByText('주치의와 혈당 공유').closest('details');
     expect(shareDisclosure).not.toHaveAttribute('open');
     fireEvent.click(shareDisclosure!.querySelector('summary')!);
