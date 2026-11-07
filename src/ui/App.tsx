@@ -88,11 +88,11 @@ function RecordTypeIllustration({ type, className = '' }: { type: EventType; cla
     {type === 'elimination' && <><path d="M7 25c-2.4 0-4-1.7-4-4.1 0-2.6 1.8-4.5 4.6-4.8-.6-1.1-.6-2.5.1-3.8.8-1.5 2.4-2.4 4.2-2.3-.2-2.1 1.1-4.1 3.2-4.8 2.8-.9 5.3.9 5.3 3.7 0 1.5-.8 2.8-2 3.7 3.1-.8 6 .1 7.6 2.2 2.6.1 4.3 2.1 4.3 4.7S28.5 25 26 25H7Z" fill="currentColor"/><path d="M12 18h.1M21 18h.1M14 21c1.2 1 3 1 4.2 0" fill="none" stroke="white" strokeWidth="1.7" strokeLinecap="round"/></>}
     {type === 'water' && <><path {...common} d="M12 5c-2.6 3.5-5 6.2-5 9a5 5 0 0 0 10 0c0-2.8-2.4-5.5-5-9Z"/><path {...common} d="M23 15c-1.8 2.4-3 4-3 6a4 4 0 0 0 8 0c0-2-1.2-3.6-3-6Z"/></>}
     {type === 'exercise' && <g fill="currentColor">
-      <ellipse cx="7.8" cy="11" rx="3" ry="4" transform="rotate(-28 7.8 11)"/>
-      <ellipse cx="13.5" cy="7.2" rx="3" ry="4" transform="rotate(-10 13.5 7.2)"/>
-      <ellipse cx="20" cy="7.5" rx="3" ry="4" transform="rotate(10 20 7.5)"/>
-      <ellipse cx="25.6" cy="11.2" rx="3" ry="4" transform="rotate(28 25.6 11.2)"/>
-      <path d="M6.8 22.8c0-4.1 3-7.3 7-7.3 1.6 0 2.5.6 3.5 1.2.8.5 1.4.9 2.2.9s1.4-.4 2.2-.9c1-.6 1.9-1.2 3.5-1.2 4 0 7 3.2 7 7.3 0 3.8-3.4 6.2-7.4 6.2-2 0-3.4-1-5.3-1s-3.3 1-5.3 1c-4 0-7.4-2.4-7.4-6.2Z"/>
+      <ellipse cx="7.6" cy="10.6" rx="2.7" ry="3.5" transform="rotate(-24 7.6 10.6)"/>
+      <ellipse cx="13.2" cy="7.3" rx="2.8" ry="3.7" transform="rotate(-9 13.2 7.3)"/>
+      <ellipse cx="19.1" cy="7.3" rx="2.8" ry="3.7" transform="rotate(9 19.1 7.3)"/>
+      <ellipse cx="24.7" cy="10.6" rx="2.7" ry="3.5" transform="rotate(24 24.7 10.6)"/>
+      <path d="M16 15c-3.8 0-6.9 3.6-7.8 7.1-.9 3.4 1.6 5.9 4.5 5.4 1.2-.2 2.1-.7 3.3-.7s2.1.5 3.3.7c2.9.5 5.4-2 4.5-5.4C22.9 18.6 19.8 15 16 15Z"/>
     </g>}
     {type === 'weight' && <><rect {...common} x="6" y="5" width="20" height="23" rx="4"/><path {...common} d="M12 12a4 4 0 0 1 8 0l-4 3-4-3Z"/></>}
     {type === 'symptom' && <path {...common} d="M16 27 5.5 17A7 7 0 0 1 16 7.7 7 7 0 0 1 26.5 17L16 27ZM7 16h5l2-4 4 9 2-5h5"/>}
@@ -1574,7 +1574,7 @@ export function QuickRecordPage(props: {
             <RecordChoices label="관찰한 식사 상태" value={mealStatus} onChange={setMealStatus}
               options={[{ value: 'ATE', label: '섭취 확인' }, { value: 'PARTIAL', label: '일부 섭취' }, { value: 'REFUSED', label: '식사 거부' }]} />
             <label className="field-label">실제 섭취량 (선택)<input type="number" inputMode="decimal" step="any" value={numericValue} onChange={(event) => setNumericValue(event.target.value)} /></label>
-            <div className="field-label glucose-unit-field"><span>섭취량 단위</span><span className="unit-fixed">g</span></div>
+            <div className="field-label glucose-unit-field" role="group" aria-label="섭취량 단위"><span>섭취량 단위</span><output className="unit-fixed">g</output></div>
             <label className="field-label full-field">섭취 내용 (선택)<textarea rows={3} maxLength={1000} value={note}
               onChange={(event) => setNote(event.target.value)} placeholder="먹은 음식이나 평소와 다른 점을 적어 주세요" />
               <small>{note.length}/1000</small></label>

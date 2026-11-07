@@ -51,8 +51,9 @@ describe('QuickRecordPage', () => {
     render(<QuickRecordPage {...props} />);
     fireEvent.click(screen.getByRole('radio', { name: '식사' }));
     expect(screen.getByText('섭취량 단위')).toBeInTheDocument();
-    expect(screen.getByText('g')).toBeInTheDocument();
-    expect(screen.queryByLabelText('섭취량 단위')).not.toBeInTheDocument();
+    const unit = screen.getByRole('group', { name: '섭취량 단위' });
+    expect(within(unit).getByText('g')).toBeVisible();
+    expect(within(unit).queryByRole('textbox')).not.toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: /섭취 내용 \(선택\)/ })).toBeVisible();
     expect(screen.getByLabelText('실제 발생 시각')).toBeVisible();
     expect(screen.queryByText(/기록 시각/)).not.toBeInTheDocument();
@@ -108,7 +109,7 @@ it('preserves type-specific drafts without submitting when choices change', asyn
   fireEvent.click(screen.getByRole('radio', { name: '식사' }));
   expect(screen.getByRole('radio', { name: /일부 섭취/ })).toBeChecked();
   fireEvent.click(screen.getByRole('button', { name: '기록 저장' }));
-  await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ mealStatus: 'PARTIAL', numericValue: '' }), null));
+  await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ mealStatus: 'PARTIAL', numericValue: '', unit: 'g' }), null));
 });
 
 it('updates the selected date without fabricating a different occurrence time', () => {
