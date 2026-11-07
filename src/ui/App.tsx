@@ -1380,6 +1380,7 @@ export function QuickRecordPage(props: {
     return () => window.clearInterval(timer);
   }, []);
   const [numericValue, setNumericValue] = useState('');
+  const [targetWeight, setTargetWeight] = useState('');
   const [unit, setUnit] = useState(initialEventType === 'meal' ? 'g' : '');
   const [note, setNote] = useState('');
   const [mealStatus, setMealStatus] = useState('');
@@ -1491,7 +1492,7 @@ export function QuickRecordPage(props: {
       return;
     }
     const fields: EventEntryFields = {
-      eventType, occurredLocal, note, numericValue, unit: eventType === 'meal' ? 'g' : unit, mealStatus, eliminationType, description,
+      eventType, occurredLocal, note, numericValue, targetWeight, unit: eventType === 'meal' ? 'g' : unit, mealStatus, eliminationType, description,
       measurementSource, measurementCondition, doseAmount, doseUnit: eventType === 'insulin' ? 'U' : '', insulinProductLabel,
     };
     const validation = validateEventEntry(fields);
@@ -1568,7 +1569,8 @@ export function QuickRecordPage(props: {
           </>}
           {eventType === 'weight' && <>
             <label className="field-label">측정값<input type="number" inputMode="decimal" step="any" value={numericValue} onChange={(event) => setNumericValue(event.target.value)} required /></label>
-            <label className="field-label">측정 단위<input value={unit} onChange={(event) => setUnit(event.target.value)} placeholder="예: kg" required /></label>
+            <div className="field-label glucose-unit-field" role="group" aria-label="측정 단위"><span>측정 단위</span><output className="unit-fixed">kg</output></div>
+            <label className="field-label">목표 체중 (선택 · kg)<input type="number" min="0.01" step="any" inputMode="decimal" value={targetWeight} onChange={(event) => setTargetWeight(event.target.value)} /><small>이 기록과 함께 저장합니다. 비워 두면 이전 목표를 유지합니다.</small></label>
           </>}
           {eventType === 'meal' && <>
             <RecordChoices label="관찰한 식사 상태" value={mealStatus} onChange={setMealStatus}
@@ -1584,7 +1586,7 @@ export function QuickRecordPage(props: {
             <label className="field-label">단위 (선택)<input value={unit} onChange={(event) => setUnit(event.target.value)} /></label>
           </>}
           {eventType === 'elimination' && <RecordChoices label="관찰한 유형" value={eliminationType} onChange={setEliminationType}
-            options={[{ value: 'URINATION', label: '배뇨' }, { value: 'BOWEL_MOVEMENT', label: '배변' }, { value: 'BOTH', label: '배변·배뇨 모두' }]} />}
+            options={[{ value: 'URINATION', label: '배뇨' }, { value: 'BOWEL_MOVEMENT', label: '배변' }, { value: 'BOTH', label: '배변·배뇨 둘 다' }]} />}
           {eventType === 'exercise' && <>
             {!activeExercise && <p className="small-note">중간에 배변·배뇨 등 다른 일을 별도로 기록해도 시작한 타이머는 유지됩니다.</p>}
             <label className="field-label">활동 내용 (선택)<input value={description} onChange={(event) => setDescription(event.target.value)} placeholder="예: 산책" /></label>
@@ -1770,7 +1772,7 @@ export function TimelinePage(props: {
         </article>
       </li>;
     })}</ol>}
-    <p className="timeline-footnote">이 화면에는 서버 조회로 확인된 기록만 표시됩니다. 제출 중 입력이나 오프라인 초안은 서버 확정 기록으로 보이지 않습니다.</p>
+
   </main>;
 }
 
@@ -1830,7 +1832,7 @@ function TimelineCorrectionEditor({ event, value, revision, onSave, onCorrectTim
         <label className="field-label">측정 출처<input maxLength={120} value={source} onChange={(input) => setSource(input.target.value)} /></label></>}
       {event.event_type === 'insulin' && <label className="field-label">인슐린 제품<input maxLength={120} value={insulinProduct} onChange={(input) => setInsulinProduct(input.target.value)} /></label>}
       {event.event_type === 'meal' && <label className="field-label">식사 상태<select value={meal} onChange={(input) => setMeal(input.target.value)}><option value="ATE">섭취 확인</option><option value="PARTIAL">일부 섭취</option><option value="REFUSED">식사 거부</option></select></label>}
-      {event.event_type === 'elimination' && <label className="field-label">배변·배뇨 유형<select value={elimination} onChange={(input) => setElimination(input.target.value)}><option value="URINATION">배뇨</option><option value="BOWEL_MOVEMENT">배변</option><option value="BOTH">배변·배뇨 모두</option></select></label>}
+      {event.event_type === 'elimination' && <label className="field-label">배변·배뇨 유형<select value={elimination} onChange={(input) => setElimination(input.target.value)}><option value="URINATION">배뇨</option><option value="BOWEL_MOVEMENT">배변</option><option value="BOTH">배변·배뇨 둘 다</option></select></label>}
       <label className="field-label">메모<input maxLength={1000} value={note} onChange={(input) => setNote(input.target.value)} /></label>
       {onCorrectTime && <label className="field-label">실제 발생 시각 · 이 기기의 시간대<input type="datetime-local" value={occurredLocal} onChange={(input) => setOccurredLocal(input.target.value)} /></label>}
       <p className="small-note">시각·기록값·메모는 각각 정정됩니다. 한 항목을 저장한 뒤 다른 항목을 바꾸려면 최신 기록을 다시 확인해 주세요. 원본과 감사 이력은 남습니다.</p>
@@ -1861,7 +1863,7 @@ function formatEventValue(event: HealthEvent, value = event.value ?? {}) {
   );
   if (typeof value.meal_status === 'string') pieces.push(mealStatusLabel(value.meal_status));
   if (typeof value.observed_value === 'number' && value.meal_status) pieces.push(`섭취량 ${value.observed_value}${event.unit ? ` ${event.unit}` : ''}`);
-  if (typeof value.observation_type === 'string') pieces.push(value.observation_type);
+  if (typeof value.observation_type === 'string') pieces.push(({ URINATION: '배뇨', BOWEL_MOVEMENT: '배변', BOTH: '배변·배뇨 둘 다' } as Record<string, string>)[value.observation_type] ?? value.observation_type);
   if (event.event_type === 'insulin' && typeof value.administered_dose_value === 'number'
     && (value.administered_dose_unit === 'U' || value.administered_dose_unit === 'mL')) {
     pieces.push(`기록된 실제 투여량 ${value.administered_dose_value} ${value.administered_dose_unit}`);

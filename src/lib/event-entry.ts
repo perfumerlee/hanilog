@@ -18,6 +18,7 @@ export interface EventEntryFields {
   occurredLocal: string;
   note: string;
   numericValue: string;
+  targetWeight?: string;
   unit: string;
   mealStatus: string;
   eliminationType: string;
@@ -73,7 +74,15 @@ export function validateEventEntry(fields: EventEntryFields): { value?: Validate
     const measurement = parseOptionalNumber(fields.numericValue);
     if (measurement === null || measurement === undefined) return { error: '측정값을 숫자로 입력해 주세요.' };
     if (fields.eventType === 'glucose') unit = GLUCOSE_UNIT;
-    else if (!unit) return { error: '측정 단위를 입력해 주세요.' };
+    else {
+      unit = 'kg';
+      if (measurement <= 0) return { error: '체중은 0보다 큰 kg 값으로 입력해 주세요.' };
+      if (fields.targetWeight?.trim()) {
+        const target = Number(fields.targetWeight);
+        if (!Number.isFinite(target) || target <= 0) return { error: '목표 체중은 0보다 큰 kg 값으로 입력해 주세요.' };
+        value.target_weight_kg = target;
+      }
+    }
     value.observed_value = measurement;
     if (fields.eventType === 'glucose') {
       const source = fields.measurementSource?.trim();

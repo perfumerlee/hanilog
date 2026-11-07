@@ -14,6 +14,13 @@ const base: EventEntryFields = {
 };
 
 describe('health event form validation', () => {
+  it('stores weight and optional target in kg and rejects invalid values', () => {
+    const fields = { ...base, eventType: 'weight' as const, numericValue: '8.2', targetWeight: '9' };
+    expect(validateEventEntry(fields).value).toMatchObject({ unit: 'kg', value: { observed_value: 8.2, target_weight_kg: 9 } });
+    expect(validateEventEntry({ ...fields, numericValue: '0' }).error).toBeTruthy();
+    expect(validateEventEntry({ ...fields, targetWeight: '-1' }).error).toBeTruthy();
+    expect(validateEventEntry({ ...fields, targetWeight: '' }).value?.value).not.toHaveProperty('target_weight_kg');
+  });
   it('requires and stores the actually reported insulin amount in U', () => {
     expect(validateEventEntry(base).error).toContain('0보다 큰 U 값');
     const result = validateEventEntry({ ...base, doseAmount: '2.5', doseUnit: 'U',
