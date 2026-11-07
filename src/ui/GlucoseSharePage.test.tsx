@@ -22,7 +22,7 @@ it('opens latest measured local day, preserves values above 500, and filters lis
  await waitFor(() => expect(screen.getByLabelText('날짜')).toHaveValue('2026-11-03'));
  await waitFor(() => expect(screen.getByRole('img', { name: '합성 반려동물 프로필' })).toHaveAttribute('src', 'blob:synthetic-photo'));
  expect(screen.getAllByText('식사와 무관').length).toBeGreaterThan(0);
- expect(document.querySelector('.share-care-times li')?.textContent).toContain('식사20 g');
+ expect(document.querySelector('.share-care-timeline-item.meal')?.textContent).toContain('식사20 g');
  expect(screen.queryByText('실제 측정값')).not.toBeInTheDocument();
  expect(screen.getByRole('heading',{name:'이날 측정값 (1건)'})).toBeInTheDocument();
  expect(document.querySelector('.glucose-point-tooltip')).toHaveTextContent('550 mg/dL');
