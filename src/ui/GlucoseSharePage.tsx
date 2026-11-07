@@ -164,7 +164,7 @@ export function GlucoseSharePage() {
       <section className="panel share-guardian-contact" aria-label="보호자 연락처">
         <h2>보호자에게 연락</h2>{share.guardian_contact_phone
           ? <><p>{share.pet_name}의 기록에 대해 보호자에게 문의할 수 있습니다.</p>
-            <div className="share-guardian-actions"><a className="button-primary" href={`tel:${share.guardian_contact_phone}`}><GuardianContactIcon type="phone" /><span>보호자에게 전화하기</span></a>
+            <div className="share-guardian-actions"><a className="button-primary" href={`tel:${share.guardian_contact_phone}`}><GuardianContactIcon type="phone" /><span>전화 하기</span></a>
               <a className="button-secondary" href={`sms:${share.guardian_contact_phone}?body=${encodeURIComponent(`${share.pet_name}의 혈당 기록을 확인했습니다. 관련해 연락드립니다.`)}`}><GuardianContactIcon type="message" /><span>문자 보내기</span></a></div></>
           : <p>이 링크에는 보호자 연락처가 포함되지 않았습니다. 연락처를 포함한 새 공유 링크를 보호자에게 요청해 주세요.</p>}
       </section>

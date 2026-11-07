@@ -891,6 +891,47 @@ footer { color: #77786f; }
   .type-icon.record-illustration { width: 2.2rem; height: 2.2rem; }
 }
 
+/* iOS date inputs have an intrinsic width that can escape a narrow grid cell. */
+@media (max-width: 599px) {
+  .daily-graph-date {
+    width: 100%;
+    min-width: 0;
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    gap: .35rem;
+  }
+  .daily-graph-date > .field-label,
+  .public-glucose-share .day-navigation > .field-label {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+  }
+  .daily-graph-date input[type="date"],
+  .public-glucose-share .day-navigation input[type="date"] {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    padding-inline: .4rem;
+    overflow: hidden;
+    font-size: 16px;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  .daily-graph-date input[type="date"]::-webkit-date-and-time-value,
+  .public-glucose-share .day-navigation input[type="date"]::-webkit-date-and-time-value {
+    min-width: 0;
+    overflow: hidden;
+    text-align: center;
+  }
+  .daily-graph-date input[type="date"]::-webkit-calendar-picker-indicator,
+  .public-glucose-share .day-navigation input[type="date"]::-webkit-calendar-picker-indicator {
+    margin: 0;
+  }
+}
+
 /* Fresh, clearer palette: cool paper surfaces with a confident teal action color. */
 :root {
   --ink: #263b3b;

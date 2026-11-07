@@ -88,10 +88,11 @@ function RecordTypeIllustration({ type, className = '' }: { type: EventType; cla
     {type === 'elimination' && <><path d="M7 25c-2.4 0-4-1.7-4-4.1 0-2.6 1.8-4.5 4.6-4.8-.6-1.1-.6-2.5.1-3.8.8-1.5 2.4-2.4 4.2-2.3-.2-2.1 1.1-4.1 3.2-4.8 2.8-.9 5.3.9 5.3 3.7 0 1.5-.8 2.8-2 3.7 3.1-.8 6 .1 7.6 2.2 2.6.1 4.3 2.1 4.3 4.7S28.5 25 26 25H7Z" fill="currentColor"/><path d="M12 18h.1M21 18h.1M14 21c1.2 1 3 1 4.2 0" fill="none" stroke="white" strokeWidth="1.7" strokeLinecap="round"/></>}
     {type === 'water' && <><path {...common} d="M12 5c-2.6 3.5-5 6.2-5 9a5 5 0 0 0 10 0c0-2.8-2.4-5.5-5-9Z"/><path {...common} d="M23 15c-1.8 2.4-3 4-3 6a4 4 0 0 0 8 0c0-2-1.2-3.6-3-6Z"/></>}
     {type === 'exercise' && <g fill="currentColor">
-      <path d="M9.2 5.1c-2.1.7-3.1 3-2.5 5.1l2.6 8.2c.6 1.9 2.4 2.9 4.1 2.3 1.8-.6 2.6-2.5 2-4.3l-2.7-8.4c-.6-2-1.7-3.5-3.5-2.9Z" transform="rotate(-24 11.2 13)"/>
-      <path d="M22.1 11.2c-2.1.7-3.1 3-2.5 5.1l2.6 8.2c.6 1.9 2.4 2.9 4.1 2.3 1.8-.6 2.6-2.5 2-4.3l-2.7-8.4c-.6-2-1.7-3.5-3.5-2.9Z" transform="rotate(24 24.1 19)"/>
-      <circle cx="7.5" cy="4.2" r="1.6"/><circle cx="10.2" cy="2.8" r="1.5"/><circle cx="13.1" cy="3.3" r="1.4"/>
-      <circle cx="19.2" cy="10.4" r="1.6"/><circle cx="21.8" cy="8.9" r="1.5"/><circle cx="24.8" cy="9.4" r="1.4"/>
+      <ellipse cx="7.8" cy="11" rx="3" ry="4" transform="rotate(-28 7.8 11)"/>
+      <ellipse cx="13.5" cy="7.2" rx="3" ry="4" transform="rotate(-10 13.5 7.2)"/>
+      <ellipse cx="20" cy="7.5" rx="3" ry="4" transform="rotate(10 20 7.5)"/>
+      <ellipse cx="25.6" cy="11.2" rx="3" ry="4" transform="rotate(28 25.6 11.2)"/>
+      <path d="M6.8 22.8c0-4.1 3-7.3 7-7.3 1.6 0 2.5.6 3.5 1.2.8.5 1.4.9 2.2.9s1.4-.4 2.2-.9c1-.6 1.9-1.2 3.5-1.2 4 0 7 3.2 7 7.3 0 3.8-3.4 6.2-7.4 6.2-2 0-3.4-1-5.3-1s-3.3 1-5.3 1c-4 0-7.4-2.4-7.4-6.2Z"/>
     </g>}
     {type === 'weight' && <><rect {...common} x="6" y="5" width="20" height="23" rx="4"/><path {...common} d="M12 12a4 4 0 0 1 8 0l-4 3-4-3Z"/></>}
     {type === 'symptom' && <path {...common} d="M16 27 5.5 17A7 7 0 0 1 16 7.7 7 7 0 0 1 26.5 17L16 27ZM7 16h5l2-4 4 9 2-5h5"/>}
