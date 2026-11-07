@@ -120,9 +120,10 @@ export function GlucoseSharePage() {
           <span>{formatTime(selected.occurredAt, share.timezone)} · {glucoseMeasurementConditionLabel(selected.condition)}</span></div>}
       </section>
       {displayMode === 'day' && careTimes.length > 0 && <section className="panel"><h2>이날의 식사·인슐린 기록</h2>
-        <ul className="share-care-times">{careTimes.map((item, index) => <li key={`${item.event_type}-${item.occurred_at}-${index}`}>
-          <span>{item.event_type === 'meal' ? '식사' : '인슐린'}<strong>{typeof item.amount === 'number' && Number.isFinite(item.amount) ? `${item.amount}${item.unit ? ` ${item.unit}` : ' (단위 미기록)'}` : share.include_care_values ? '수치 미기록' : '수치 미공유'}</strong></span><time>{formatTime(item.occurred_at, share.timezone)}</time>
-        </li>)}</ul>
+        <ol className="share-care-timeline">{careTimes.map((item, index) => <li className={`share-care-timeline-item ${item.event_type}`} key={`${item.event_type}-${item.occurred_at}-${index}`}>
+          <time>{formatTime(item.occurred_at, share.timezone)}</time><span className="share-care-timeline-node" aria-hidden="true" />
+          <div><span>{item.event_type === 'meal' ? '식사' : '인슐린'}</span><strong>{typeof item.amount === 'number' && Number.isFinite(item.amount) ? `${item.amount}${item.unit ? ` ${item.unit}` : ' (단위 미기록)'}` : share.include_care_values ? '수치 미기록' : '수치 미공유'}</strong></div>
+        </li>)}</ol>
       </section>}
       <section className="panel measurement-list"><h2>{displayMode === 'day' ? '이날' : '선택한 기간'} 측정값 ({displayedSamples.length}건)</h2>
         {displayedSamples.length ? <ol>{[...displayedSamples].reverse().map((sample) => <li key={sample.id}>

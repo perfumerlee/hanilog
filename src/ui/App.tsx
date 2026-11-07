@@ -82,10 +82,10 @@ const eventLabels = Object.fromEntries(eventOptions.map((option) => [option.type
 function RecordTypeIllustration({ type, className = '' }: { type: EventType; className?: string }) {
   const common = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
   return <span className={`record-illustration record-illustration--${type} ${className}`} aria-hidden="true"><svg viewBox="0 0 32 32" focusable="false">
-    {type === 'glucose' && <><path {...common} d="M16 4c-3.6 5.1-8 9.5-8 15a8 8 0 0 0 16 0c0-5.5-4.4-9.9-8-15Z"/><path {...common} d="M12 20a4 4 0 0 0 4 4"/></>}
-    {type === 'insulin' && <><path {...common} d="m9 23 11-11 5 5-11 11H9z"/><path {...common} d="m18 14 5 5M6 26l3 3M20 8l4-4 4 4M23 4v-2M25 20l4 4M7 23l5 5M12 20l5 5M9 13l-3-3M7 15l-3-3"/></>}
-    {type === 'meal' && <><path {...common} d="M6 16c-2.5 0-4 1.8-4 4s1.5 4 4 4h20c2.5 0 4-1.8 4-4s-1.5-4-4-4H6Z"/><path {...common} d="M6 16v8M26 16v8M10 16v8M22 16v8"/></>}
-    {type === 'elimination' && <><path {...common} d="M8 23c-2-1-3-3-3-5 0-3 2-5 5-5 0-4 3-7 7-7 4 0 7 3 7 7 3 0 5 2 5 5 0 3-2 5-5 5H8Z"/><path {...common} d="M12 18c0-2 2-3 4-3 0-2 1-3 3-3 2 0 3 1 3 3"/></>}
+    {type === 'glucose' && <><path d="M16 3.5C12.4 8.7 7.3 14 7.3 20a8.7 8.7 0 1 0 17.4 0c0-6-5.1-11.3-8.7-16.5Z" fill="currentColor"/><path d="M12 20.5a4.2 4.2 0 0 0 4.2 4.2" fill="none" stroke="white" strokeWidth="1.7" strokeLinecap="round"/></>}
+    {type === 'insulin' && <g transform="rotate(42 16 16)"><rect x="12" y="8" width="8" height="15" rx="1.5" {...common}/><path {...common} d="M11 8h10M16 3v5M13 4h6M16 23v5M14 28h4M12 12h3M12 15h3M12 18h3"/></g>}
+    {type === 'meal' && <><path d="M8.8 12.2c-2.8-2.3-6.5-1-6.5 2.1 0 2.5 2 4.3 4.5 4.3h18.4c2.5 0 4.5-1.8 4.5-4.3 0-3.1-3.7-4.4-6.5-2.1-2.3-2.5-3.2-4.7-7.2-4.7s-4.9 2.2-7.2 4.7Z" fill="currentColor"/><path d="M8.3 15.2h15.4M8 19v3.2M24 19v3.2M12 19v2.2M20 19v2.2" fill="none" stroke="white" strokeWidth="1.4" strokeLinecap="round"/></>}
+    {type === 'elimination' && <><path d="M7 25c-2.4 0-4-1.7-4-4.1 0-2.6 1.8-4.5 4.6-4.8-.6-1.1-.6-2.5.1-3.8.8-1.5 2.4-2.4 4.2-2.3-.2-2.1 1.1-4.1 3.2-4.8 2.8-.9 5.3.9 5.3 3.7 0 1.5-.8 2.8-2 3.7 3.1-.8 6 .1 7.6 2.2 2.6.1 4.3 2.1 4.3 4.7S28.5 25 26 25H7Z" fill="currentColor"/><path d="M12 18h.1M21 18h.1M14 21c1.2 1 3 1 4.2 0" fill="none" stroke="white" strokeWidth="1.7" strokeLinecap="round"/></>}
     {type === 'water' && <><path {...common} d="M12 5c-2.6 3.5-5 6.2-5 9a5 5 0 0 0 10 0c0-2.8-2.4-5.5-5-9Z"/><path {...common} d="M23 15c-1.8 2.4-3 4-3 6a4 4 0 0 0 8 0c0-2-1.2-3.6-3-6Z"/></>}
     {type === 'exercise' && <><path {...common} d="M6 21c5-1 7-5 9-12l4-3 3 5c1 2 2 4 5 5v5H6Z"/><path {...common} d="M9 24h18"/></>}
     {type === 'weight' && <><rect {...common} x="6" y="5" width="20" height="23" rx="4"/><path {...common} d="M12 12a4 4 0 0 1 8 0l-4 3-4-3Z"/></>}
@@ -1064,7 +1064,7 @@ function DataLoadingPage({ title }: { title: string }) {
 function SessionNavigation({ pathname, search }: { pathname: string; search: string }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const desktopItems = [
-    { to: '/trends', label: '혈당 기록', icon: '⌁' },
+    { to: '/trends', label: '혈당 기록', icon: 'glucose' },
     { to: '/timeline', label: '하루 타임머신', icon: '◷' },
     { to: '/record', label: '빠른 기록', icon: '+' },
     { to: '/?profile=1', label: '반려동물 설정', icon: '🐾' },
@@ -1078,7 +1078,7 @@ function SessionNavigation({ pathname, search }: { pathname: string; search: str
     { to: '/notifications', label: '알림 및 전달 설정', icon: '♧' },
   ];
   const primaryItems = [
-    { to: '/trends', label: '혈당 기록', icon: '⌁' },
+    { to: '/trends', label: '혈당 기록', icon: 'glucose' },
     { to: '/record', label: '빠른 기록', icon: '+' },
   ];
   useEffect(() => {
@@ -1092,7 +1092,7 @@ function SessionNavigation({ pathname, search }: { pathname: string; search: str
       const active = item.to.startsWith('/?') ? pathname === '/' && search === item.to.slice(1)
         : item.to === '/' ? pathname === '/' : pathname.startsWith(item.to);
       return <NavLink key={item.to} to={item.to} className={`${active ? 'nav-item active' : 'nav-item'}${item.to === '/record' ? ' nav-record' : ''}`} aria-current={active ? 'page' : undefined}>
-        <span className="nav-icon" aria-hidden="true">{item.icon}</span><span>{item.label}</span>
+        {item.icon === 'glucose' ? <RecordTypeIllustration type="glucose" className="nav-glucose-icon" /> : <span className="nav-icon" aria-hidden="true">{item.icon}</span>}<span>{item.label}</span>
       </NavLink>;
   };
   const activeSecondary = secondaryItems.some((item) => item.to.startsWith('/?')

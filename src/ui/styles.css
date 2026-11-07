@@ -931,3 +931,54 @@ button:hover:not(:disabled), .nav-record:hover:not(:disabled) { background: #226
   .actual-occurrence-field { grid-template-columns: minmax(0, 1fr); gap: .2rem; padding: .65rem; }
   .actual-time-action { justify-self: start; }
 }
+
+/* Keep selection states soft; filled primary actions retain their strong color. */
+button.sample-row:hover:not(:disabled), button.sample-row:active,
+button.period-chip:hover:not(:disabled), button.timeline-filter-chip:hover:not(:disabled),
+button.nav-item:not(.nav-record):hover:not(:disabled), button.nav-more-toggle:hover:not(:disabled),
+.record-page .type-choice:hover:not(:disabled), .record-week button:hover:not(:disabled) {
+  background: #e8f1eb;
+  color: #244e43;
+}
+button.sample-row.active, button.sample-row.active:hover:not(:disabled) {
+  background: #e5f0e9;
+  color: #203e37;
+}
+.sample-row:active, .period-chip:active, .timeline-filter-chip:active, .type-choice:active {
+  transform: none;
+}
+.nav-glucose-icon { width: 1.35rem; height: 1.35rem; background: #fdebed; --record-icon-color: #c83d4d; --record-icon-bg: #fdebed; }
+.nav-glucose-icon svg { width: 1rem; height: 1rem; }
+
+/* Grid tracks and their controls must be allowed to shrink on narrow phones. */
+.timeline-correction, .timeline-correction-fields, .timeline-correction-fields > *,
+.timeline-correction-fields .field-label, .timeline-correction-fields .field-label > input,
+.timeline-correction-fields .field-label > select, .timeline-correction-fields .field-label > textarea,
+.form-grid, .form-grid > *, .form-grid .field-label { min-width: 0; max-width: 100%; }
+.timeline-correction-fields { width: 100%; grid-template-columns: minmax(0, 1fr); }
+.timeline-correction-fields .field-label > input, .timeline-correction-fields .field-label > select,
+.timeline-correction-fields .field-label > textarea { width: 100%; }
+@media (max-width: 599px) {
+  .timeline-correction-fields { width: 100%; padding-inline: 0; }
+  .timeline-correction-fields .field-label { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .timeline-correction-actions { min-width: 0; }
+}
+
+/* Shared meal and insulin rows follow the day timeline without exposing notes. */
+.share-care-timeline { --share-timeline-time: 92px; list-style: none; margin: .35rem 0 0; padding: 0; }
+.share-care-timeline-item { position: relative; display: grid; grid-template-columns: var(--share-timeline-time) 20px minmax(0, 1fr); gap: .45rem; min-width: 0; min-height: 58px; }
+.share-care-timeline-item::before { content: ""; position: absolute; top: 19px; bottom: -1px; left: calc(var(--share-timeline-time) + 9px); width: 1px; background: #d9e5dd; }
+.share-care-timeline-item:last-child::before { display: none; }
+.share-care-timeline-item > time { padding-top: .1rem; color: var(--text-secondary); font-size: .76rem; font-variant-numeric: tabular-nums; }
+.share-care-timeline-node { position: relative; z-index: 1; width: 12px; height: 12px; margin: .23rem auto 0; border: 2px solid var(--surface-raised); border-radius: 50%; background: #d5a350; box-shadow: 0 0 0 1px #d5a350; }
+.share-care-timeline-item.insulin .share-care-timeline-node { background: #7868b3; box-shadow: 0 0 0 1px #7868b3; }
+.share-care-timeline-item > div { display: flex; align-items: baseline; justify-content: space-between; gap: .6rem; min-width: 0; padding: 0 0 .65rem; border-bottom: 1px solid var(--line); }
+.share-care-timeline-item:last-child > div { border-bottom: 0; }
+.share-care-timeline-item > div > span { color: var(--text-primary); font-size: .86rem; font-weight: 700; }
+.share-care-timeline-item > div > strong { min-width: 0; color: var(--text-primary); font-size: .9rem; font-variant-numeric: tabular-nums; text-align: right; overflow-wrap: anywhere; }
+@media (max-width: 390px) {
+  .share-care-timeline { --share-timeline-time: 76px; }
+  .share-care-timeline-item { grid-template-columns: var(--share-timeline-time) 16px minmax(0, 1fr); gap: .35rem; }
+  .share-care-timeline-item::before { left: calc(var(--share-timeline-time) + 7px); }
+  .share-care-timeline-item > div { flex-wrap: wrap; gap: .05rem .35rem; }
+}
