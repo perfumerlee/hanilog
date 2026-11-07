@@ -1091,28 +1091,41 @@ function SessionNavigation({ pathname, search }: { pathname: string; search: str
     const resetAtDesktop = () => {
       if (window.matchMedia('(min-width: 900px)').matches) setMoreOpen(false);
     };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMoreOpen(false);
+    };
     window.addEventListener('resize', resetAtDesktop);
-    return () => window.removeEventListener('resize', resetAtDesktop);
+    window.addEventListener('keydown', closeOnEscape);
+    return () => {
+      window.removeEventListener('resize', resetAtDesktop);
+      window.removeEventListener('keydown', closeOnEscape);
+    };
   }, [pathname]);
   const linkFor = (item: { to: string; label: string; icon: string }) => {
       const active = item.to.startsWith('/?') ? pathname === '/' && search === item.to.slice(1)
         : item.to === '/' ? pathname === '/' : pathname.startsWith(item.to);
-      return <NavLink key={item.to} to={item.to} className={`${active ? 'nav-item active' : 'nav-item'}${item.to === '/record' ? ' nav-record' : ''}`} aria-current={active ? 'page' : undefined}>
+      return <NavLink key={item.to} to={item.to} onClick={() => {
+        setMoreOpen(false);
+        if (item.to === '/record') window.scrollTo({ top: 0, behavior: 'smooth' });
+      }} className={`${active ? 'nav-item active' : 'nav-item'}${item.to === '/record' ? ' nav-record' : ''}`} aria-current={active ? 'page' : undefined}>
         {item.icon === 'glucose' ? <RecordTypeIllustration type="glucose" className="nav-glucose-icon" /> : <span className="nav-icon" aria-hidden="true">{item.icon}</span>}<span>{item.label}</span>
       </NavLink>;
   };
   const activeSecondary = secondaryItems.some((item) => item.to.startsWith('/?')
     ? pathname === '/' && search === item.to.slice(1) : pathname.startsWith(item.to));
-  return <nav className={`app-nav${moreOpen ? ' is-open' : ''}`} aria-label="주요 메뉴">
-    <div className="nav-desktop-list">{desktopItems.map(linkFor)}</div>
-    <div className="nav-primary">{primaryItems.map(linkFor)}
-      <button type="button" className={`nav-more-toggle${activeSecondary ? ' active' : ''}`} aria-expanded={moreOpen}
-        aria-controls="nav-secondary-links" onClick={() => setMoreOpen((value) => !value)}>
-        <span className="nav-icon" aria-hidden="true">⋯</span><span>더 보기</span>
-      </button>
-    </div>
-    <div id="nav-secondary-links" className="nav-secondary" aria-label="추가 메뉴">{secondaryItems.map(linkFor)}</div>
-  </nav>;
+  return <>
+    {moreOpen && <button type="button" className="nav-menu-backdrop" aria-label="메뉴 닫기" onClick={() => setMoreOpen(false)} />}
+    <nav className={`app-nav${moreOpen ? ' is-open' : ''}`} aria-label="주요 메뉴">
+      <div className="nav-desktop-list">{desktopItems.map(linkFor)}</div>
+      <div className="nav-primary">{primaryItems.map(linkFor)}
+        <button type="button" className={`nav-more-toggle${activeSecondary ? ' active' : ''}`} aria-expanded={moreOpen}
+          aria-controls="nav-secondary-links" onClick={() => setMoreOpen((value) => !value)}>
+          <span className="nav-icon" aria-hidden="true">⋯</span><span>더 보기</span>
+        </button>
+      </div>
+      <div id="nav-secondary-links" className="nav-secondary" aria-label="추가 메뉴">{secondaryItems.map(linkFor)}</div>
+    </nav>
+  </>;
 }
 
 function SetupPrompt({ loading, accessMessage = '' }: { loading: boolean; accessMessage?: string }) {
@@ -1478,7 +1491,7 @@ export function QuickRecordPage(props: {
       return;
     }
     const fields: EventEntryFields = {
-      eventType, occurredLocal, note, numericValue, unit, mealStatus, eliminationType, description,
+      eventType, occurredLocal, note, numericValue, unit: eventType === 'meal' ? 'g' : unit, mealStatus, eliminationType, description,
       measurementSource, measurementCondition, doseAmount, doseUnit: eventType === 'insulin' ? 'U' : '', insulinProductLabel,
     };
     const validation = validateEventEntry(fields);
@@ -1561,7 +1574,7 @@ export function QuickRecordPage(props: {
             <RecordChoices label="관찰한 식사 상태" value={mealStatus} onChange={setMealStatus}
               options={[{ value: 'ATE', label: '섭취 확인' }, { value: 'PARTIAL', label: '일부 섭취' }, { value: 'REFUSED', label: '식사 거부' }]} />
             <label className="field-label">실제 섭취량 (선택)<input type="number" inputMode="decimal" step="any" value={numericValue} onChange={(event) => setNumericValue(event.target.value)} /></label>
-            <label className="field-label">섭취량 단위<input value={unit} onChange={(event) => setUnit(event.target.value)} placeholder="g" /></label>
+            <div className="field-label glucose-unit-field"><span>섭취량 단위</span><span className="unit-fixed">g</span></div>
             <label className="field-label full-field">섭취 내용 (선택)<textarea rows={3} maxLength={1000} value={note}
               onChange={(event) => setNote(event.target.value)} placeholder="먹은 음식이나 평소와 다른 점을 적어 주세요" />
               <small>{note.length}/1000</small></label>

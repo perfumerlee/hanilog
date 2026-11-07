@@ -1174,3 +1174,44 @@ button.period-chip.selected:focus-visible {
     text-align: left;
   }
 }
+
+/* Mobile navigation menu backdrop: block the page beneath the expanded menu. */
+.nav-menu-backdrop,
+.nav-menu-backdrop:hover:not(:disabled),
+.nav-menu-backdrop:active,
+.nav-menu-backdrop:focus-visible {
+  position: fixed;
+  z-index: 7;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: rgba(26, 43, 36, .24);
+  color: transparent;
+  box-shadow: none;
+  transform: none;
+  cursor: default;
+}
+.nav-menu-backdrop:hover:not(:disabled),
+.nav-menu-backdrop:active,
+.nav-menu-backdrop:focus-visible {
+  background: rgba(26, 43, 36, .24);
+}
+@media (min-width: 900px) {
+  .nav-menu-backdrop { display: none; }
+}
+
+/* Keep refresh feedback in the sage palette, with readable text. */
+.workspace-bar .refresh-button:hover:not(:disabled),
+.workspace-bar .refresh-button:focus-visible {
+  background: #d9e8dd;
+  color: #174f46;
+}
+.workspace-bar .refresh-button:active:not(:disabled) {
+  background: #cbded1;
+  color: #123f38;
+}
