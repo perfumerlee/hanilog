@@ -26,7 +26,7 @@ const formatTimelineDate = (instant: string, timezone: string) => new Intl.DateT
 
 function ShareCareIcon({ type }: { type: 'meal' | 'insulin' }) {
   return <span className={`share-care-icon share-care-icon--${type}`} aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false">
-    {type === 'meal' ? <g fill="currentColor" transform="rotate(-38 12 12)"><rect x="9.5" y="5" width="5" height="14" rx="2.5"/><circle cx="9" cy="6.8" r="3.2"/><circle cx="15" cy="6.8" r="3.2"/><circle cx="9" cy="17.2" r="3.2"/><circle cx="15" cy="17.2" r="3.2"/></g>
+    {type === 'meal' ? <g fill="currentColor" transform="rotate(-38 12 12)"><rect x="10.5" y="5" width="3" height="14" rx="1.5"/><circle cx="9" cy="6.8" r="3.2"/><circle cx="15" cy="6.8" r="3.2"/><circle cx="9" cy="17.2" r="3.2"/><circle cx="15" cy="17.2" r="3.2"/></g>
       : <g fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" transform="rotate(42 12 12)">
         <rect x="8" y="5.5" width="8" height="12" rx="1.5"/><path d="M7 5.5h10M12 2v3.5M9 2h6M12 17.5V22m-2 0h4M8.5 9h3M8.5 12h3M8.5 15h3"/>
       </g>}

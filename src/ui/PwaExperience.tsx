@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 
 type InstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }> };
 
-export function PwaExperience() {
+export function PwaExperience({ updatesOnly = false }: { updatesOnly?: boolean }) {
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
   const [installed, setInstalled] = useState(false);
   const [updateReady, setUpdateReady] = useState(false);
@@ -54,13 +54,15 @@ export function PwaExperience() {
   const isAndroid = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent);
   const isStandalone = typeof window !== 'undefined' && (window.matchMedia('(display-mode: standalone)').matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone));
   if (updateDismissed && !updateReady) return null;
-  if (!installPrompt && !isIos && !isAndroid && !updateReady && !notice && !installed) return null;
+  const showInstall = !updatesOnly && !isStandalone && Boolean(installPrompt || isIos || isAndroid);
+  if (updatesOnly && !updateReady) return null;
+  if (!showInstall && !updateReady && !notice && !installed) return null;
   return <aside className="pwa-notice" aria-live="polite">
     {updateReady ? <><span>새 버전의 HaniLog를 사용할 수 있습니다.</span><button type="button" className="secondary-action" onClick={() => void applyUpdate()}>업데이트 적용</button></> : null}
-    {installPrompt && !isStandalone ? <><span>홈 화면에 추가하면 앱처럼 사용할 수 있습니다.</span><button type="button" className="secondary-action" onClick={() => void installApp()}>앱 설치</button></> : null}
-    {isAndroid && !isStandalone && !installPrompt ? <span>브라우저 메뉴에서 “앱 설치” 또는 “홈 화면에 추가”를 찾아보세요. 메뉴가 없으면 현재 브라우저에서 설치를 지원하지 않을 수 있습니다.</span> : null}
-    {isIos && !isStandalone ? <span>설치 안내: 공유 메뉴에서 “홈 화면에 추가”를 선택하세요. 설치 및 Push 지원 여부는 iOS 버전과 브라우저에 따라 다릅니다.</span> : null}
-    {notice && <span>{notice}</span>}
-    {installed && <span>설치 상태가 확인됐습니다.</span>}
+    {!updatesOnly && installPrompt && !isStandalone ? <><span>홈 화면에 추가하면 앱처럼 사용할 수 있습니다.</span><button type="button" className="secondary-action" onClick={() => void installApp()}>앱 설치</button></> : null}
+    {!updatesOnly && isAndroid && !isStandalone && !installPrompt ? <span>브라우저 메뉴에서 “앱 설치” 또는 “홈 화면에 추가”를 찾아보세요. 메뉴가 없으면 현재 브라우저에서 설치를 지원하지 않을 수 있습니다.</span> : null}
+    {!updatesOnly && isIos && !isStandalone ? <span>설치 안내: 공유 메뉴에서 “홈 화면에 추가”를 선택하세요. 설치 및 Push 지원 여부는 iOS 버전과 브라우저에 따라 다릅니다.</span> : null}
+    {!updatesOnly && notice && <span>{notice}</span>}
+    {!updatesOnly && installed && <span>설치 상태가 확인됐습니다.</span>}
   </aside>;
 }

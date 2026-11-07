@@ -1036,3 +1036,50 @@ button.sample-row.active, button.sample-row.active:hover:not(:disabled) {
   .public-glucose-share .day-navigation { grid-template-columns: 44px minmax(0, 210px) 44px; gap: .4rem; }
   .public-glucose-share .custom-date-range { grid-template-columns: minmax(0, 220px); }
 }
+
+/* Keep selected trend tabs legible in touch/active states on iOS and desktop. */
+button.period-chip.selected,
+button.period-chip.selected:hover:not(:disabled),
+button.period-chip.selected:active,
+button.period-chip.selected:focus-visible {
+  border-color: #718a71;
+  background: #e3e9dd;
+  color: #394f3d;
+  box-shadow: inset 0 0 0 1px #718a71;
+}
+
+/* iOS date controls can keep a wide intrinsic date string; stack custom ranges
+   on every phone width and constrain the native control to its grid track. */
+@media (max-width: 599px) {
+  .custom-date-range,
+  .public-glucose-share .custom-date-range {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr);
+    justify-content: stretch;
+  }
+  .custom-date-range > label,
+  .public-glucose-share .custom-date-range > label {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .custom-date-range input[type="date"],
+  .public-glucose-share input[type="date"] {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    font-size: 16px;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  .custom-date-range input[type="date"]::-webkit-date-and-time-value,
+  .public-glucose-share input[type="date"]::-webkit-date-and-time-value {
+    min-width: 0;
+    text-align: left;
+  }
+}
