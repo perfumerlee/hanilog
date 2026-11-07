@@ -1,5 +1,5 @@
 begin;
-select plan(10);
+select plan(15);
 
 insert into auth.users(id,aud,role,email,encrypted_password,email_confirmed_at,raw_app_meta_data,raw_user_meta_data,created_at,updated_at)
 values
@@ -21,6 +21,7 @@ select public.record_health_event(current_setting('test.share_pet')::uuid,'insul
 
 select public.create_glucose_share_link(current_setting('test.share_pet')::uuid,repeat('a',64),'2026-11-03','2026-11-03',now()+interval '1 day',true);
 select public.create_glucose_share_link_v2(current_setting('test.share_pet')::uuid,repeat('b',64),'2026-11-03','2026-11-03',now()+interval '1 day',true,true);
+select public.create_glucose_share_link_v3(current_setting('test.share_pet')::uuid,repeat('e',64),'2026-11-03','2026-11-03',now()+interval '1 day',true,false,'+821012345678');
 select is((select count(*)::integer from public.list_my_glucose_share_links_v2(current_setting('test.share_pet')::uuid) where include_care_values),1,
   'Only the explicit new link shares care values');
 select throws_ok($$select public.create_glucose_share_link_v2(current_setting('test.share_pet')::uuid,repeat('c',64),'2026-11-03','2026-11-03',now()+interval '1 day',false,true)$$,
@@ -28,6 +29,13 @@ select throws_ok($$select public.create_glucose_share_link_v2(current_setting('t
 select set_config('request.jwt.claims','{"sub":"00000000-0000-4000-8000-000000000302","role":"authenticated"}',true);
 select throws_ok($$select public.create_glucose_share_link_v2(current_setting('test.share_pet')::uuid,repeat('d',64),'2026-11-03','2026-11-03',now()+interval '1 day',true,true)$$,
   '42501','PET_SHARE_ACCESS_DENIED','Unrelated user cannot create a care value share');
+select is((select guardian_contact_phone from public.list_my_glucose_share_links_v3(current_setting('test.share_pet')::uuid) where guardian_contact_phone='+821012345678'), '+821012345678',
+  'Owner can see the contact number attached to their share');
+select throws_ok($$select public.create_glucose_share_link_v3(current_setting('test.share_pet')::uuid,repeat('f',64),'2026-11-03','2026-11-03',now()+interval '1 day',true,false,'010-1234-5678')$$,
+  '22023','GLUCOSE_SHARE_INVALID','RPC rejects phone numbers not normalized by the edge handler');
+select set_config('request.jwt.claims','{"sub":"00000000-0000-4000-8000-000000000302","role":"authenticated"}',true);
+select throws_ok($$select count(*) from public.list_my_glucose_share_links_v3(current_setting('test.share_pet')::uuid)$$,
+  '42501','PET_SHARE_ACCESS_DENIED','Unrelated user cannot read a share contact number');
 
 set local role service_role;
 select is((public.resolve_glucose_share_link(repeat('a',64))->'care_times'->0 ? 'amount'),false,
@@ -42,6 +50,10 @@ select is((public.resolve_glucose_share_link(repeat('b',64))->'care_times'->1->>
   'Explicit link retains insulin dose unit');
 select is((public.resolve_glucose_share_link(repeat('b',64))->'care_times'->1 ? 'note'),false,
   'Care notes are excluded from the shared payload');
+select is((public.resolve_glucose_share_link_with_contact(repeat('e',64))->>'guardian_contact_phone'),'+821012345678',
+  'Active bearer share resolves the explicitly shared guardian contact');
+select is((public.resolve_glucose_share_link_with_contact(repeat('a',64))->>'guardian_contact_phone'),null,
+  'Older share links do not reveal a guardian contact');
 
 select * from finish();
 rollback;

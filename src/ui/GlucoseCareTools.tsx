@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { callGlucoseShare, createShareToken, glucoseShareUrl, GlucoseShareRequestError, type GlucoseShareRange } from '../lib/glucose-share';
+import { callGlucoseShare, createShareToken, glucoseShareUrl, GlucoseShareRequestError, normalizeGuardianPhone, type GlucoseShareRange } from '../lib/glucose-share';
 import { supabase } from '../lib/supabase';
 import { localDateKey } from '../lib/health-trends';
 
@@ -29,6 +29,8 @@ export function GlucoseCareTools({ petId, petName, timezone, canEdit, demo = fal
   const [newLink, setNewLink] = useState('');
   const [activeLinks, setActiveLinks] = useState<Record<string, string>>({});
   const [recipientPhone, setRecipientPhone] = useState('');
+  const [guardianPhoneInput, setGuardianPhoneInput] = useState('');
+  const [shareGuardianContact, setShareGuardianContact] = useState(false);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState('');
   const [now] = useState(() => Date.now());
@@ -75,12 +77,15 @@ export function GlucoseCareTools({ petId, petName, timezone, canEdit, demo = fal
     if (!fromDate || !toDate || fromDate > toDate || (Date.parse(`${toDate}T00:00:00Z`) - Date.parse(`${fromDate}T00:00:00Z`)) / 86_400_000 > 365) {
       setMessage('공유 시작일과 종료일을 확인해 주세요. 최대 1년 범위를 선택할 수 있습니다.'); return;
     }
+    const guardianPhone = shareGuardianContact ? normalizeGuardianPhone(guardianPhoneInput) : null;
+    if (shareGuardianContact && !guardianPhone) { setMessage('공유할 보호자 전화번호를 확인해 주세요.'); return; }
     setPending(true); setNewLink(''); setMessage('');
     try {
       const { token, tokenHash } = createShareToken();
       const result = await callGlucoseShare<{ share: GlucoseShareRange }>(supabase, {
         action: 'create', pet_id: petId, token_hash: await tokenHash, from_date: fromDate, to_date: toDate < today(timezone) ? today(timezone) : toDate,
         expires_days: Number(expiresDays), include_care_times: includeCareTimes, include_care_values: includeCareTimes && includeCareValues,
+        guardian_contact_phone: guardianPhone,
       });
       if (!result.share?.id) throw new Error('SHARE_CREATE_FAILED');
       const link = glucoseShareUrl(token);
@@ -124,7 +129,8 @@ export function GlucoseCareTools({ petId, petName, timezone, canEdit, demo = fal
       const result = await callGlucoseShare<{ share: GlucoseShareRange }>(supabase, {
         action: 'create', pet_id: petId, token_hash: await tokenHash, from_date: item.from_date,
         to_date: item.to_date < today(timezone) ? today(timezone) : item.to_date,
-        expires_days: 1, include_care_times: item.include_care_times, include_care_values: item.include_care_values === true,
+          expires_days: 1, include_care_times: item.include_care_times, include_care_values: item.include_care_values === true,
+        guardian_contact_phone: item.guardian_contact_phone ?? null,
       });
       const link = glucoseShareUrl(token);
       setActiveLinks((current) => ({ ...current, [result.share.id]: link }));
@@ -193,6 +199,9 @@ export function GlucoseCareTools({ petId, petName, timezone, canEdit, demo = fal
         <label className="check-row"><input type="checkbox" checked={includeCareTimes} onChange={(event) => { setIncludeCareTimes(event.target.checked); if (!event.target.checked) setIncludeCareValues(false); }} />같은 기간의 식사·인슐린 기록 시각도 포함</label>
         {includeCareTimes && <label className="check-row"><input type="checkbox" checked={includeCareValues} onChange={(event) => setIncludeCareValues(event.target.checked)} />식사량과 인슐린 투여량·단위도 공유 (민감정보)</label>}
         <label className="check-row share-access-ack"><input type="checkbox" checked={acknowledgeBearerLink} required onChange={(event) => setAcknowledgeBearerLink(event.target.checked)} />링크만 가진 사람도 만료 전까지 열람할 수 있음을 확인했습니다.</label>
+        <label className="check-row"><input type="checkbox" checked={shareGuardianContact} onChange={(event) => setShareGuardianContact(event.target.checked)} />공유 페이지에 보호자 연락 버튼 표시</label>
+        {shareGuardianContact && <><label className="field-label full-field">보호자 전화번호<input type="tel" inputMode="tel" autoComplete="tel" value={guardianPhoneInput} onChange={(event) => setGuardianPhoneInput(event.target.value)} placeholder="예: 010-1234-5678" required /></label>
+          <small className="share-contact-disclosure">이 번호는 공유 링크를 열 수 있는 사람에게 표시됩니다. 연락처를 공유해도 괜찮은 경우에만 선택하세요.</small></>}
         <button type="submit" className="button-primary" disabled={pending}>{pending ? '안전한 링크 생성 중…' : '링크 만들고 복사'}</button>
         {newLink && <div className="share-link-result">
           <label className="field-label full-field">공유 링크<input readOnly value={newLink} onFocus={(event) => event.currentTarget.select()} /></label>

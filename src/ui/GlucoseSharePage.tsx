@@ -17,6 +17,21 @@ const formatDate = (date: string) => new Intl.DateTimeFormat('ko-KR', { dateStyl
 const formatTime = (instant: string, timezone: string) => new Intl.DateTimeFormat('ko-KR', {
   timeZone: timezone, dateStyle: 'medium', timeStyle: 'short',
 }).format(new Date(instant));
+const formatClock = (instant: string, timezone: string) => new Intl.DateTimeFormat('ko-KR', {
+  timeZone: timezone, hour: 'numeric', minute: '2-digit',
+}).format(new Date(instant));
+const formatTimelineDate = (instant: string, timezone: string) => new Intl.DateTimeFormat('ko-KR', {
+  timeZone: timezone, year: 'numeric', month: 'numeric', day: 'numeric',
+}).format(new Date(instant));
+
+function ShareCareIcon({ type }: { type: 'meal' | 'insulin' }) {
+  return <span className={`share-care-icon share-care-icon--${type}`} aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false">
+    {type === 'meal' ? <path d="M7.7 4.6c-1.9-1.5-4.8-.5-4.8 1.9 0 2 1.7 3.5 4 3.5h10.2c2.3 0 4-1.5 4-3.5 0-2.4-2.9-3.4-4.8-1.9-1.2 1-2.3 1.4-4.3 1.4s-3.1-.4-4.3-1.4Z" fill="currentColor" transform="rotate(45 12 12)" />
+      : <g fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" transform="rotate(42 12 12)">
+        <rect x="8" y="5.5" width="8" height="12" rx="1.5"/><path d="M7 5.5h10M12 2v3.5M9 2h6M12 17.5V22m-2 0h4M8.5 9h3M8.5 12h3M8.5 15h3"/>
+      </g>}
+  </svg></span>;
+}
 
 export function GlucoseSharePage() {
   const { token = '' } = useParams();
@@ -86,6 +101,7 @@ export function GlucoseSharePage() {
   const periodSamples = share ? samples.filter((item) => localDateKey(item.occurredAt, share.timezone) >= cutoffDay
     && localDateKey(item.occurredAt, share.timezone) <= anchorDay) : [];
   const displayedSamples = displayMode === 'day' ? daily : custom ? samples.filter(item => { const day=localDateKey(item.occurredAt,share?.timezone ?? 'UTC'); return from && to && from <= to && day >= from && day <= to; }) : periodSamples;
+  const average = displayedSamples.length >= 3 ? displayedSamples.reduce((sum, item) => sum + item.value, 0) / displayedSamples.length : null;
   const selected = displayedSamples.find((item) => item.id === selectedId) ?? displayedSamples.at(-1) ?? null;
   const actualSegments = measuredLineSegments(displayedSamples, displayMode === 'day' ? 6 / 24 : 7);
 
@@ -114,6 +130,7 @@ export function GlucoseSharePage() {
           <label className="field-label">날짜<input type="date" value={day} min={share.from_date} max={share.to_date} onChange={(event) => { if (event.target.value >= share.from_date && event.target.value <= share.to_date) setChosenDay(event.target.value); }} /></label>
           <button type="button" disabled={day >= share.to_date} onClick={() => setChosenDay(shiftLocalDate(day, 1))}>다음</button>
         </div>}
+        {average !== null && <p className="glucose-average">평균 혈당 <strong>{average.toFixed(1)} mg/dL</strong><small>현재 그래프의 측정 {displayedSamples.length}건 · 산술평균</small></p>}
         <GlucoseScatterChart samples={displayedSamples} actualSegments={actualSegments} trendSegments={[]} timezone={share.timezone} targetRange={share.target_range} onSelect={setSelectedId} selectedId={selected?.id ?? null} mode={displayMode} />
         {!displayedSamples.length && <p className="trend-empty">{displayMode === 'day' ? '이 날짜에' : '선택한 기간에'} 기록된 혈당 측정값이 없습니다.</p>}
         {selected && <div className="share-selected-value" aria-live="polite"><strong>{selected.value} mg/dL</strong>
@@ -121,8 +138,9 @@ export function GlucoseSharePage() {
       </section>
       {displayMode === 'day' && careTimes.length > 0 && <section className="panel"><h2>이날의 식사·인슐린 기록</h2>
         <ol className="share-care-timeline">{careTimes.map((item, index) => <li className={`share-care-timeline-item ${item.event_type}`} key={`${item.event_type}-${item.occurred_at}-${index}`}>
-          <time>{formatTime(item.occurred_at, share.timezone)}</time><span className="share-care-timeline-node" aria-hidden="true" />
-          <div><span>{item.event_type === 'meal' ? '식사' : '인슐린'}</span><strong>{typeof item.amount === 'number' && Number.isFinite(item.amount) ? `${item.amount}${item.unit ? ` ${item.unit}` : ' (단위 미기록)'}` : share.include_care_values ? '수치 미기록' : '수치 미공유'}</strong></div>
+          <time dateTime={item.occurred_at}><span>{formatTimelineDate(item.occurred_at, share.timezone)}</span><span>{formatClock(item.occurred_at, share.timezone)}</span></time>
+          <span className="share-care-timeline-node" aria-hidden="true" />
+          <div><span className="share-care-kind"><ShareCareIcon type={item.event_type} />{item.event_type === 'meal' ? '식사' : '인슐린'}</span><strong>{typeof item.amount === 'number' && Number.isFinite(item.amount) ? `${item.amount}${item.unit ? ` ${item.unit}` : ' (단위 미기록)'}` : share.include_care_values ? '수치 미기록' : '수치 미공유'}</strong></div>
         </li>)}</ol>
       </section>}
       <section className="panel measurement-list"><h2>{displayMode === 'day' ? '이날' : '선택한 기간'} 측정값 ({displayedSamples.length}건)</h2>
@@ -132,7 +150,15 @@ export function GlucoseSharePage() {
             <span><small>{glucoseMeasurementConditionLabel(sample.condition)}{sample.revisionKind ? ' · 정정된 값' : ''}</small></span>
           </button>
         </li>)}</ol> : <p>표시할 실제 측정값이 없습니다.</p>}
-        <p className="timeline-footnote">공유 링크 만료 · {formatTime(share.expires_at,share.timezone)}</p>
+
+      </section>
+      <section className="panel share-validity" aria-label="공유 기간 안내"><h2>공유 기간 안내</h2><p>공유되는 기록 기간 · {formatDate(share.from_date)} ~ {formatDate(share.to_date)}</p><p>이 페이지 열람 가능 기한 · {formatTime(share.expires_at, share.timezone)}</p><small>공유 링크와 이 페이지의 열람 기한은 동일합니다.</small></section>
+      <section className="panel share-guardian-contact" aria-label="보호자 연락처">
+        <h2>보호자에게 연락</h2>{share.guardian_contact_phone
+          ? <><p>{share.pet_name}의 기록에 대해 보호자에게 문의할 수 있습니다.</p>
+            <div className="share-guardian-actions"><a className="button-primary" href={`tel:${share.guardian_contact_phone}`}>보호자에게 전화하기</a>
+              <a className="button-secondary" href={`sms:${share.guardian_contact_phone}?body=${encodeURIComponent(`${share.pet_name}의 혈당 기록을 확인했습니다. 관련해 연락드립니다.`)}`}>문자 보내기</a></div></>
+          : <p>이 링크에는 보호자 연락처가 포함되지 않았습니다. 연락처를 포함한 새 공유 링크를 보호자에게 요청해 주세요.</p>}
       </section>
 
     </>}

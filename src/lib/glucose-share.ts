@@ -9,6 +9,7 @@ export type GlucoseShareRange = {
   revoked_at: string | null;
   include_care_times: boolean;
   include_care_values?: boolean;
+  guardian_contact_phone?: string | null;
 };
 export type GlucoseSharePayload = {
   pet_name: string;
@@ -17,6 +18,7 @@ export type GlucoseSharePayload = {
   to_date: string;
   created_at: string;
   expires_at: string;
+  guardian_contact_phone?: string | null;
   target_range: null | { lower_mg_dl: number; upper_mg_dl: number; source_label: string; effective_on: string };
   include_care_values?: boolean;
   measurements: { id: string; occurred_at: string; recorded_at: string; value: Record<string, unknown>; unit: string; revision_kind: string | null }[];
@@ -42,6 +44,15 @@ export function createShareToken(): { token: string; tokenHash: Promise<string> 
 export function glucoseShareUrl(token: string): string {
   const base = `${window.location.origin}${import.meta.env.BASE_URL}`;
   return `${base}#/glucose-share/${token}`;
+}
+
+/** Converts common Korean mobile/landline input to E.164; rejects ambiguous values. */
+export function normalizeGuardianPhone(value: string): string | null {
+  const compact = value.trim().replace(/[\s()-]/g, '');
+  if (/^\+[1-9]\d{7,14}$/.test(compact)) return compact;
+  const digits = compact.replace(/\D/g, '');
+  if (/^0\d{8,10}$/.test(digits)) return `+82${digits.slice(1)}`;
+  return null;
 }
 
 export async function callGlucoseShare<T>(client: SupabaseClient, body: Record<string, unknown>): Promise<T> {

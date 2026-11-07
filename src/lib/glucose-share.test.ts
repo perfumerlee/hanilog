@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { callGlucoseShare } from './glucose-share';
+import { callGlucoseShare, normalizeGuardianPhone } from './glucose-share';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 const clientWithError = (status: number, errorCode?: string) => ({
@@ -18,5 +18,17 @@ describe('glucose share errors', () => {
   it('preserves the safe schema-not-applied code returned by the function', async () => {
     await expect(callGlucoseShare(clientWithError(503, 'SHARE_SCHEMA_UNAVAILABLE'), { action: 'create' }))
       .rejects.toMatchObject({ code: 'SHARE_SCHEMA_UNAVAILABLE', status: 503 });
+  });
+});
+
+describe('guardian contact phone', () => {
+  it('normalizes Korean phone numbers to E.164', () => {
+    expect(normalizeGuardianPhone('010-1234-5678')).toBe('+821012345678');
+    expect(normalizeGuardianPhone('+1 (415) 555-2671')).toBe('+14155552671');
+  });
+
+  it('rejects incomplete or ambiguous phone numbers', () => {
+    expect(normalizeGuardianPhone('1234')).toBeNull();
+    expect(normalizeGuardianPhone('010-123-')).toBeNull();
   });
 });

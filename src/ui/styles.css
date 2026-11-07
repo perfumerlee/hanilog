@@ -982,3 +982,54 @@ button.sample-row.active, button.sample-row.active:hover:not(:disabled) {
   .share-care-timeline-item::before { left: calc(var(--share-timeline-time) + 7px); }
   .share-care-timeline-item > div { flex-wrap: wrap; gap: .05rem .35rem; }
 }
+
+/* Make shared care entries scannable: date, time and a recognizable event icon. */
+.share-care-timeline-item > time { display: grid; align-content: start; gap: .12rem; line-height: 1.35; white-space: nowrap; }
+.share-care-kind { display: inline-flex; align-items: center; gap: .4rem; }
+.share-care-icon { display: inline-grid; flex: 0 0 1.55rem; width: 1.55rem; height: 1.55rem; place-items: center; border-radius: 50%; }
+.share-care-icon svg { display: block; width: 1rem; height: 1rem; }
+.share-care-icon--meal { color: #986124; background: #fbf0dc; }
+.share-care-icon--insulin { color: #6556a4; background: #efecfa; }
+
+/* Match the main glucose page's soft selected-tab state, including touch/hover. */
+.public-glucose-share .period-chip.selected,
+.public-glucose-share .period-chip.selected:hover:not(:disabled),
+.public-glucose-share .period-chip.selected:active {
+  border-color: #718a71;
+  background: #e3e9dd;
+  color: #394f3d;
+  box-shadow: inset 0 0 0 1px #718a71;
+}
+.public-glucose-share .period-chip:not(.selected):hover:not(:disabled),
+.public-glucose-share .period-chip:not(.selected):active {
+  background: #f2f2eb;
+  color: #4d5d4e;
+}
+
+/* Native iOS date fields have a large intrinsic width; keep them compact and centered. */
+.public-glucose-share .day-navigation {
+  grid-template-columns: 48px minmax(0, 220px) 48px;
+  justify-content: center;
+  gap: .55rem;
+}
+.public-glucose-share .day-navigation .field-label { width: 100%; min-width: 0; }
+.public-glucose-share input[type="date"] {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  padding-inline: .55rem;
+  font-size: 16px;
+}
+.public-glucose-share .custom-date-range { grid-template-columns: repeat(2, minmax(0, 220px)); justify-content: center; }
+.public-glucose-share .custom-date-range > label { min-width: 0; }
+.public-glucose-share .share-guardian-contact > p { margin-bottom: 0; }
+@media (max-width: 390px) {
+  .share-care-timeline { --share-timeline-time: 86px; }
+  .share-care-timeline-item { grid-template-columns: var(--share-timeline-time) 16px minmax(0, 1fr); }
+  .share-care-timeline-item > time { font-size: .7rem; }
+  .share-care-icon { flex-basis: 1.4rem; width: 1.4rem; height: 1.4rem; }
+  .public-glucose-share .day-navigation { grid-template-columns: 44px minmax(0, 210px) 44px; gap: .4rem; }
+  .public-glucose-share .custom-date-range { grid-template-columns: minmax(0, 220px); }
+}
