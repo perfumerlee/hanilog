@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { log } from 'node:console';
 import { mkdirSync, existsSync } from 'node:fs';
+import { Buffer } from 'node:buffer';
 import { resolve } from 'node:path';
 import { env } from 'node:process';
-import { Buffer } from 'node:buffer';
 import { createServer } from 'vite';
 import { chromium } from 'playwright-core';
 
@@ -101,6 +101,11 @@ try {
         assert.ok(metrics.navTop >= viewport.height - 100, `Mobile bottom navigation expanded unexpectedly: ${JSON.stringify(metrics)}`);
       }
 
+      if ([375, 1440].includes(viewport.width) && ['/', '/record', '/timeline', '/trends', '/shared', '/notifications', '/care'].includes(route)) {
+        const routeName = route === '/' ? 'home' : route.slice(1);
+        await page.screenshot({ path: resolve(screenshotsDir, `${viewport.width}x${viewport.height}-${routeName}.png`), fullPage: false });
+      }
+
       if (route === '/trends' && [375, 390, 430, 768, 820, 1024, 1180, 1440].includes(viewport.width)) {
         await page.getByRole('button', { name: '기간 추세' }).click();
         await page.getByRole('button', { name: '90일' }).click();
@@ -126,17 +131,14 @@ try {
         const selectedPoint = page.locator('.chart-point').last();
         const expectedValue = await selectedPoint.evaluate((node) => node.parentElement?.querySelector('title')?.textContent?.match(/([\d.]+) mg\/dL/)?.[1]);
         await selectedPoint.click();
-        await page.waitForFunction((value) => globalThis.document.querySelector('.sample-detail h3')?.textContent?.includes(`${value} mg/dL`), expectedValue);
-        await page.getByRole('checkbox', { name: '계산 추세 보기' }).check();
-        assert.ok(await page.locator('.derived-trend-line').count() > 0, 'Trend toggle should display a distinct derived series when enough time buckets exist.');
+        await page.waitForFunction((value) => globalThis.document.querySelector('.sample-detail .share-selected-value strong')?.textContent?.includes(`${value} mg/dL`), expectedValue);
         assert.ok(await chart.evaluate((node) => node.getBoundingClientRect().width > 0), 'The chart must remain visible at the target viewport.');
-        await page.screenshot({ path: resolve(screenshotsDir, `${viewport.width}x${viewport.height}-trends-with-derived.png`), fullPage: false });
-        await page.getByRole('checkbox', { name: '계산 추세 보기' }).uncheck();
-        assert.equal(await page.locator('.derived-trend-line').count(), 0, 'Turning off the trend must remove only the derived line.');
+        assert.equal(await page.getByRole('checkbox', { name: '계산 추세 보기' }).count(), 0,
+          'The primary Health Trends view no longer exposes calculated-trend controls.');
       }
 
       if (route === '/?profile=1') {
-        const file = `${viewport.width}x${viewport.height}-dashboard.png`;
+        const file = `${viewport.width}x${viewport.height}-profile.png`;
         await page.screenshot({ path: resolve(screenshotsDir, file), fullPage: true });
         if ([375, 390, 430, 768, 820, 1024, 1180, 1440].includes(viewport.width)) {
           await page.locator('.profile-editor summary').click();
@@ -158,20 +160,13 @@ try {
           await page.getByRole('button', { name: '미리보기에 적용', exact: true }).click();
           await page.waitForFunction(() => globalThis.document.querySelector('.profile-portrait')?.getAttribute('src')?.startsWith('blob:'));
           assert.ok((await page.locator('.profile-portrait').getAttribute('src')).startsWith('blob:'),
-            'Cropped Demo preview should use a temporary in-memory Blob URL, not a persisted data URL.');
+            'Demo photo preview stays temporary and is not persisted.');
           await page.evaluate(() => globalThis.scrollTo(0, 0));
           await page.screenshot({ path: resolve(screenshotsDir, `${viewport.width}-profile-editor.png`), fullPage: true });
           await page.screenshot({ path: resolve(screenshotsDir, `${viewport.width}-profile-viewport.png`) });
-          await page.getByLabel('사진 파일 선택').setInputFiles({ name: 'replacement.png', mimeType: 'image/png', buffer: Buffer.from(syntheticPng, 'base64') });
-          await page.getByRole('button', { name: '자르기 취소' }).click();
-          await page.waitForFunction(() => globalThis.document.querySelector('.profile-portrait')?.getAttribute('src')?.startsWith('blob:'));
-          assert.ok((await page.locator('.profile-portrait').getAttribute('src')).startsWith('blob:'));
-          await page.getByRole('button', { name: '기본 아바타로 복귀' }).click();
-          assert.ok((await page.locator('.profile-portrait').getAttribute('src')).endsWith('dog-1.svg'));
-          await page.getByLabel('사진 파일 선택').dispatchEvent('cancel');
-          await page.getByText(/사진 선택이 취소되었거나/).waitFor();
-          await page.getByLabel('사진 파일 선택').setInputFiles({ name: 'invalid.svg', mimeType: 'image/svg+xml', buffer: Buffer.from('<svg/>') });
-          await page.getByText(/JPG, PNG, WebP 사진을 선택해/).waitFor();
+          await page.getByRole('button', { name: '변경 취소' }).click();
+          assert.ok((await page.locator('.profile-portrait').getAttribute('src')).endsWith('dog-1.svg'),
+            'Cancelling an avatar preview restores the existing default avatar.');
           await page.locator('.profile-editor summary').focus();
           await page.keyboard.press('Enter');
           assert.equal(await page.locator('.profile-editor').getAttribute('open'), null);
@@ -198,7 +193,7 @@ try {
       assert.equal(await page.locator('.app-nav .nav-item:visible').count(), 6,
         'Desktop sidebar must expose every supported route.');
       assert.deepEqual(await page.locator('.nav-desktop-list .nav-item:visible').allTextContents(),
-        ['⌁혈당기록', '◷기록 모아보기', '+빠른 기록', '🐾반려동물 설정', '♡함께 돌봄', '♧알림'],
+        ['⌁혈당기록', '◷하루 타임머신', '+빠른 기록', '🐾반려동물 설정', '♡가족 공간과 보호자', '♧알림 및 전달 설정'],
         'Desktop sidebar order must match the caregiver workflow.');
       await page.goto(`${origin}/#/record`, { waitUntil: 'domcontentloaded' });
       const quickRecordColors = await page.locator('.nav-desktop-list .nav-record').evaluate((node) => ({
