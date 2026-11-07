@@ -430,8 +430,11 @@ button, a, input, select, textarea, summary { scroll-margin: 1rem; }
 .share-link-result .field-label { min-width: 0; }
 .share-link-result input { font-size: .8rem; }
 .share-contact-disclosure { grid-column: 1 / -1; color: #80502f; }
-.share-guardian-contact .share-guardian-actions { display: flex; flex-wrap: wrap; gap: .6rem; }
-.share-guardian-contact .share-guardian-actions > a { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; padding: .65rem 1rem; border-radius: 12px; text-decoration: none; }
+.share-guardian-contact .share-guardian-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem; margin-top: .8rem; }
+.share-guardian-contact .share-guardian-actions > a { display: inline-flex; min-width: 0; min-height: 48px; align-items: center; justify-content: center; gap: .5rem; padding: .65rem .8rem; border: 1px solid var(--line); border-radius: 12px; text-decoration: none; font-weight: 700; }
+.share-guardian-contact .share-guardian-actions > .button-primary { border-color: var(--green); background: var(--green); color: #fff; }
+.share-guardian-contact .share-guardian-actions > .button-secondary { background: #f1f4ed; color: var(--green-dark); }
+.guardian-contact-icon { flex: 0 0 1.15rem; width: 1.15rem; height: 1.15rem; }
 .public-glucose-share { padding-bottom: calc(1.5rem + env(safe-area-inset-bottom)); }
 .share-target-summary strong { color: #356d47; font-size: 1.35rem; font-variant-numeric: tabular-nums; }
 .share-target-summary p, .share-target-summary small { display: block; color: var(--muted); line-height: 1.5; }

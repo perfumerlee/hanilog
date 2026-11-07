@@ -26,11 +26,19 @@ const formatTimelineDate = (instant: string, timezone: string) => new Intl.DateT
 
 function ShareCareIcon({ type }: { type: 'meal' | 'insulin' }) {
   return <span className={`share-care-icon share-care-icon--${type}`} aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false">
-    {type === 'meal' ? <path d="M7.7 4.6c-1.9-1.5-4.8-.5-4.8 1.9 0 2 1.7 3.5 4 3.5h10.2c2.3 0 4-1.5 4-3.5 0-2.4-2.9-3.4-4.8-1.9-1.2 1-2.3 1.4-4.3 1.4s-3.1-.4-4.3-1.4Z" fill="currentColor" transform="rotate(45 12 12)" />
+    {type === 'meal' ? <g fill="currentColor" transform="rotate(-38 12 12)"><rect x="9.5" y="5" width="5" height="14" rx="2.5"/><circle cx="9" cy="6.8" r="3.2"/><circle cx="15" cy="6.8" r="3.2"/><circle cx="9" cy="17.2" r="3.2"/><circle cx="15" cy="17.2" r="3.2"/></g>
       : <g fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" transform="rotate(42 12 12)">
         <rect x="8" y="5.5" width="8" height="12" rx="1.5"/><path d="M7 5.5h10M12 2v3.5M9 2h6M12 17.5V22m-2 0h4M8.5 9h3M8.5 12h3M8.5 15h3"/>
       </g>}
   </svg></span>;
+}
+
+function GuardianContactIcon({ type }: { type: 'phone' | 'message' }) {
+  return <svg className="guardian-contact-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    {type === 'phone'
+      ? <path d="M7 3.5h3l1.5 4-2 1.7a15 15 0 0 0 5.3 5.3l1.7-2 4 1.5v3c0 1.1-.9 2-2 2A15.5 15.5 0 0 1 5 5.5c0-1.1.9-2 2-2Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      : <path d="M4 5.5h16v11H9l-5 3v-14Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />}
+  </svg>;
 }
 
 export function GlucoseSharePage() {
@@ -152,12 +160,12 @@ export function GlucoseSharePage() {
         </li>)}</ol> : <p>표시할 실제 측정값이 없습니다.</p>}
 
       </section>
-      <section className="panel share-validity" aria-label="공유 기간 안내"><h2>공유 기간 안내</h2><p>공유되는 기록 기간 · {formatDate(share.from_date)} ~ {formatDate(share.to_date)}</p><p>이 페이지 열람 가능 기한 · {formatTime(share.expires_at, share.timezone)}</p><small>공유 링크와 이 페이지의 열람 기한은 동일합니다.</small></section>
+      <section className="panel share-validity" aria-label="공유 기록 기간"><h2>공유 기록 기간</h2><p>{formatDate(share.from_date)} ~ {formatDate(share.to_date)}</p></section>
       <section className="panel share-guardian-contact" aria-label="보호자 연락처">
         <h2>보호자에게 연락</h2>{share.guardian_contact_phone
           ? <><p>{share.pet_name}의 기록에 대해 보호자에게 문의할 수 있습니다.</p>
-            <div className="share-guardian-actions"><a className="button-primary" href={`tel:${share.guardian_contact_phone}`}>보호자에게 전화하기</a>
-              <a className="button-secondary" href={`sms:${share.guardian_contact_phone}?body=${encodeURIComponent(`${share.pet_name}의 혈당 기록을 확인했습니다. 관련해 연락드립니다.`)}`}>문자 보내기</a></div></>
+            <div className="share-guardian-actions"><a className="button-primary" href={`tel:${share.guardian_contact_phone}`}><GuardianContactIcon type="phone" /><span>보호자에게 전화하기</span></a>
+              <a className="button-secondary" href={`sms:${share.guardian_contact_phone}?body=${encodeURIComponent(`${share.pet_name}의 혈당 기록을 확인했습니다. 관련해 연락드립니다.`)}`}><GuardianContactIcon type="message" /><span>문자 보내기</span></a></div></>
           : <p>이 링크에는 보호자 연락처가 포함되지 않았습니다. 연락처를 포함한 새 공유 링크를 보호자에게 요청해 주세요.</p>}
       </section>
 
