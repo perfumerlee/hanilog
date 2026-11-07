@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { glucoseMeasurementConditionLabel } from '../lib/event-entry';
 import {
   effectiveGlucoseValue, inPeriod, localDateKey, localMinuteOfDay, longGaps, measuredLineSegments, mgDlSamples, monthlyCounts, samplesForLocalDay,
-  shiftLocalDate, sortSamples, trendLineSegments, trendPoints,
+  shiftLocalDate, sortSamples,
   type GlucoseSample, type NumericGlucoseSample, type TrendPeriod, type TrendPoint,
 } from '../lib/health-trends';
 import { supabase } from '../lib/supabase';
@@ -75,7 +75,6 @@ export function HealthTrendsPage({ pet, userId, online, demoEvents, refreshVersi
   const [verified, setVerified] = useState(Boolean(demoEvents));
   const [message, setMessage] = useState(demoEvents ? 'DEMO · 합성 데이터이며 서버 조회가 아닙니다.' : '');
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [showTrend, setShowTrend] = useState(false);
   const [now] = useState(() => new Date());
   const [selectedDay, setSelectedDay] = useState(() => localDateKey(new Date().toISOString(), pet.timezone));
   const [targetRange, setTargetRange] = useState<TargetRange | null>(null);
@@ -157,13 +156,10 @@ export function HealthTrendsPage({ pet, userId, online, demoEvents, refreshVersi
   const displayedSamples = displayMode === 'day' ? dailySamples : custom ? allSamples.filter(item => { const day=localDateKey(item.occurredAt,pet.timezone); return from && to && from <= to && day >= from && day <= to; }) : samples;
   const actualSegments = useMemo(() => displayMode === 'day'
     ? measuredLineSegments(displayedSamples, 6 / 24) : measuredLineSegments(displayedSamples), [displayMode, displayedSamples]);
-  const derivedTrend = useMemo(() => trendPoints(displayedSamples, period, pet.timezone), [displayedSamples, period, pet.timezone]);
-  const derivedSegments = useMemo(() => trendLineSegments(derivedTrend, period), [derivedTrend, period]);
-  const trendSampleCount = derivedTrend.reduce((sum, point) => sum + point.count, 0);
   const newest = allSamples.at(-1);
   const previous = allSamples.at(-2);
+  const average = displayedSamples.length >= 3 ? displayedSamples.reduce((sum, item) => sum + item.value, 0) / displayedSamples.length : null;
   const selected = displayedSamples.find((item) => item.id === selectedId) ?? displayedSamples.at(-1) ?? null;
-  const sameDay = selected ? allSamples.filter((item) => localDateKey(item.occurredAt, pet.timezone) === localDateKey(selected.occurredAt, pet.timezone)) : [];
   const monthly = useMemo(() => monthlyCounts(samples, pet.timezone), [samples, pet.timezone]);
   const gaps = useMemo(() => longGaps(samples, period === '7d' || period === '30d' ? 7 : period === '90d' ? 14 : 30), [samples, period]);
   const delta = newest && previous ? newest.value - previous.value : null;
@@ -191,7 +187,7 @@ export function HealthTrendsPage({ pet, userId, online, demoEvents, refreshVersi
           <small>{delta === null || !previous ? '건강 상태의 개선·악화를 의미하지 않습니다' : `직전 측정 ${dateTime(previous.occurredAt, pet.timezone)} · 해석이 아닌 값 차이`}</small></div>
       </section>
       <section className="panel trends-panel">
-        <div className="trends-heading"><div><p className="eyebrow">실제 측정값</p><h2>{displayMode === 'day' ? `${selectedDay} 시간대별 혈당` : '시간에 따른 기록'}</h2></div>
+        <div className="trends-heading"><div><p className="eyebrow">실제 측정값 : {displayedSamples.length}건</p><h2>{displayMode === 'day' ? `${selectedDay} 시간대별 혈당` : '시간에 따른 기록'}</h2></div>
           <Link className="button-link trends-add" to="/record?event=glucose">혈당 기록 추가</Link></div>
         <div className="trend-display-toggle" role="group" aria-label="혈당 그래프 보기">
           <button type="button" className={displayMode === 'period' ? 'period-chip selected' : 'period-chip'} aria-pressed={displayMode === 'period'} onClick={() => setDisplayMode('period')}>기간 추세</button>
@@ -202,25 +198,21 @@ export function HealthTrendsPage({ pet, userId, online, demoEvents, refreshVersi
           <label className="field-label">날짜<input type="date" value={selectedDay} onChange={(event) => { setSelectedDay(event.target.value); setSelectedId(null); }} /></label>
           <button type="button" className="button-secondary" aria-label="다음 날짜" onClick={() => setSelectedDay((day) => shiftLocalDate(day, 1))}>다음</button>
         </div>}
-        <div className="trend-controls">
-          {displayMode === 'period' && <label className="trend-toggle"><input type="checkbox" checked={showTrend} onChange={(event) => setShowTrend(event.target.checked)} />
-            <span>계산 추세 보기</span></label>
-          }
-          {displayMode === 'period' && showTrend && <span className="small-note">{period === '1y' || period === 'all' ? '월별 중앙값' : '7일 구간 중앙값'} · 실제 측정 {trendSampleCount}건 · 최소 3개 구간 필요</span>}
-        </div>
+
         {displayMode === 'period' && <div className="period-picker" role="group" aria-label="추세 기간">
           {periods.map((item) => <button type="button" key={item.id} className={!custom && period === item.id ? 'period-chip selected' : 'period-chip'}
             aria-pressed={!custom && period === item.id} onClick={() => { setCustom(false); setPeriod(item.id); setSelectedId(null); }}>{item.label}</button>)}<button type="button" className={custom ? "period-chip selected" : "period-chip"} aria-pressed={custom} onClick={() => setCustom(true)}>기간 지정</button>
         </div>}
         {displayMode === "period" && custom && <div className="custom-date-range"><label>시작일<input type="date" value={from} onChange={e=>setFrom(e.target.value)} /></label><label>종료일<input type="date" min={from} value={to} onChange={e=>setTo(e.target.value)} /></label>{to && from > to && <p role="alert">종료일을 확인해 주세요.</p>}</div>}
+        {average !== null && <p className="glucose-average">평균 혈당 <strong>{average.toFixed(1)} mg/dL</strong><small>현재 그래프의 측정 {displayedSamples.length}건 · 산술평균</small></p>}
         {displayedSamples.length === 0 && <div className="trend-empty"><h3>{displayMode === 'day' ? '선택한 날짜에 혈당 기록이 없습니다' : '선택한 기간에 호환 가능한 혈당 기록이 없습니다'}</h3>
           <p>기록이 없는 구간은 빈 상태로 유지합니다. 측정값을 생성하거나 보간하지 않습니다.</p>
           {allSamples.length === 0 && <Link to="/record?event=glucose" className="text-link">실제로 측정한 값 기록하기</Link>}</div>}
         {(displayedSamples.length > 0 || (displayMode === 'day' && activeTargetRange !== null)) && <>
-            <GlucoseScatterChart samples={displayedSamples} actualSegments={actualSegments} trendSegments={displayMode === 'period' && showTrend ? derivedSegments : []}
+            <GlucoseScatterChart samples={displayedSamples} actualSegments={actualSegments} trendSegments={[]}
               timezone={pet.timezone} selectedId={selected?.id ?? null} onSelect={setSelectedId} mode={displayMode} targetRange={activeTargetRange} />
 
-            {displayMode === 'period' && showTrend && derivedSegments.length === 0 && <p className="small-note" role="status">연결 가능한 구간이 부족해 계산 추세를 표시하지 않습니다. 미측정 구간을 가로질러 추세선을 그리지 않습니다.</p>}
+
             {selected && <section className="sample-detail" aria-live="polite">
               <div className="share-selected-value"><strong>{selected.value} mg/dL</strong><span>{dateTime(selected.occurredAt, pet.timezone)} · {glucoseMeasurementConditionLabel(selected.condition)}</span></div>
               <details className="measurement-detail-extra"><summary>측정 상세 정보</summary><dl><div><dt>측정 출처</dt><dd>{selected.source ?? '미기록'}</dd></div>
@@ -231,7 +223,7 @@ export function HealthTrendsPage({ pet, userId, online, demoEvents, refreshVersi
                 {selected.note && <div><dt>메모</dt><dd>{selected.note}</dd></div>}
               </dl></details>
               <Link className="button-link" to={`/timeline?date=${encodeURIComponent(localDateKey(selected.occurredAt, pet.timezone))}`}>하루 타임머신 열기</Link>
-              <p className="small-note">이 날짜에 실제 기록된 측정 {sameDay.length}건</p>
+
             </section>}
           </>}
       </section>

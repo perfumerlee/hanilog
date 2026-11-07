@@ -29,9 +29,7 @@ describe('HealthTrendsPage', () => {
     expect(document.querySelector('.glucose-point-tooltip')).toHaveTextContent('140 mg/dL');
     expect(document.querySelectorAll('.chart-axis-label').length).toBeGreaterThan(13);
     expect(document.querySelectorAll('.derived-trend-line')).toHaveLength(0);
-    fireEvent.click(screen.getByRole('checkbox', { name: '계산 추세 보기' }));
-    expect(document.querySelectorAll('.derived-trend-line').length).toBeGreaterThan(0);
-    expect(screen.getByText(/7일 구간 중앙값 · 실제 측정 21건/)).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: '계산 추세 보기' })).not.toBeInTheDocument();
   });
 
   it('shows UNVERIFIED and no last-known chart when offline', () => {
@@ -55,7 +53,7 @@ describe('HealthTrendsPage', () => {
     expect(screen.getByRole('heading', { name: /시간대별 혈당/ })).toBeInTheDocument();
     expect(document.querySelector('.share-selected-value')).toHaveTextContent('164 mg/dL');
     expect(document.querySelector('.glucose-point-tooltip')).toHaveTextContent('164 mg/dL');
-    expect(screen.getByText('이 날짜에 실제 기록된 측정 1건')).toBeInTheDocument();
+    expect(screen.getByText('실제 측정값 : 1건')).toBeInTheDocument();
     expect(screen.queryByText(/이 날짜의 식사·인슐린 기록/)).not.toBeInTheDocument();
     const shareDisclosure = screen.getByText('주치의와 혈당 공유').closest('details');
     expect(shareDisclosure).not.toHaveAttribute('open');

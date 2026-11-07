@@ -850,3 +850,32 @@ footer { color: #77786f; }
   .panel, .timeline-card, .glance-row { transition: border-color .16s ease, background-color .16s ease; }
   .glance-row:hover { background: rgba(220, 229, 216, .22); }
 }
+
+/* Record type illustrations use consistent line art with a quiet category tint. */
+.record-illustration { display: inline-grid; flex: 0 0 auto; place-items: center; border-radius: 50%; color: var(--record-icon-color, #536b57); background: var(--record-icon-bg, #e7ece3); }
+.record-illustration svg { display: block; width: 1.45rem; height: 1.45rem; }
+.type-icon.record-illustration { width: 2.45rem; height: 2.45rem; }
+.type-icon.record-illustration svg { width: 1.65rem; height: 1.65rem; }
+.record-illustration--glucose { --record-icon-color: #247c78; --record-icon-bg: #e2f0ec; }
+.record-illustration--insulin { --record-icon-color: #6557a5; --record-icon-bg: #eeeaf8; }
+.record-illustration--elimination { --record-icon-color: #8b6b43; --record-icon-bg: #f4eddf; }
+.record-illustration--meal { --record-icon-color: #ad6f35; --record-icon-bg: #f8ecdc; }
+.record-illustration--water { --record-icon-color: #347ca1; --record-icon-bg: #e4f1f6; }
+.record-illustration--exercise { --record-icon-color: #51805e; --record-icon-bg: #e7f0e5; }
+.record-illustration--weight { --record-icon-color: #6c727d; --record-icon-bg: #eceef0; }
+.record-illustration--symptom { --record-icon-color: #a45661; --record-icon-bg: #f7e8e8; }
+.type-choice.selected .record-illustration { box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 16%, transparent); }
+.timeline-chip-icon { width: 1.35rem; height: 1.35rem; vertical-align: middle; margin-right: .2rem; }
+.timeline-chip-icon svg { width: 1rem; height: 1rem; }
+.event-icon.record-illustration { width: 30px; height: 30px; border: 3px solid var(--surface-page); }
+.event-icon.record-illustration svg { width: 1rem; height: 1rem; }
+.glance-symbol.record-illustration { width: 34px; height: 34px; border-radius: 12px; }
+.glance-symbol.record-illustration svg { width: 1.25rem; height: 1.25rem; }
+.remember-email-control { display: flex; min-height: 44px; flex-direction: row; align-items: center; gap: .55rem; color: var(--text-primary); font-size: .88rem; }
+.remember-email-control input { flex: 0 0 20px; width: 20px; height: 20px; min-height: 20px; margin: 0; accent-color: var(--green); }
+.remember-email-control span { display: flex; flex-wrap: wrap; align-items: baseline; gap: .35rem .6rem; }
+.remember-email-control small { color: var(--text-secondary); font-size: .75rem; }
+@media (max-width: 599px) {
+  .type-choice { min-height: 76px; }
+  .type-icon.record-illustration { width: 2.2rem; height: 2.2rem; }
+}

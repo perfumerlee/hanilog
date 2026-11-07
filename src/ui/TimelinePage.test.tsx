@@ -32,9 +32,8 @@ describe('TimelinePage filters', () => {
     expect(screen.getByLabelText('날짜 선택')).toHaveValue('2026-11-04');
     expect(screen.getByRole('heading', { name: '혈당' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '인슐린' })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: '식사' })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /식사/ }));
     expect(screen.getByRole('heading', { name: '식사' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /주요 기록/ }));
     expect(screen.getByLabelText('현재 필터')).toHaveTextContent('date=2026-11-04');
     expect(screen.getByLabelText('현재 필터')).toHaveTextContent('types=glucose%2Cinsulin%2Celimination%2Cmeal');
   });

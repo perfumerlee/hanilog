@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { QuickRecordPage } from './App';
 
@@ -20,6 +20,7 @@ describe('QuickRecordPage', () => {
     render(<QuickRecordPage {...props} />);
     expect(screen.getByRole('group', { name: '무엇을 기록할까요?' })).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: /혈당/ })).toBeInTheDocument();
+    expect(within(screen.getByRole('group', { name: '무엇을 기록할까요?' })).getByRole('radio', { name: /식사/ })).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: /배변·배뇨/ })).toBeInTheDocument();
   });
 

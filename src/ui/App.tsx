@@ -74,9 +74,24 @@ const eventOptions: { type: EventType; label: string; icon: string; short: strin
   { type: 'weight', label: '체중', icon: '◌', short: '측정값과 단위' },
   { type: 'symptom', label: '증상·컨디션', icon: '♡', short: '관찰한 상태' },
 ];
-const coreTimelineTypes: EventType[] = ['glucose', 'insulin', 'elimination'];
+const primaryRecordTypes: EventType[] = ['glucose', 'insulin', 'elimination', 'meal'];
+const coreTimelineTypes: EventType[] = primaryRecordTypes;
+const rememberedLoginEmailKey = 'hanilog:remembered-login-email';
 const commonInsulinProductLabels = ['캐니슐린', '프로진크', 'NPH', '글라진', '디터미르'];
 const eventLabels = Object.fromEntries(eventOptions.map((option) => [option.type, option.label])) as Record<EventType, string>;
+function RecordTypeIllustration({ type, className = '' }: { type: EventType; className?: string }) {
+  const common = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+  return <span className={`record-illustration record-illustration--${type} ${className}`} aria-hidden="true"><svg viewBox="0 0 32 32" focusable="false">
+    {type === 'glucose' && <><path {...common} d="M16 4c-3.6 5.1-8 9.5-8 15a8 8 0 0 0 16 0c0-5.5-4.4-9.9-8-15Z"/><path {...common} d="M12 20a4 4 0 0 0 4 4"/></>}
+    {type === 'insulin' && <><path {...common} d="m7 24 13-13 5 5-13 13H7z"/><path {...common} d="m17 14 5 5M5 27l4 4M20 7l5-5M24 11l5-5M8 23l4 4"/></>}
+    {type === 'meal' && <><path {...common} d="M5 17h22a11 11 0 0 1-22 0Z"/><path {...common} d="M8 13h16M10 6v5M7.5 6v5M12.5 6v5M25 6v9"/></>}
+    {type === 'elimination' && <><path {...common} d="M10 7c-2 0-3 2-3 4v4a9 9 0 0 0 18 0v-4c0-2-1-4-3-4-2 0-2 2-4 2s-2-2-4-2Z"/><circle cx="10" cy="5" r="1.5" fill="currentColor"/><circle cx="15" cy="3.5" r="1.5" fill="currentColor"/><circle cx="20" cy="3.5" r="1.5" fill="currentColor"/><circle cx="25" cy="5" r="1.5" fill="currentColor"/></>}
+    {type === 'water' && <><path {...common} d="M12 5c-2.6 3.5-5 6.2-5 9a5 5 0 0 0 10 0c0-2.8-2.4-5.5-5-9Z"/><path {...common} d="M23 15c-1.8 2.4-3 4-3 6a4 4 0 0 0 8 0c0-2-1.2-3.6-3-6Z"/></>}
+    {type === 'exercise' && <><path {...common} d="M6 21c5-1 7-5 9-12l4-3 3 5c1 2 2 4 5 5v5H6Z"/><path {...common} d="M9 24h18"/></>}
+    {type === 'weight' && <><rect {...common} x="6" y="5" width="20" height="23" rx="4"/><path {...common} d="M12 12a4 4 0 0 1 8 0l-4 3-4-3Z"/></>}
+    {type === 'symptom' && <path {...common} d="M16 27 5.5 17A7 7 0 0 1 16 7.7 7 7 0 0 1 26.5 17L16 27ZM7 16h5l2-4 4 9 2-5h5"/>}
+  </svg></span>;
+}
 const localDateTimeNow = () => {
   const now = new Date();
   return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
@@ -378,7 +393,12 @@ function DemoNotificationsPage() {
 
 function Login({ initialMessage = '' }: { initialMessage?: string }) {
   const stagingMode = import.meta.env.MODE === 'staging';
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(() => {
+    try { return window.localStorage.getItem(rememberedLoginEmailKey) ?? ''; } catch { return ''; }
+  });
+  const [rememberEmail, setRememberEmail] = useState(() => {
+    try { return window.localStorage.getItem(rememberedLoginEmailKey) !== null; } catch { return false; }
+  });
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState(initialMessage);
   const [busy, setBusy] = useState(false);
@@ -387,6 +407,12 @@ function Login({ initialMessage = '' }: { initialMessage?: string }) {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!supabase) return;
+    if (!creatingAccount) {
+      try {
+        if (rememberEmail && email.trim()) window.localStorage.setItem(rememberedLoginEmailKey, email.trim());
+        else window.localStorage.removeItem(rememberedLoginEmailKey);
+      } catch { /* Storage may be unavailable; authentication should still proceed. */ }
+    }
     setBusy(true);
     setMessage('');
     try {
@@ -455,6 +481,14 @@ function Login({ initialMessage = '' }: { initialMessage?: string }) {
       <p>이메일과 비밀번호로 로그인하세요.</p>
       <form className="stack" onSubmit={(event) => void submit(event)}>
         <label>이메일<input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></label>
+        <label className="remember-email-control"><input type="checkbox" checked={rememberEmail} onChange={(event) => {
+          const checked = event.target.checked;
+          setRememberEmail(checked);
+          try {
+            if (checked && email.trim()) window.localStorage.setItem(rememberedLoginEmailKey, email.trim());
+            else if (!checked) window.localStorage.removeItem(rememberedLoginEmailKey);
+          } catch { /* Optional convenience only. */ }
+        }} /> <span>이메일 기억하기 <small>이 기기에만 저장돼요. 비밀번호는 저장하지 않습니다.</small></span></label>
         <label>비밀번호<input type="password" autoComplete={creatingAccount ? 'new-password' : 'current-password'} required value={password} onChange={(event) => setPassword(event.target.value)} /></label>
         <button disabled={busy}>{busy ? '확인 중…' : creatingAccount ? '계정 만들기' : '로그인'}</button>
         {!stagingMode && import.meta.env.MODE !== 'production' && <button type="button" className="secondary-action" onClick={() => { setCreatingAccount((current) => !current); setMessage(''); }}>
@@ -527,14 +561,14 @@ function Workspace({ userId, online }: { userId: string; online: boolean }) {
   const [loadedPetId, setLoadedPetId] = useState('');
   const [events, setEvents] = useState<HealthEvent[]>([]);
   const [revisions, setRevisions] = useState<EventRevision[]>([]);
-  const [syncAt, setSyncAt] = useState<string | null>(null);
+  const [, setSyncAt] = useState<string | null>(null);
   const [healthRefreshVersion, setHealthRefreshVersion] = useState(0);
   const [loadingPets, setLoadingPets] = useState(true);
   const [loadingEvents, setLoadingEvents] = useState(false);
   const [accessMessage, setAccessMessage] = useState('');
   const [dataMessage, setDataMessage] = useState('');
   const [recordNotice, setRecordNotice] = useState<{ kind: 'success' | 'error' | 'unverified'; text: string } | null>(null);
-  const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
+  const [, setRealtimeStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
   const [householdName, setHouseholdName] = useState(() => readOnboardingDraft(userId).householdName);
   const [petName, setPetName] = useState(() => readOnboardingDraft(userId).petName);
   const [petTimezone, setPetTimezone] = useState(() => readOnboardingDraft(userId).petTimezone);
@@ -980,11 +1014,7 @@ function Workspace({ userId, online }: { userId: string; online: boolean }) {
       {!online && recordNotice?.kind !== 'unverified' && <div role="status" className="notice notice-warning">
         서버 최신 상태 확인 불가 · 과거 기록이 현재 상태를 보증하지 않습니다.
       </div>}
-      {selectedPet && <p className="sync-caption" aria-live="polite">
-        {syncAt ? `마지막 서버 확인 · ${dateTimeInTimezone(syncAt, selectedPet.timezone)}` : '서버 확인 시각 없음'}
-        {' · '}생활 지역 시간대 {formatTimezoneLabel(selectedPet.timezone)}
-        {' · '}실시간 {realtimeStatus === 'connected' ? '연결됨' : realtimeStatus === 'connecting' ? '연결 확인 중' : '연결 끊김 · 서버 재조회 필요'}
-      </p>}
+
       <Routes>
         <Route path="/invite" element={<InvitationAcceptPage />} />
         <Route path="/" element={selectedPet && !loadingPets && location.search !== '?profile=1' ? <Navigate to="/record" replace /> : <DashboardPage profileOnly={location.search === '?profile=1'}
@@ -1034,7 +1064,7 @@ function DataLoadingPage({ title }: { title: string }) {
 function SessionNavigation({ pathname, search }: { pathname: string; search: string }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const desktopItems = [
-    { to: '/trends', label: '혈당기록', icon: '⌁' },
+    { to: '/trends', label: '혈당 기록', icon: '⌁' },
     { to: '/timeline', label: '하루 타임머신', icon: '◷' },
     { to: '/record', label: '빠른 기록', icon: '+' },
     { to: '/?profile=1', label: '반려동물 설정', icon: '🐾' },
@@ -1048,7 +1078,7 @@ function SessionNavigation({ pathname, search }: { pathname: string; search: str
     { to: '/notifications', label: '알림 및 전달 설정', icon: '♧' },
   ];
   const primaryItems = [
-    { to: '/trends', label: '혈당기록', icon: '⌁' },
+    { to: '/trends', label: '혈당 기록', icon: '⌁' },
     { to: '/record', label: '빠른 기록', icon: '+' },
   ];
   useEffect(() => {
@@ -1299,7 +1329,7 @@ function GlanceRow({ title, event, pet, revisions, userId }: {
   const value = typeof event.value.observed_value === 'number' || typeof event.value.observed_value === 'string'
     ? event.event_type === 'glucose' ? formatGlucoseValue(event.value.observed_value, event.unit) : `${event.value.observed_value}${event.unit ? ` ${event.unit}` : ''}`
     : typeof event.value.meal_status === 'string' ? mealStatusLabel(event.value.meal_status) : '상세 기록 보기';
-  return <div className="glance-row"><span className="glance-symbol" aria-hidden="true">{eventOptions.find((item) => item.type === event.event_type)?.icon}</span>
+  return <div className="glance-row"><RecordTypeIllustration type={event.event_type} className="glance-symbol" />
     <div><strong>{title} · {value}</strong><small>{dateTimeInTimezone(event.occurred_at, pet.timezone)} · {actorLabel(event.actor_id, userId)}
       {revision?.revision_kind === 'VOID' ? ' · 무효 처리' : revision ? ' · 정정 이력 있음' : ''}</small></div></div>;
 }
@@ -1346,7 +1376,7 @@ export function QuickRecordPage(props: {
   const [showAllRecordTypes, setShowAllRecordTypes] = useState(false);
   const visibleEventOptions = showAllRecordTypes
     ? eventOptions
-    : eventOptions.filter((option, index) => index < 3 || option.type === eventType);
+    : eventOptions.filter((option) => primaryRecordTypes.includes(option.type) || option.type === eventType);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
   const [activityMessage, setActivityMessage] = useState('');
@@ -1365,8 +1395,7 @@ export function QuickRecordPage(props: {
     setMeasurementCondition(draft?.measurementCondition ?? ''); setDoseAmount(draft?.doseAmount ?? '');
     setInsulinProductLabel(draft?.insulinProductLabel ?? '');
     setFormError('');
-    if (['meal', 'water', 'weight', 'symptom', 'exercise'].includes(next)) setShowAllRecordTypes(true);
-    else setShowAllRecordTypes(false);
+    setShowAllRecordTypes(!primaryRecordTypes.includes(next));
     setEventType(next);
   }
 
@@ -1488,7 +1517,7 @@ export function QuickRecordPage(props: {
           <label className={eventType === option.type ? 'type-choice selected' : 'type-choice'} key={option.type}>
             <input type="radio" name="event-type" value={option.type} checked={eventType === option.type}
               disabled={saving} onChange={() => selectRecordType(option.type)} />
-            <span className="type-icon" aria-hidden="true">{option.icon}</span>
+            <RecordTypeIllustration type={option.type} className="type-icon" />
             <span className="type-label">{option.label}</span>
           </label>)}</div>
         <button type="button" className="record-more-types" aria-expanded={showAllRecordTypes}
@@ -1663,7 +1692,7 @@ export function TimelinePage(props: {
             if (currentTypes.has(option.type)) currentTypes.delete(option.type); else currentTypes.add(option.type);
             next.set('types', eventOptions.filter((item) => currentTypes.has(item.type)).map((item) => item.type).join(','));
             return next;
-          })}>{option.icon} {option.label}</button>)}
+          })}><RecordTypeIllustration type={option.type} className="timeline-chip-icon" /> {option.label}</button>)}
       </div>
       <small>{filteredEvents.length} / {dailyEvents.length}개 기록 표시</small>
     </section>
@@ -1678,10 +1707,9 @@ export function TimelinePage(props: {
       const itemRevisions = revisions.filter((revision) => revision.event_id === event.id).sort((a, b) => a.revision_no - b.revision_no);
       const latest = itemRevisions[itemRevisions.length - 1];
       const effectiveValue = effectiveEventValue(event.value, itemRevisions);
-      const icon = eventOptions.find((option) => option.type === event.event_type)?.icon ?? '•';
       return <li className="timeline-item" key={event.id}>
         <time className="timeline-time" dateTime={event.occurred_at}>{timeInTimezone(event.occurred_at, pet.timezone)}</time>
-        <span className="event-icon" aria-hidden="true">{icon}</span>
+        <RecordTypeIllustration type={event.event_type} className="event-icon" />
         <article className="timeline-card">
           <div className="timeline-card-heading"><h2>{eventLabels[event.event_type] ?? event.event_type}</h2>
             {latest && <span className={latest.revision_kind === 'VOID' ? 'event-status void' : 'event-status corrected'}>
