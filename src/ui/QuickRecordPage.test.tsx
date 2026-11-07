@@ -47,6 +47,15 @@ describe('QuickRecordPage', () => {
     expect(props.onSubmit).not.toHaveBeenCalled();
   });
 
+  it('defaults meal amounts to grams and keeps the food note visible', () => {
+    render(<QuickRecordPage {...props} />);
+    fireEvent.click(screen.getByRole('radio', { name: '식사' }));
+    expect(screen.getByLabelText('섭취량 단위')).toHaveValue('g');
+    expect(screen.getByRole('textbox', { name: /섭취 내용 \(선택\)/ })).toBeVisible();
+    expect(screen.getByLabelText('실제 발생 시각')).toBeVisible();
+    expect(screen.queryByText(/기록 시각/)).not.toBeInTheDocument();
+  });
+
   it('submits insulin amount and product without marking the user as performer', async () => {
     const onSubmit = vi.fn().mockResolvedValue(false);
     render(<QuickRecordPage {...props} onSubmit={onSubmit} />);
@@ -103,8 +112,7 @@ it('preserves type-specific drafts without submitting when choices change', asyn
 it('updates the selected date without fabricating a different occurrence time', () => {
   render(<QuickRecordPage {...props} />);
   fireEvent.change(screen.getByLabelText('실제 발생 시각'), { target: { value: '2026-10-20T14:35' } });
-  fireEvent.change(screen.getByLabelText('기록 날짜'), { target: { value: '2026-10-18' } });
-  expect(screen.getByLabelText('실제 발생 시각')).toHaveValue('2026-10-18T14:35');
+  expect(screen.getByLabelText('실제 발생 시각')).toHaveValue('2026-10-20T14:35');
 });
 
 it('keeps the prescribed insulin product after switching record types', () => {

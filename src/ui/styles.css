@@ -879,3 +879,55 @@ footer { color: #77786f; }
   .type-choice { min-height: 76px; }
   .type-icon.record-illustration { width: 2.2rem; height: 2.2rem; }
 }
+
+/* Fresh, clearer palette: cool paper surfaces with a confident teal action color. */
+:root {
+  --ink: #263b3b;
+  --muted: #617472;
+  --green: #28786e;
+  --green-dark: #1e5e56;
+  --mint: #dceee8;
+  --line: #dce7e2;
+  --paper: #ffffff;
+  --surface-page: #f4f7f5;
+  --surface-soft: #eaf2ef;
+  --surface-raised: #ffffff;
+  --text-primary: #263b3b;
+  --text-secondary: #617472;
+  --color-interactive: #28786e;
+  --color-focus: #65a895;
+  --color-success: #28765a;
+  --shadow-soft: 0 5px 18px rgba(35, 76, 67, .055);
+}
+form, fieldset, label, .field-label { min-width: 0; }
+label > input:not([type="radio"]):not([type="checkbox"]), label > select, label > textarea,
+.field-label > input:not([type="radio"]):not([type="checkbox"]), .field-label > select, .field-label > textarea {
+  width: 100%; min-width: 0; max-width: 100%;
+}
+button:hover:not(:disabled), .nav-record:hover:not(:disabled) { background: #22685f; }
+.environment-badge { border-color: #c5ded5; background: #e6f2ed; color: #245f55; }
+.record-page .event-type-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.record-page .type-choice { min-width: 0; }
+.record-page .type-choice.selected { border-color: #398a77; background: #e3f1eb; color: #1e5e56; }
+.record-illustration--glucose { --record-icon-color: #c83d4d; --record-icon-bg: #fdebed; }
+.record-illustration--insulin { --record-icon-color: #6556a4; --record-icon-bg: #efecfa; }
+.record-illustration--elimination { --record-icon-color: #80502e; --record-icon-bg: #f4e9dd; }
+.record-illustration--meal { --record-icon-color: #a56a24; --record-icon-bg: #fbf0dc; }
+.actual-occurrence-field { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: .6rem; padding: .7rem .8rem; border: 1px solid var(--line); border-radius: 14px; background: #edf4f1; }
+.actual-occurrence-field .field-label { min-width: 0; }
+.actual-time-action { white-space: nowrap; }
+.record-page .field-label, .record-page .form-grid > *, .record-page .actual-occurrence-field,
+.record-page .actual-occurrence-field input:not([type="radio"]):not([type="checkbox"]),
+.record-page input:not([type="radio"]):not([type="checkbox"]), .record-page select, .record-page textarea {
+  min-width: 0;
+  max-width: 100%;
+}
+.record-page input:not([type="radio"]):not([type="checkbox"]), .record-page select, .record-page textarea { width: 100%; }
+.record-page .event-type-grid .type-label { overflow-wrap: anywhere; }
+@media (max-width: 599px) {
+  .record-page .event-type-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .4rem; }
+  .record-page .type-choice { padding-inline: .1rem; }
+  .record-page .type-label { font-size: clamp(.62rem, 2.8vw, .76rem); }
+  .actual-occurrence-field { grid-template-columns: minmax(0, 1fr); gap: .2rem; padding: .65rem; }
+  .actual-time-action { justify-self: start; }
+}

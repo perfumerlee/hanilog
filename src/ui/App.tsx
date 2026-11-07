@@ -21,7 +21,7 @@ import { GlucoseSharePage } from './GlucoseSharePage';
 import { effectiveGlucoseValue } from '../lib/health-trends';
 import { authCallbackPurpose, authFailureMessage, authLinkErrorMessage, authRedirectTo, type AuthCallbackPurpose } from '../lib/auth-redirect';
 import { detectBrowserTimezone, formatTimezoneLabel, timezoneOptionsFor } from '../lib/timezone';
-import { RecordChoices, RecordDateStrip } from './RecordControls';
+import { RecordChoices } from './RecordControls';
 import { PetProfileEditor } from './PetProfileEditor';
 import { PetProfilePortrait } from './PetProfilePortrait';
 import { persistPetProfile } from '../lib/pet-profile-persistence';
@@ -83,9 +83,9 @@ function RecordTypeIllustration({ type, className = '' }: { type: EventType; cla
   const common = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
   return <span className={`record-illustration record-illustration--${type} ${className}`} aria-hidden="true"><svg viewBox="0 0 32 32" focusable="false">
     {type === 'glucose' && <><path {...common} d="M16 4c-3.6 5.1-8 9.5-8 15a8 8 0 0 0 16 0c0-5.5-4.4-9.9-8-15Z"/><path {...common} d="M12 20a4 4 0 0 0 4 4"/></>}
-    {type === 'insulin' && <><path {...common} d="m7 24 13-13 5 5-13 13H7z"/><path {...common} d="m17 14 5 5M5 27l4 4M20 7l5-5M24 11l5-5M8 23l4 4"/></>}
-    {type === 'meal' && <><path {...common} d="M5 17h22a11 11 0 0 1-22 0Z"/><path {...common} d="M8 13h16M10 6v5M7.5 6v5M12.5 6v5M25 6v9"/></>}
-    {type === 'elimination' && <><path {...common} d="M10 7c-2 0-3 2-3 4v4a9 9 0 0 0 18 0v-4c0-2-1-4-3-4-2 0-2 2-4 2s-2-2-4-2Z"/><circle cx="10" cy="5" r="1.5" fill="currentColor"/><circle cx="15" cy="3.5" r="1.5" fill="currentColor"/><circle cx="20" cy="3.5" r="1.5" fill="currentColor"/><circle cx="25" cy="5" r="1.5" fill="currentColor"/></>}
+    {type === 'insulin' && <><path {...common} d="m9 23 11-11 5 5-11 11H9z"/><path {...common} d="m18 14 5 5M6 26l3 3M20 8l4-4 4 4M23 4v-2M25 20l4 4M7 23l5 5M12 20l5 5M9 13l-3-3M7 15l-3-3"/></>}
+    {type === 'meal' && <><path {...common} d="M6 16c-2.5 0-4 1.8-4 4s1.5 4 4 4h20c2.5 0 4-1.8 4-4s-1.5-4-4-4H6Z"/><path {...common} d="M6 16v8M26 16v8M10 16v8M22 16v8"/></>}
+    {type === 'elimination' && <><path {...common} d="M8 23c-2-1-3-3-3-5 0-3 2-5 5-5 0-4 3-7 7-7 4 0 7 3 7 7 3 0 5 2 5 5 0 3-2 5-5 5H8Z"/><path {...common} d="M12 18c0-2 2-3 4-3 0-2 1-3 3-3 2 0 3 1 3 3"/></>}
     {type === 'water' && <><path {...common} d="M12 5c-2.6 3.5-5 6.2-5 9a5 5 0 0 0 10 0c0-2.8-2.4-5.5-5-9Z"/><path {...common} d="M23 15c-1.8 2.4-3 4-3 6a4 4 0 0 0 8 0c0-2-1.2-3.6-3-6Z"/></>}
     {type === 'exercise' && <><path {...common} d="M6 21c5-1 7-5 9-12l4-3 3 5c1 2 2 4 5 5v5H6Z"/><path {...common} d="M9 24h18"/></>}
     {type === 'weight' && <><rect {...common} x="6" y="5" width="20" height="23" rx="4"/><path {...common} d="M12 12a4 4 0 0 1 8 0l-4 3-4-3Z"/></>}
@@ -1361,7 +1361,7 @@ export function QuickRecordPage(props: {
     return () => window.clearInterval(timer);
   }, []);
   const [numericValue, setNumericValue] = useState('');
-  const [unit, setUnit] = useState('');
+  const [unit, setUnit] = useState(initialEventType === 'meal' ? 'g' : '');
   const [note, setNote] = useState('');
   const [mealStatus, setMealStatus] = useState('');
   const [eliminationType, setEliminationType] = useState('');
@@ -1389,7 +1389,7 @@ export function QuickRecordPage(props: {
     drafts.current[eventType] = { numericValue, unit, note, mealStatus, eliminationType, description,
       measurementSource, measurementCondition, doseAmount, insulinProductLabel };
     const draft = drafts.current[next];
-    setNumericValue(draft?.numericValue ?? ''); setUnit(draft?.unit ?? ''); setNote(draft?.note ?? '');
+    setNumericValue(draft?.numericValue ?? ''); setUnit(draft?.unit ?? (next === 'meal' ? 'g' : '')); setNote(draft?.note ?? '');
     setMealStatus(draft?.mealStatus ?? ''); setEliminationType(draft?.eliminationType ?? '');
     setDescription(draft?.description ?? ''); setMeasurementSource(draft?.measurementSource ?? '');
     setMeasurementCondition(draft?.measurementCondition ?? ''); setDoseAmount(draft?.doseAmount ?? '');
@@ -1485,7 +1485,7 @@ export function QuickRecordPage(props: {
     setSaving(false);
     if (saved) {
       setNumericValue('');
-      setUnit('');
+      setUnit(eventType === 'meal' ? 'g' : '');
       setNote('');
       setDescription('');
       setMeasurementSource('');
@@ -1500,7 +1500,6 @@ export function QuickRecordPage(props: {
   return <main className="page-container record-page">
     <section className="page-heading"><p className="eyebrow">빠른 기록</p><h1>{pet.name}의 하루를 남겨요</h1>
       <p>관찰한 일을 골라 기록하세요. 선택만으로 저장되지는 않아요.</p></section>
-    <div className="record-current-time" role="status">지금 {currentLocal.replace('T', ' ')} · 기록 시각 {occurredLocal.replace('T', ' ')} <button type="button" className="text-button" onClick={() => { manuallyChosenTime.current = false; setOccurredLocal(localDateTimeNow()); }}>지금 시각 사용</button></div>
     {props.demoOnly && <div className="notice notice-warning" role="status">DEMO · 제출한 내용은 이 탭의 메모리에만 표시되며 서버에 저장되지 않습니다.</div>}
     {activityMessage && <p className="activity-message" role="status">{activityMessage}</p>}
     {activeExercise && <section className="activity-session-bar" aria-label="진행 중인 운동 및 산책 기록">
@@ -1523,6 +1522,17 @@ export function QuickRecordPage(props: {
         <button type="button" className="record-more-types" aria-expanded={showAllRecordTypes}
           onClick={() => setShowAllRecordTypes((current) => !current)}>{showAllRecordTypes ? '다른 기록 종류 접기' : '다른 기록 종류 보기'}</button>
       </fieldset>
+      {eventType !== 'exercise' && <div className="actual-occurrence-field">
+        <label className="field-label">실제 발생 시각
+          <input aria-label="실제 발생 시각" type="datetime-local" required value={occurredLocal}
+            onChange={(event) => { manuallyChosenTime.current = true; setOccurredLocal(event.target.value); }} />
+          <small>기기 현재 시각 {currentLocal.replace('T', ' ')} · 기기 시간대 기준</small>
+        </label>
+        <button type="button" className="text-button actual-time-action" onClick={() => {
+          manuallyChosenTime.current = false;
+          setOccurredLocal(localDateTimeNow());
+        }}>현재 시각 적용</button>
+      </div>}
 
       <section className={eventType === 'insulin' ? 'insulin-record-section' : 'event-fields'}>
         {eventType === 'insulin' && <div className="insulin-header">
@@ -1545,7 +1555,10 @@ export function QuickRecordPage(props: {
             <RecordChoices label="관찰한 식사 상태" value={mealStatus} onChange={setMealStatus}
               options={[{ value: 'ATE', label: '섭취 확인' }, { value: 'PARTIAL', label: '일부 섭취' }, { value: 'REFUSED', label: '식사 거부' }]} />
             <label className="field-label">실제 섭취량 (선택)<input type="number" inputMode="decimal" step="any" value={numericValue} onChange={(event) => setNumericValue(event.target.value)} /></label>
-            <label className="field-label">섭취량 단위 (선택)<input value={unit} onChange={(event) => setUnit(event.target.value)} placeholder="보호자가 확인한 단위" /></label>
+            <label className="field-label">섭취량 단위<input value={unit} onChange={(event) => setUnit(event.target.value)} placeholder="g" /></label>
+            <label className="field-label full-field">섭취 내용 (선택)<textarea rows={3} maxLength={1000} value={note}
+              onChange={(event) => setNote(event.target.value)} placeholder="먹은 음식이나 평소와 다른 점을 적어 주세요" />
+              <small>{note.length}/1000</small></label>
           </>}
           {eventType === 'water' && <>
             <label className="field-label">관찰한 음수량 (선택)<input type="number" inputMode="decimal" step="any" value={numericValue} onChange={(event) => setNumericValue(event.target.value)} /></label>
@@ -1619,14 +1632,9 @@ export function QuickRecordPage(props: {
           </label></>}
           <details className="record-details full-field" key={eventType}>
             <summary>상세 입력 · 시각과 메모</summary><div className="form-grid">
-          {eventType !== 'exercise' && <RecordDateStrip value={occurredLocal} onChange={(value) => { manuallyChosenTime.current = true; setOccurredLocal(value); }} />}
-          {eventType !== 'exercise' && <label className="field-label">실제 발생 시각
-            <input aria-label="실제 발생 시각" type="datetime-local" required value={occurredLocal} onChange={(event) => { manuallyChosenTime.current = true; setOccurredLocal(event.target.value); }} />
-            <small>기기 시간대 기준 · 서버에는 UTC로 저장</small>
-          </label>}
             {eventType === 'glucose' && <>            <label className="field-label">측정 출처 (선택)<input maxLength={120} value={measurementSource} onChange={(event) => setMeasurementSource(event.target.value)} placeholder="예: 혈당계, 병원 검사" /></label>
 </>}
-            {eventType !== 'symptom' && <>          <label className="field-label full-field">메모 (선택)
+            {eventType !== 'symptom' && eventType !== 'meal' && <>          <label className="field-label full-field">메모 (선택)
             <textarea rows={3} maxLength={1000} value={note} onChange={(event) => setNote(event.target.value)}
               placeholder={eventType === 'insulin' ? '필요한 경우 실제 발생 상황을 적어 주세요' : '관찰하거나 수행한 내용을 기록하세요'} />
             <small>{note.length}/1000</small>
