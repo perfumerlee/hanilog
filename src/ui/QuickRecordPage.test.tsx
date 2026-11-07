@@ -50,7 +50,9 @@ describe('QuickRecordPage', () => {
   it('defaults meal amounts to grams and keeps the food note visible', () => {
     render(<QuickRecordPage {...props} />);
     fireEvent.click(screen.getByRole('radio', { name: '식사' }));
-    expect(screen.getByLabelText('섭취량 단위')).toHaveValue('g');
+    expect(screen.getByText('섭취량 단위')).toBeInTheDocument();
+    expect(screen.getByText('g')).toBeInTheDocument();
+    expect(screen.queryByLabelText('섭취량 단위')).not.toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: /섭취 내용 \(선택\)/ })).toBeVisible();
     expect(screen.getByLabelText('실제 발생 시각')).toBeVisible();
     expect(screen.queryByText(/기록 시각/)).not.toBeInTheDocument();
