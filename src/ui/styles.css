@@ -896,8 +896,9 @@ footer { color: #77786f; }
   .daily-graph-date {
     width: 100%;
     min-width: 0;
-    grid-template-columns: 44px minmax(0, 1fr) 44px;
-    gap: .35rem;
+    grid-template-columns: 44px minmax(0, 210px) 44px;
+    justify-content: center;
+    gap: .4rem;
   }
   .daily-graph-date > .field-label,
   .public-glucose-share .day-navigation > .field-label {
@@ -930,7 +931,30 @@ footer { color: #77786f; }
   .public-glucose-share .day-navigation input[type="date"]::-webkit-calendar-picker-indicator {
     margin: 0;
   }
+  .daily-graph-date > button,
+  .public-glucose-share .day-navigation > button {
+    width: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    padding-inline: .2rem;
+    white-space: nowrap;
+    writing-mode: horizontal-tb;
+  }
 }
+
+/* Keep the header logout action visibly quiet instead of inheriting the filled
+   primary button hover/pressed color. */
+.topbar .quiet-button,
+.topbar .quiet-button:hover:not(:disabled),
+.topbar .quiet-button:active,
+.topbar .quiet-button:focus-visible {
+  background: transparent;
+  color: var(--text-secondary);
+  box-shadow: none;
+}
+.topbar .quiet-button:hover:not(:disabled) { background: var(--surface-soft); color: var(--green-dark); }
+.topbar .quiet-button:active { background: #dce9e2; color: #174f46; }
+.topbar .quiet-button:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
 
 /* Fresh, clearer palette: cool paper surfaces with a confident teal action color. */
 :root {
