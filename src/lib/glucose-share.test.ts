@@ -3,6 +3,10 @@ import { callGlucoseShare, normalizeGuardianPhone } from './glucose-share';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 const clientWithError = (status: number, errorCode?: string) => ({
+  auth: {
+    getSession: vi.fn().mockResolvedValue({ data: { session: { access_token: 'synthetic-test-token', expires_at: 4_102_444_800 } }, error: null }),
+    refreshSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
+  },
   functions: { invoke: vi.fn().mockResolvedValue({
     data: null,
     error: { context: new Response(JSON.stringify(errorCode ? { error: errorCode } : { message: 'unavailable' }), { status }) },

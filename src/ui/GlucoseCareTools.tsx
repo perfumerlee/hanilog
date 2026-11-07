@@ -97,6 +97,7 @@ export function GlucoseCareTools({ petId, petName, timezone, canEdit, demo = fal
     } catch (error) {
       const code = error instanceof GlucoseShareRequestError ? error.code : error instanceof Error ? error.message : '';
       setMessage(code === 'ACCESS_DENIED' ? '이 반려동물의 공유 링크를 만들 권한이 없습니다.'
+        : code === 'UNAUTHENTICATED' ? '로그인 인증이 만료되었습니다. 다시 로그인한 뒤 공유 링크를 만들어 주세요.'
         : code === 'SHARE_FUNCTION_NOT_DEPLOYED' ? '공유 기능 서버가 아직 운영 환경에 적용되지 않았습니다. 서버 배포가 필요합니다.'
           : code === 'SHARE_SCHEMA_UNAVAILABLE' ? '공유 기능의 데이터베이스 설정이 아직 운영 환경에 적용되지 않았습니다.'
             : code === 'SHARE_SERVICE_UNAVAILABLE' ? '공유 서버가 일시적으로 응답하지 않습니다. 잠시 후 다시 시도해 주세요.'

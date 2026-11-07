@@ -56,7 +56,40 @@ export function normalizeGuardianPhone(value: string): string | null {
 }
 
 export async function callGlucoseShare<T>(client: SupabaseClient, body: Record<string, unknown>): Promise<T> {
-  const { data, error } = await client.functions.invoke('glucose-share', { body });
+  const isPublicAction = body.action === 'resolve' || body.action === 'photo';
+  let headers: Record<string, string> | undefined;
+  if (!isPublicAction) {
+    // Resolve the current session explicitly. Functions.invoke normally adds the
+    // stored token, but a stale page can otherwise send an expired/missing bearer.
+    let { data: sessionData, error: sessionError } = await client.auth.getSession();
+    if (sessionError || !sessionData.session) {
+      const refreshed = await client.auth.refreshSession();
+      sessionData = refreshed.data;
+      sessionError = refreshed.error;
+    } else if (sessionData.session.expires_at && sessionData.session.expires_at * 1000 <= Date.now() + 30_000) {
+      const refreshed = await client.auth.refreshSession();
+      sessionData = refreshed.data;
+      sessionError = refreshed.error;
+    }
+    const accessToken = sessionData.session?.access_token;
+    if (sessionError || !accessToken) throw new GlucoseShareRequestError('UNAUTHENTICATED', 401);
+    headers = { Authorization: `Bearer ${accessToken}` };
+  }
+
+  let result = await client.functions.invoke('glucose-share', { body, headers });
+  if (!isPublicAction && result.error && result.error.context instanceof Response && result.error.context.status === 401) {
+    // A long-lived app tab may hold a revoked/stale token even when the local
+    // session still looks present. Refresh once, then retry the same operation.
+    const refreshed = await client.auth.refreshSession();
+    const refreshedToken = refreshed.data.session?.access_token;
+    if (!refreshed.error && refreshedToken) {
+      result = await client.functions.invoke('glucose-share', {
+        body,
+        headers: { Authorization: `Bearer ${refreshedToken}` },
+      });
+    }
+  }
+  const { data, error } = result;
   if (error) {
     const context = error.context;
     const status = context instanceof Response ? context.status : undefined;

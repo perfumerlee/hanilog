@@ -687,6 +687,14 @@ button, a, input, select, textarea, summary { scroll-margin: 1rem; }
 .record-page .type-icon { font-size: 1.45rem; }
 .record-more-types { display: block; min-height: 44px; margin: .35rem auto 0; padding-inline: .8rem; color: var(--green-dark); background: transparent; font-weight: 700; }
 .record-more-types:hover { background: #e8f1e7; }
+.record-page button.record-more-types,
+.record-page button.record-more-types:hover:not(:disabled),
+.record-page button.record-more-types:active,
+.record-page button.record-more-types:focus-visible {
+  color: var(--green-dark);
+  background: #e8f1e7;
+}
+.record-page button.record-more-types[aria-expanded="true"] { background: #dce9dc; }
 .insulin-extra-details { grid-column: 1 / -1; }
 .insulin-product-field { grid-column: 1 / -1; }
 .insulin-default-save { display: block; min-height: 44px; margin-top: .45rem; padding: .55rem .8rem; border: 1px solid var(--line); border-radius: 12px; color: var(--green-dark); background: #edf4eb; font-weight: 700; }
@@ -924,8 +932,26 @@ button:hover:not(:disabled), .nav-record:hover:not(:disabled) { background: #226
 .record-page input:not([type="radio"]):not([type="checkbox"]), .record-page select, .record-page textarea {
   min-width: 0;
   max-width: 100%;
+  box-sizing: border-box;
 }
-.record-page input:not([type="radio"]):not([type="checkbox"]), .record-page select, .record-page textarea { width: 100%; }
+.record-page .event-fields, .record-page .form-grid, .record-page .field-label,
+.record-page .actual-occurrence-field { min-width: 0; }
+.record-page .form-grid > *,
+.record-page .field-label,
+.record-page .actual-occurrence-field > * { min-width: 0; }
+.record-page input:not([type="radio"]):not([type="checkbox"]), .record-page select, .record-page textarea {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.record-page input[type="date"], .record-page input[type="datetime-local"], .record-page input[type="time"] {
+  -webkit-appearance: none;
+  appearance: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .record-page .event-type-grid .type-label { overflow-wrap: anywhere; }
 @media (max-width: 599px) {
   .record-page .event-type-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .4rem; }
