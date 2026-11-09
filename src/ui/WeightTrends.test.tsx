@@ -16,6 +16,8 @@ it('uses 3 kg grid lines, switches the selected measurement, and hides writes fo
   fireEvent.click(screen.getByRole('button', {name:'전체'}));
   expect(screen.getByRole('heading', {name:'측정값 목록 : 2건'})).toBeInTheDocument();
   expect(container.querySelector('.weight-chart')).toBeInTheDocument();
+  expect(container.querySelector('.weight-target-marker')).toHaveTextContent('목표 12 kg');
+  expect(container.querySelector('.weight-target-marker line')).toHaveAttribute('stroke-dasharray', '7 5');
   expect(container.querySelector('svg')?.textContent).toContain('30');
   expect(container.querySelectorAll('svg line').length).toBeGreaterThanOrEqual(11);
   fireEvent.click(screen.getByRole('button', {name:/8 kg/}));

@@ -35,10 +35,14 @@ export function WeightTrends({ events, revisions, timezone, readOnly = false }: 
     <details><summary>체중 흐름 보기</summary>
       <div className="weight-period-picker" aria-label="체중 조회 기간">{[30,90,365,0].map(value => <button type="button" key={value} className={`period-chip${days === value ? ' selected' : ''}`} aria-pressed={days === value} onClick={() => setDays(value)}>{value === 0 ? '전체' : value === 365 ? '1년' : `${value}일`}</button>)}</div>
       {shown.length > 0 ? <>
-        <svg ref={chartRef} className="weight-chart" viewBox={`0 0 ${chartWidth} 375`} role="img" aria-label="실제 측정 날짜에 비례한 체중 그래프. 아래 목록에서 측정값 선택 가능">
+        <svg ref={chartRef} className="weight-chart" viewBox={`0 0 ${chartWidth} 375`} role="img" aria-label={`실제 측정 날짜에 비례한 체중 그래프${target !== null ? `, 목표 체중 ${target} kg 기준선` : ''}. 아래 목록에서 측정값 선택 가능`}>
           {Array.from({ length: high / 3 + 1 }, (_, tick) => tick * 3).map(value => { const tick = value; return <g key={tick}><line x1="55" x2={chartWidth - 55} y1={y(value)} y2={y(value)} stroke="#d5dfda"/><text x="5" y={y(value)+4} fontSize="12">{value}</text></g>; })}
           <text x="10" y="20" fontSize="12">kg</text>
-          {target !== null && <g><line x1="55" x2={chartWidth - 55} y1={y(target)} y2={y(target)} stroke="#597b64" strokeDasharray="5 5"/><text x={chartWidth - 160} y={y(target)-6} fontSize="12">목표 {target} kg</text></g>}
+          {target !== null && <g className="weight-target-marker" aria-label={`목표 체중 ${target} kg 기준선`}>
+            <line x1="55" x2={chartWidth - 55} y1={y(target)} y2={y(target)} stroke="#a75d29" strokeWidth="2" strokeDasharray="7 5" />
+            <rect x={chartWidth - 175} y={y(target) - 30} width="120" height="25" rx="12" fill="#fff3e6" stroke="#a75d29" />
+            <text x={chartWidth - 115} y={y(target) - 13} textAnchor="middle" fontSize="12" fontWeight="700" fill="#713d19">목표 {target} kg</text>
+          </g>}
           {shown.map((sample,index) => { const prev = shown[index-1]; return <g key={sample.id}>{prev && Date.parse(sample.occurredAt)-Date.parse(prev.occurredAt) <= 45*86400000 && <line x1={x(prev.occurredAt)} y1={y(prev.value)} x2={x(sample.occurredAt)} y2={y(sample.value)} stroke="#8aab96"/>}<circle cx={x(sample.occurredAt)} cy={y(sample.value)} r={selected?.id === sample.id ? 6 : 4} fill="#39735d"/><circle cx={x(sample.occurredAt)} cy={y(sample.value)} r="18" fill="transparent" onClick={() => setSelectedId(sample.id)}/></g>; })}
           {selected && <g className="weight-tooltip" pointerEvents="none" transform={`translate(${Math.max(55, Math.min(chartWidth - 175, x(selected.occurredAt)-80))}, ${Math.max(10, y(selected.value)-65)})`}>
             <rect width="165" height="55" rx="9" fill="#fffefa" stroke="#39735d" />
