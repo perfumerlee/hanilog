@@ -10,18 +10,21 @@ it('uses 3 kg grid lines, switches the selected measurement, and hides writes fo
     { id:'b', event_type:'weight', occurred_at:date, value:{observed_value:9},unit:'kg' },
   ]}/></MemoryRouter>);
   expect(screen.queryByRole('link', {name:'체중 기록'})).not.toBeInTheDocument();
+  expect(screen.getByLabelText('체중 요약')).toHaveTextContent('목표와의 차이3 kg목표보다 낮음');
+  expect(screen.getByLabelText('체중 요약')).toHaveTextContent('직전 측정 대비+1 kg');
   expect(container.querySelector('details')).not.toHaveAttribute('open');
   fireEvent.click(screen.getByText('체중 흐름 보기'));
   expect(screen.getByRole('button', {name:'90일'})).toHaveAttribute('aria-pressed', 'true');
   fireEvent.click(screen.getByRole('button', {name:'전체'}));
   expect(screen.getByRole('heading', {name:'측정값 목록 : 2건'})).toBeInTheDocument();
   expect(container.querySelector('.weight-chart')).toBeInTheDocument();
-  expect(container.querySelector('.weight-target-marker')).toHaveTextContent('목표 12 kg');
+  expect(container.querySelector('.weight-chart-legend')).toHaveTextContent('목표 12 kg');
   expect(container.querySelector('.weight-target-marker line')).toHaveAttribute('stroke-dasharray', '8 5');
   expect(container.querySelector('svg')?.textContent).toContain('30');
   expect(container.querySelectorAll('svg line').length).toBeGreaterThanOrEqual(11);
   fireEvent.click(screen.getByRole('button', {name:/8 kg/}));
   expect(container.querySelector('.weight-tooltip')).toHaveTextContent('8 kg');
+  expect(container.querySelector('.weight-target-marker rect')).not.toBeInTheDocument();
   expect(screen.getByRole('button', {name:/8 kg/})).toHaveAttribute('aria-pressed', 'true');
   expect(screen.getByRole('button', {name:/9 kg/})).toHaveAttribute('aria-pressed', 'false');
 });
@@ -31,7 +34,7 @@ it('shows a separately shared target when its source measurement falls outside t
   ]}/></MemoryRouter>);
   expect(screen.getByText('21 kg')).toBeInTheDocument();
   fireEvent.click(screen.getByText('체중 흐름 보기'));
-  expect(container.querySelector('.weight-target-marker')).toHaveTextContent('목표 21 kg');
+  expect(container.querySelector('.weight-chart-legend')).toHaveTextContent('목표 21 kg');
 });
 it('lets the guardian set a target from the weight panel without altering the measured value', async () => {
   const save = vi.fn().mockResolvedValue(true);

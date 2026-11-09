@@ -23,6 +23,8 @@ export function WeightTrends({ events, revisions, timezone, readOnly = false, sh
   }, []);
   const last = samples.at(-1);
   const previous = samples.at(-2);
+  const targetDifference = last && target !== null ? Number((last.value - target).toFixed(2)) : null;
+  const previousDifference = last && previous ? Number((last.value - previous.value).toFixed(2)) : null;
   const shown = samples.filter(sample => !days || Date.parse(sample.occurredAt) >= now - days * 86400000);
   const selected = shown.find(sample => sample.id === selectedId) ?? shown.at(-1);
   const date = (instant: string) => new Intl.DateTimeFormat('ko-KR', { timeZone: timezone, dateStyle: 'medium' }).format(new Date(instant));
@@ -53,21 +55,23 @@ export function WeightTrends({ events, revisions, timezone, readOnly = false, sh
     finally { setTargetSaving(false); }
   }
   return <section className="panel weight-trends" aria-label="체중 흐름">
-    <div className="trends-heading"><div><h2>체중 흐름</h2><strong>{last ? `${last.value} kg` : '아직 체중 기록이 없어요'}</strong>{last && <small> · {date(last.occurredAt)} 측정</small>}</div>{!readOnly && <Link className="button-link" to="/record?event=weight">체중 기록</Link>}</div>
-    <div className="weight-goal-row"><div className="weight-goal-badge"><span>목표 체중</span><strong>{target !== null ? `${target} kg` : '설정 전'}</strong>{target !== null && last && <small>현재와 {Math.abs(Number((last.value - target).toFixed(2)))} kg 차이</small>}</div>
-      {!readOnly && onSaveTarget && last && <button type="button" className="button-secondary" onClick={() => { setTargetDraft(target === null ? '' : String(target)); setTargetError(''); setEditingTarget(current => !current); }}>{target === null ? '목표 설정' : '목표 변경'}</button>}</div>
+    <div className="trends-heading"><h2>체중 흐름</h2>{!readOnly && <Link className="button-link" to="/record?event=weight">체중 기록</Link>}</div>
+    <div className="weight-summary" aria-label="체중 요약">
+      <div className="weight-summary-item weight-summary-current"><span>최근 측정</span><strong>{last ? `${last.value} kg` : '기록 없음'}</strong>{last && <small>{date(last.occurredAt)}</small>}</div>
+      <div className="weight-summary-item weight-summary-target"><span>목표 체중</span><strong>{target !== null ? `${target} kg` : '설정 전'}</strong>{!readOnly && onSaveTarget && last && <button type="button" className="weight-target-edit" onClick={() => { setTargetDraft(target === null ? '' : String(target)); setTargetError(''); setEditingTarget(current => !current); }}>{target === null ? '목표 설정' : '목표 변경'}</button>}</div>
+      <div className="weight-summary-item"><span>목표와의 차이</span><strong>{targetDifference === null ? '—' : `${Math.abs(targetDifference)} kg`}</strong><small>{targetDifference === null ? '목표 설정 후 표시' : targetDifference < 0 ? '목표보다 낮음' : targetDifference > 0 ? '목표보다 높음' : '목표와 같음'}</small></div>
+      <div className="weight-summary-item"><span>직전 측정 대비</span><strong>{previousDifference === null ? '—' : `${previousDifference > 0 ? '+' : ''}${previousDifference} kg`}</strong><small>{previousDifference === null ? '이전 측정 없음' : date(previous!.occurredAt)}</small></div>
+    </div>
     {editingTarget && onSaveTarget && !readOnly && <form className="weight-goal-editor" onSubmit={(event) => void saveTarget(event)}><label className="field-label">목표 체중 (kg)<input type="number" inputMode="decimal" min="0.01" step="any" value={targetDraft} onChange={(event) => setTargetDraft(event.target.value)} required /></label><button type="submit" className="button-primary" disabled={targetSaving}>{targetSaving ? '저장 중…' : '목표 저장'}</button>{targetError && <p role="alert">{targetError}</p>}<small>가장 최근 체중 기록에 정정 이력으로 저장합니다. 측정값은 바뀌지 않습니다.</small></form>}
-    {last && previous && <p>직전 측정 대비 {Number((last.value - previous.value).toFixed(2)) > 0 ? '+' : ''}{Number((last.value - previous.value).toFixed(2))} kg</p>}
     <details><summary>체중 흐름 보기</summary>
       <div className="weight-period-picker" aria-label="체중 조회 기간">{[30,90,365,0].map(value => <button type="button" key={value} className={`period-chip${days === value ? ' selected' : ''}`} aria-pressed={days === value} onClick={() => setDays(value)}>{value === 0 ? '전체' : value === 365 ? '1년' : `${value}일`}</button>)}</div>
       {shown.length > 0 ? <>
+        {target !== null && <div className="weight-chart-legend"><span className="weight-legend-line" aria-hidden="true"/>목표 {target} kg</div>}
         <svg ref={chartRef} className="weight-chart" viewBox={`0 0 ${chartWidth} 375`} role="img" aria-label={`실제 측정 날짜에 비례한 체중 그래프${target !== null ? `, 목표 체중 ${target} kg 기준선` : ''}. 아래 목록에서 측정값 선택 가능`}>
           {Array.from({ length: high / 3 + 1 }, (_, tick) => tick * 3).map(value => { const tick = value; return <g key={tick}><line x1="55" x2={chartWidth - 55} y1={y(value)} y2={y(value)} stroke="#d5dfda"/><text x="5" y={y(value)+4} fontSize="12">{value}</text></g>; })}
           <text x="10" y="20" fontSize="12">kg</text>
           {target !== null && <g className="weight-target-marker" aria-label={`목표 체중 ${target} kg 기준선`}>
-            <line x1="55" x2={chartWidth - 55} y1={y(target)} y2={y(target)} stroke="#ad5b21" strokeWidth="3" strokeDasharray="8 5" />
-            <rect x={chartWidth - 179} y={y(target) - 34} width="124" height="29" rx="10" fill="#fff1dc" stroke="#ad5b21" strokeWidth="2" />
-            <text x={chartWidth - 117} y={y(target) - 15} textAnchor="middle" fontSize="13" fontWeight="700" fill="#713d19">목표 {target} kg</text>
+            <line x1="55" x2={chartWidth - 55} y1={y(target)} y2={y(target)} stroke="#54786c" strokeWidth="2" strokeDasharray="8 5" />
           </g>}
           {shown.map((sample,index) => { const prev = shown[index-1]; return <g key={sample.id}>{prev && Date.parse(sample.occurredAt)-Date.parse(prev.occurredAt) <= 45*86400000 && <line x1={x(prev.occurredAt)} y1={y(prev.value)} x2={x(sample.occurredAt)} y2={y(sample.value)} stroke="#8aab96"/>}<circle cx={x(sample.occurredAt)} cy={y(sample.value)} r={selected?.id === sample.id ? 6 : 4} fill="#39735d"/><circle cx={x(sample.occurredAt)} cy={y(sample.value)} r="18" fill="transparent" onClick={() => setSelectedId(sample.id)}/></g>; })}
           {selected && <g className="weight-tooltip" pointerEvents="none" transform={`translate(${Math.max(55, Math.min(chartWidth - 175, x(selected.occurredAt)-80))}, ${Math.max(10, y(selected.value)-65)})`}>
