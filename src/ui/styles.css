@@ -1222,6 +1222,9 @@ button.period-chip.selected:focus-visible {
 }
 .weight-trends summary { cursor: pointer; min-height: 44px; padding-block: 12px; }
 .weight-chart { display: block; width: 100%; max-width: 760px; margin-inline: auto; }
+.weight-list-heading { margin: .75rem 0 .3rem; font-size: 1rem; }
+.trends-panel > .measurement-list { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+.timeline-link-panel .button-link { display: flex; justify-content: center; }
 .weight-measurements { list-style: none; padding: 0; }
 .weight-measurements button { width: 100%; display: flex; justify-content: space-between; gap: 12px; margin-block: 4px; }
 .weight-period-picker { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-block: 12px; }

@@ -14,6 +14,7 @@ it('uses 3 kg grid lines, switches the selected measurement, and hides writes fo
   fireEvent.click(screen.getByText('체중 흐름 보기'));
   expect(screen.getByRole('button', {name:'90일'})).toHaveAttribute('aria-pressed', 'true');
   fireEvent.click(screen.getByRole('button', {name:'전체'}));
+  expect(screen.getByRole('heading', {name:'체중 측정값 목록 : 2건'})).toBeInTheDocument();
   expect(container.querySelector('.weight-chart')).toBeInTheDocument();
   expect(container.querySelector('svg')?.textContent).toContain('30');
   expect(container.querySelectorAll('svg line').length).toBeGreaterThanOrEqual(11);

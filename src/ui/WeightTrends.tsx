@@ -25,6 +25,7 @@ export function WeightTrends({ events, revisions, timezone, readOnly = false }: 
     {last && previous && <p>직전 측정 대비 {Number((last.value - previous.value).toFixed(2)) > 0 ? '+' : ''}{Number((last.value - previous.value).toFixed(2))} kg</p>}
     <details><summary>체중 흐름 보기</summary>
       <div className="weight-period-picker" aria-label="체중 조회 기간">{[30,90,365,0].map(value => <button type="button" key={value} className={`period-chip${days === value ? ' selected' : ''}`} aria-pressed={days === value} onClick={() => setDays(value)}>{value === 0 ? '전체' : value === 365 ? '1년' : `${value}일`}</button>)}</div>
+      <h3 className="weight-list-heading">체중 측정값 목록 : {shown.length}건</h3>
       {shown.length > 0 ? <>
         <svg className="weight-chart" viewBox="0 0 550 375" role="img" aria-label="실제 측정 날짜에 비례한 체중 그래프. 아래 목록에서 측정값 선택 가능">
           {Array.from({ length: high / 3 + 1 }, (_, tick) => tick * 3).map(value => { const tick = value; return <g key={tick}><line x1="55" x2="495" y1={y(value)} y2={y(value)} stroke="#d5dfda"/><text x="5" y={y(value)+4} fontSize="12">{value}</text></g>; })}
