@@ -25,7 +25,6 @@ export function WeightTrends({ events, revisions, timezone, readOnly = false }: 
     {last && previous && <p>직전 측정 대비 {Number((last.value - previous.value).toFixed(2)) > 0 ? '+' : ''}{Number((last.value - previous.value).toFixed(2))} kg</p>}
     <details><summary>체중 흐름 보기</summary>
       <div className="weight-period-picker" aria-label="체중 조회 기간">{[30,90,365,0].map(value => <button type="button" key={value} className={`period-chip${days === value ? ' selected' : ''}`} aria-pressed={days === value} onClick={() => setDays(value)}>{value === 0 ? '전체' : value === 365 ? '1년' : `${value}일`}</button>)}</div>
-      <h3 className="weight-list-heading">체중 측정값 목록 : {shown.length}건</h3>
       {shown.length > 0 ? <>
         <svg className="weight-chart" viewBox="0 0 550 375" role="img" aria-label="실제 측정 날짜에 비례한 체중 그래프. 아래 목록에서 측정값 선택 가능">
           {Array.from({ length: high / 3 + 1 }, (_, tick) => tick * 3).map(value => { const tick = value; return <g key={tick}><line x1="55" x2="495" y1={y(value)} y2={y(value)} stroke="#d5dfda"/><text x="5" y={y(value)+4} fontSize="12">{value}</text></g>; })}
@@ -39,10 +38,9 @@ export function WeightTrends({ events, revisions, timezone, readOnly = false }: 
           </g>}
           <text x="55" y="365" fontSize="12">{date(shown[0].occurredAt)}</text><text x="495" y="365" textAnchor="end" fontSize="12">{date(shown.at(-1)!.occurredAt)}</text>
         </svg>
-        {selected && <p role="status"><strong>{selected.value} kg</strong> · {date(selected.occurredAt)}</p>}
-        <small>측정한 날짜만 표시합니다. 45일을 넘는 공백은 연결하지 않으며, 선 사이의 값은 측정값이 아닙니다.</small>
+        <h3 className="weight-list-heading">측정값 목록 : {shown.length}건</h3>
         <ul className="weight-measurements">{[...shown].reverse().map(sample => <li key={sample.id}><button type="button" className={sample.id === selected?.id ? 'sample-row active' : 'sample-row'} onClick={() => setSelectedId(sample.id)} aria-pressed={sample.id === selected?.id}><strong>{sample.value} kg</strong><span>{date(sample.occurredAt)}</span></button></li>)}</ul>
-      </> : <p>이 기간에는 측정한 체중이 없습니다. 전체 기간을 선택하거나 새 기록을 남겨 주세요.</p>}
+      </> : <><h3 className="weight-list-heading">측정값 목록 : 0건</h3><p>이 기간에는 측정한 체중이 없습니다. 전체 기간을 선택하거나 새 기록을 남겨 주세요.</p></>}
       {excluded > 0 && <p>단위 또는 값 확인이 필요한 기존 기록 {excluded}건은 그래프에서 제외했습니다.</p>}
     </details>
   </section>;

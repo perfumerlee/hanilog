@@ -33,8 +33,9 @@ it('opens latest measured local day, preserves values above 500, and filters lis
  expect(screen.getByText('+386 mg/dL')).toBeInTheDocument();
  const sections = [...document.querySelectorAll('.public-glucose-share > section')];
  expect(sections.map((section) => section.className)).toEqual([
-  'panel trends-summary', 'panel trends-panel', 'panel measurement-list', 'panel', 'panel weight-trends', 'panel share-validity', 'panel share-guardian-contact',
+  'panel trends-summary', 'panel trends-panel', 'panel weight-trends', 'panel', 'panel share-validity', 'panel share-guardian-contact',
  ]);
+ expect(document.querySelector('.trends-panel > .measurement-list')).toBeInTheDocument();
  expect(document.querySelector('.glucose-point-tooltip')).toHaveTextContent('550 mg/dL');
  expect(screen.getByText('2.5 U')).toBeInTheDocument();
  expect(screen.getByText('35 g')).toBeInTheDocument();

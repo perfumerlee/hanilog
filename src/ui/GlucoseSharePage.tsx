@@ -153,15 +153,16 @@ export function GlucoseSharePage() {
         {!displayedSamples.length && <p className="trend-empty">{displayMode === 'day' ? '이 날짜에' : '선택한 기간에'} 기록된 혈당 측정값이 없습니다.</p>}
         {selected && <div className="share-selected-value" aria-live="polite"><strong>{selected.value} mg/dL</strong>
           <span>{formatTime(selected.occurredAt, share.timezone)} · {glucoseMeasurementConditionLabel(selected.condition)}</span></div>}
-      </section>
-      <section className="panel measurement-list"><h2>측정값 목록 : {displayedSamples.length}건</h2>
+        <section className="measurement-list"><h2>측정값 목록 : {displayedSamples.length}건</h2>
         {displayedSamples.length ? <ol>{[...displayedSamples].reverse().map((sample) => <li key={sample.id}>
           <button type="button" className={selected?.id === sample.id ? 'sample-row active' : 'sample-row'} onClick={() => setSelectedId(sample.id)}>
             <span><strong>{sample.value} mg/dL</strong><small>{formatTime(sample.occurredAt, share.timezone)}</small></span>
             <span><small>{glucoseMeasurementConditionLabel(sample.condition)}{sample.revisionKind ? ' · 정정된 값' : ''}</small></span>
           </button>
         </li>)}</ol> : <p>표시할 실제 측정값이 없습니다.</p>}
+        </section>
       </section>
+      {share.weights && <WeightTrends key={token} events={share.weights} revisions={[]} timezone={share.timezone} readOnly />}
       {displayMode === 'day' && careTimes.length > 0 && <section className="panel"><h2>이날의 식사·인슐린 기록</h2>
         <ol className="share-care-timeline">{careTimes.map((item, index) => <li className={`share-care-timeline-item ${item.event_type}`} key={`${item.event_type}-${item.occurred_at}-${index}`}>
           <time dateTime={item.occurred_at}><span>{formatTimelineDate(item.occurred_at, share.timezone)}</span><span>{formatClock(item.occurred_at, share.timezone)}</span></time>
@@ -169,7 +170,6 @@ export function GlucoseSharePage() {
           <div><span className="share-care-kind"><ShareCareIcon type={item.event_type} />{item.event_type === 'meal' ? '식사' : '인슐린'}</span><strong>{typeof item.amount === 'number' && Number.isFinite(item.amount) ? `${item.amount}${item.unit ? ` ${item.unit}` : ' (단위 미기록)'}` : share.include_care_values ? '수치 미기록' : '수치 미공유'}</strong></div>
         </li>)}</ol>
       </section>}
-      {share.weights && <WeightTrends key={token} events={share.weights} revisions={[]} timezone={share.timezone} readOnly />}
       <section className="panel share-validity" aria-label="공유 기록 기간"><h2>공유 기록 기간</h2><p>{formatDate(share.from_date)} ~ {formatDate(share.to_date)}</p></section>
       <section className="panel share-guardian-contact" aria-label="보호자 연락처">
         <h2>보호자에게 연락</h2>{share.guardian_contact_phone
