@@ -19,7 +19,7 @@ type RawEvent = {
   value: Record<string, unknown>; unit: string | null; source?: string; occurrence_id: string | null; event_type: string;
 };
 type Revision = { event_id: string; revision_no: number; revision_kind: 'CORRECT' | 'VOID'; patch: Record<string, unknown> };
-type Props = { pet: TrendPet; userId: string; online: boolean; demoEvents?: RawEvent[]; refreshVersion?: number };
+type Props = { pet: TrendPet; userId: string; online: boolean; demoEvents?: RawEvent[]; refreshVersion?: number; onSaveWeightTarget?: (eventId: string, expectedRevision: number, value: Record<string, unknown>) => Promise<boolean> };
 
 const periods: { id: TrendPeriod; label: string }[] = [
   { id: '7d', label: '7일' }, { id: '30d', label: '30일' }, { id: '90d', label: '90일' },
@@ -52,7 +52,7 @@ function toSample(event: RawEvent, revision?: Revision): GlucoseSample | null {
   };
 }
 
-export function HealthTrendsPage({ pet, userId, online, demoEvents, refreshVersion }: Props) {
+export function HealthTrendsPage({ pet, userId, online, demoEvents, refreshVersion, onSaveWeightTarget }: Props) {
   const [portrait, setPortrait] = useState<{ path: string; url: string } | null>(null);
   useEffect(() => {
     if (!online || !supabase || !pet.profile_photo_object_path) return;
@@ -234,7 +234,7 @@ export function HealthTrendsPage({ pet, userId, online, demoEvents, refreshVersi
           </li>)}</ol> : <p>선택한 기간에 측정값이 없습니다.</p>}
         </section>
       </section>
-      <WeightTrends key={pet.id} events={sourceEvents} revisions={revisions} timezone={pet.timezone} />
+      <WeightTrends key={pet.id} events={sourceEvents} revisions={revisions} timezone={pet.timezone} onSaveTarget={onSaveWeightTarget} />
       {glucoseCareTools}
       <section className="panel timeline-link-panel"><Link className="button-link" to={`/timeline?date=${encodeURIComponent(selected ? localDateKey(selected.occurredAt, pet.timezone) : selectedDay)}`}>하루 타임라인 열기</Link></section>
       {displayMode === 'period' && (period === '1y' || period === 'all') && <section className="panel monthly-panel"><h2>월별 실제 검사 횟수</h2>
