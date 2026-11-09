@@ -4,7 +4,7 @@ import { weightSamples, type WeightEvent, type WeightRevision } from '../lib/wei
 
 export function WeightTrends({ events, revisions, timezone, readOnly = false }: { events: WeightEvent[]; revisions: WeightRevision[]; timezone: string; readOnly?: boolean }) {
   const { samples, excluded, target } = weightSamples(events, revisions);
-  const [days, setDays] = useState(() => readOnly ? 0 : 90);
+  const [days, setDays] = useState(90);
   const [now] = useState(() => Date.now());
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const last = samples.at(-1);
@@ -23,10 +23,10 @@ export function WeightTrends({ events, revisions, timezone, readOnly = false }: 
     <div className="trends-heading"><div><h2>체중 흐름</h2><strong>{last ? `${last.value} kg` : '아직 체중 기록이 없어요'}</strong>{last && <small> · {date(last.occurredAt)} 측정</small>}</div>{!readOnly && <Link className="button-link" to="/record?event=weight">체중 기록</Link>}</div>
     {target !== null && <p>목표 <strong>{target} kg</strong>{last && ` · 목표와의 차이 ${Number((last.value - target).toFixed(2)) > 0 ? '+' : ''}${Number((last.value - target).toFixed(2))} kg`}</p>}
     {last && previous && <p>직전 측정 대비 {Number((last.value - previous.value).toFixed(2)) > 0 ? '+' : ''}{Number((last.value - previous.value).toFixed(2))} kg</p>}
-    <details open={readOnly || undefined}><summary>체중 흐름 보기</summary>
+    <details><summary>체중 흐름 보기</summary>
       <div className="weight-period-picker" aria-label="체중 조회 기간">{[30,90,365,0].map(value => <button type="button" key={value} className={`period-chip${days === value ? ' selected' : ''}`} aria-pressed={days === value} onClick={() => setDays(value)}>{value === 0 ? '전체' : value === 365 ? '1년' : `${value}일`}</button>)}</div>
       {shown.length > 0 ? <>
-        <svg viewBox="0 0 550 375" role="img" aria-label="실제 측정 날짜에 비례한 체중 그래프. 아래 목록에서 측정값 선택 가능" style={{ width: '100%', display: 'block' }}>
+        <svg className="weight-chart" viewBox="0 0 550 375" role="img" aria-label="실제 측정 날짜에 비례한 체중 그래프. 아래 목록에서 측정값 선택 가능">
           {Array.from({ length: high / 3 + 1 }, (_, tick) => tick * 3).map(value => { const tick = value; return <g key={tick}><line x1="55" x2="495" y1={y(value)} y2={y(value)} stroke="#d5dfda"/><text x="5" y={y(value)+4} fontSize="12">{value}</text></g>; })}
           <text x="10" y="20" fontSize="12">kg</text>
           {target !== null && <g><line x1="55" x2="495" y1={y(target)} y2={y(target)} stroke="#597b64" strokeDasharray="5 5"/><text x="350" y={y(target)-6} fontSize="12">목표 {target} kg</text></g>}
@@ -40,7 +40,7 @@ export function WeightTrends({ events, revisions, timezone, readOnly = false }: 
         </svg>
         {selected && <p role="status"><strong>{selected.value} kg</strong> · {date(selected.occurredAt)}</p>}
         <small>측정한 날짜만 표시합니다. 45일을 넘는 공백은 연결하지 않으며, 선 사이의 값은 측정값이 아닙니다.</small>
-        <ul className="weight-measurements">{[...shown].reverse().map(sample => <li key={sample.id}><button type="button" className="button-secondary" onClick={() => setSelectedId(sample.id)} aria-pressed={sample.id === selected?.id}><strong>{sample.value} kg</strong><span>{date(sample.occurredAt)}</span></button></li>)}</ul>
+        <ul className="weight-measurements">{[...shown].reverse().map(sample => <li key={sample.id}><button type="button" className={sample.id === selected?.id ? 'sample-row active' : 'sample-row'} onClick={() => setSelectedId(sample.id)} aria-pressed={sample.id === selected?.id}><strong>{sample.value} kg</strong><span>{date(sample.occurredAt)}</span></button></li>)}</ul>
       </> : <p>이 기간에는 측정한 체중이 없습니다. 전체 기간을 선택하거나 새 기록을 남겨 주세요.</p>}
       {excluded > 0 && <p>단위 또는 값 확인이 필요한 기존 기록 {excluded}건은 그래프에서 제외했습니다.</p>}
     </details>

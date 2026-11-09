@@ -10,10 +10,16 @@ it('uses 3 kg grid lines, switches the selected measurement, and hides writes fo
     { id:'b', event_type:'weight', occurred_at:date, value:{observed_value:9},unit:'kg' },
   ]}/></MemoryRouter>);
   expect(screen.queryByRole('link', {name:'체중 기록'})).not.toBeInTheDocument();
-  expect(screen.getByRole('button', {name:'전체'})).toHaveAttribute('aria-pressed', 'true');
+  expect(container.querySelector('details')).not.toHaveAttribute('open');
+  fireEvent.click(screen.getByText('체중 흐름 보기'));
+  expect(screen.getByRole('button', {name:'90일'})).toHaveAttribute('aria-pressed', 'true');
+  fireEvent.click(screen.getByRole('button', {name:'전체'}));
+  expect(container.querySelector('.weight-chart')).toBeInTheDocument();
   expect(container.querySelector('svg')?.textContent).toContain('30');
   expect(container.querySelectorAll('svg line').length).toBeGreaterThanOrEqual(11);
   fireEvent.click(screen.getByRole('button', {name:/8 kg/}));
   expect(container.querySelector('.weight-tooltip')).toHaveTextContent('8 kg');
   expect(screen.getByRole('status')).toHaveTextContent('8 kg');
+  expect(screen.getByRole('button', {name:/8 kg/})).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.getByRole('button', {name:/9 kg/})).toHaveAttribute('aria-pressed', 'false');
 });
