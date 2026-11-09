@@ -19,6 +19,8 @@ it('opens latest measured local day, preserves values above 500, and filters lis
  Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: vi.fn(() => 'blob:synthetic-photo') });
  Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() });
  render(<MemoryRouter initialEntries={['/share/'+'a'.repeat(43)]}><Routes><Route path="/share/:token" element={<GlucoseSharePage />} /></Routes></MemoryRouter>);
+ expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true');
+ expect(screen.getByRole('heading', { name: '공유 기록을 불러오고 있어요' })).toBeInTheDocument();
  await waitFor(() => expect(screen.getByLabelText('날짜')).toHaveValue('2026-11-03'));
  await waitFor(() => expect(screen.getByRole('img', { name: '합성 반려동물 프로필' })).toHaveAttribute('src', 'blob:synthetic-photo'));
  expect(screen.getAllByText('식사와 무관').length).toBeGreaterThan(0);

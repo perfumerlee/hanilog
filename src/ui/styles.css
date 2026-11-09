@@ -1221,11 +1221,14 @@ button.period-chip.selected:focus-visible {
   .trends-page > * { grid-column: 1; grid-row: auto; }
 }
 .weight-trends summary { cursor: pointer; min-height: 44px; padding-block: 12px; }
-.weight-chart { display: block; width: 100%; max-width: 760px; margin-inline: auto; }
-.weight-list-heading { margin: .75rem 0 .3rem; font-size: 1rem; }
+.weight-chart { display: block; width: 100%; height: 375px; max-width: none; }
+.weight-list-heading { margin: 1rem 0 .45rem; padding-top: 1rem; border-top: 1px solid var(--line); font-size: 1.05rem; font-weight: 750; }
 .trends-panel > .measurement-list { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+.trends-panel > .measurement-list h2 { font-weight: 750; }
+.measurement-list li { border-bottom: 0; }
+.measurement-list ol, .weight-measurements { display: grid; gap: .25rem; }
 .timeline-link-panel .button-link { display: flex; justify-content: center; }
 .weight-measurements { list-style: none; padding: 0; }
-.weight-measurements button { width: 100%; display: flex; justify-content: space-between; gap: 12px; margin-block: 4px; }
+.weight-measurements button { width: 100%; display: flex; justify-content: space-between; gap: 12px; margin-block: 0; }
 .weight-period-picker { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-block: 12px; }
 .weight-period-picker button { min-width: 0; width: 100%; min-height: 44px; padding-inline: 4px; white-space: nowrap; }

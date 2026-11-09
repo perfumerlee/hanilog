@@ -117,13 +117,16 @@ export function GlucoseSharePage() {
   const selected = displayedSamples.find((item) => item.id === selectedId) ?? displayedSamples.at(-1) ?? null;
   const actualSegments = measuredLineSegments(displayedSamples, displayMode === 'day' ? 6 / 24 : 7);
 
+  if (loading) return <main className="page-container trends-loading-page public-glucose-share" role="status" aria-live="polite" aria-busy="true">
+    <div className="loading-spinner" aria-hidden="true" /><h1>공유 기록을 불러오고 있어요</h1>
+    <p>공유 권한과 최신 기록을 확인하고 있습니다.</p>
+  </main>;
 
   return <main className="page-container public-glucose-share">
     <header className="page-heading pet-photo-heading">{share && <img className="pet-heading-portrait" src={portrait?.token === token ? portrait.url : PET_AVATARS[0].src} alt={`${share.pet_name} 프로필`} />}<div><p className="eyebrow">HaniLog · 건강 기록 공유</p>
       <h1>{share ? `${share.pet_name}의 혈당 기록` : '혈당 기록 공유'}</h1>
       {share && <p>{samples.length ? formatDate(localDateKey(samples.reduce((a,b)=>a.occurredAt < b.occurredAt ? a : b).occurredAt,share.timezone)) : '기록 없음'} ~ {formatDate(todayInPetTimezone)}</p>}
     </div></header>
-    {loading && <p className="notice" role="status">공유 권한과 최신 기록을 확인하고 있습니다…</p>}
     {error && !loading && <section className="panel empty-panel"><h2>링크를 확인할 수 없습니다</h2><p>{error}</p></section>}
     {share && !loading && <>
       <section className="panel trends-summary" aria-label="최근 측정 비교">
