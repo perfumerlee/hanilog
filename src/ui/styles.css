@@ -1216,6 +1216,10 @@ button.period-chip.selected:focus-visible {
   color: #123f38;
 }
 .weight-trends { grid-column: 1 / -1; min-width: 0; }
+@media (min-width: 768px) {
+  .trends-page { grid-template-columns: minmax(0, 1fr); }
+  .trends-page > * { grid-column: 1; grid-row: auto; }
+}
 .weight-trends summary { cursor: pointer; min-height: 44px; padding-block: 12px; }
 .weight-measurements { list-style: none; padding: 0; }
 .weight-measurements button { width: 100%; display: flex; justify-content: space-between; gap: 12px; margin-block: 4px; }

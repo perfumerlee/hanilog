@@ -1073,7 +1073,7 @@ function SessionNavigation({ pathname, search }: { pathname: string; search: str
   const [moreOpen, setMoreOpen] = useState(false);
   const desktopItems = [
     { to: '/trends', label: '혈당 기록', icon: 'glucose' },
-    { to: '/timeline', label: '하루 타임머신', icon: '◷' },
+    { to: '/timeline', label: '하루 타임라인', icon: '◷' },
     { to: '/record', label: '빠른 기록', icon: '+' },
     { to: '/?profile=1', label: '반려동물 설정', icon: '🐾' },
     { to: '/shared', label: '가족 공간과 보호자', icon: '♡' },
@@ -1081,7 +1081,7 @@ function SessionNavigation({ pathname, search }: { pathname: string; search: str
   ];
   const secondaryItems = [
     { to: '/?profile=1', label: '반려동물 설정', icon: '🐾' },
-    { to: '/timeline', label: '하루 타임머신', icon: '◷' },
+    { to: '/timeline', label: '하루 타임라인', icon: '◷' },
     { to: '/shared', label: '가족 공간과 보호자', icon: '♡' },
     { to: '/notifications', label: '알림 및 전달 설정', icon: '♧' },
   ];
@@ -1712,7 +1712,7 @@ export function TimelinePage(props: {
   const filteredEvents = dailyEvents.filter((event) => visibleTypes.has(event.event_type));
 
   return <main className="page-container timeline-page">
-    <section className="page-heading pet-photo-heading"><PetProfilePortrait pet={pet} /><div><p className="eyebrow">건강 기록</p><h1>하루 타임머신</h1>
+    <section className="page-heading pet-photo-heading"><PetProfilePortrait pet={pet} /><div><p className="eyebrow">건강 기록</p><h1>하루 타임라인</h1>
       <p>{pet.name}의 기록 · {dateFilter}</p></div></section>
     <div className="timeline-filter"><label htmlFor="timeline-date">날짜 선택</label>
       <input id="timeline-date" type="date" value={dateFilter} onChange={(event) => {

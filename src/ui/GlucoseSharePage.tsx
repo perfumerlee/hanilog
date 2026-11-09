@@ -96,7 +96,10 @@ export function GlucoseSharePage() {
       source: typeof item.value.measurement_source === 'string' ? item.value.measurement_source : '미기록',
       revisionKind: item.revision_kind === 'CORRECT' ? 'CORRECT' as const : undefined }))
     .filter((item) => Number.isFinite(item.value)), [share]);
-  const latest = [...samples].sort((a, b) => Date.parse(a.occurredAt) - Date.parse(b.occurredAt)).at(-1);
+  const chronologicalSamples = [...samples].sort((a, b) => Date.parse(a.occurredAt) - Date.parse(b.occurredAt) || a.id.localeCompare(b.id));
+  const latest = chronologicalSamples.at(-1);
+  const previous = chronologicalSamples.at(-2);
+  const delta = latest && previous ? latest.value - previous.value : null;
   const todayInPetTimezone = share ? localDateKey(new Date().toISOString(), share.timezone) : '';
   const day = chosenDay || (share && share.from_date <= todayInPetTimezone && todayInPetTimezone <= share.to_date
     ? todayInPetTimezone : share && latest ? localDateKey(latest.occurredAt, share.timezone) : share?.to_date ?? '');
@@ -123,8 +126,14 @@ export function GlucoseSharePage() {
     {loading && <p className="notice" role="status">공유 권한과 최신 기록을 확인하고 있습니다…</p>}
     {error && !loading && <section className="panel empty-panel"><h2>링크를 확인할 수 없습니다</h2><p>{error}</p></section>}
     {share && !loading && <>
+      <section className="panel trends-summary" aria-label="최근 측정 비교">
+        <div><span className="eyebrow">최근 측정</span><strong>{latest ? `${latest.value} mg/dL` : '기록 없음'}</strong>
+          <small>{latest ? formatTime(latest.occurredAt, share.timezone) : '측정값이 없습니다'}</small></div>
+        <div><span className="eyebrow">직전 측정 비교</span><strong>{delta === null ? '비교할 기록 없음' : `${delta > 0 ? '+' : ''}${delta} mg/dL`}</strong>
+          <small>{delta === null || !previous ? '건강 상태의 개선·악화를 의미하지 않습니다' : `직전 측정 ${formatTime(previous.occurredAt, share.timezone)} · 해석이 아닌 값 차이`}</small></div>
+      </section>
       <section className="panel trends-panel">
-        <div className="section-heading"><h2>{displayMode === 'day' ? '하루 혈당 그래프' : '기간 혈당 추세'}</h2></div>
+        <div className="trends-heading"><div><p className="eyebrow">실제 측정값 : {displayedSamples.length}건</p><h2>{displayMode === 'day' ? `${day} 시간대별 혈당` : '시간에 따른 기록'}</h2></div></div>
         <div className="trend-display-toggle" role="group" aria-label="공유 혈당 그래프 보기">
           <button type="button" className={displayMode === 'period' ? 'period-chip selected' : 'period-chip'} aria-pressed={displayMode === 'period'} onClick={() => { setDisplayMode('period'); setSelectedId(''); }}>기간 추세</button>
           <button type="button" className={displayMode === 'day' ? 'period-chip selected' : 'period-chip'} aria-pressed={displayMode === 'day'} onClick={() => { setDisplayMode('day'); setSelectedId(''); }}>하루 보기</button>
@@ -145,7 +154,14 @@ export function GlucoseSharePage() {
         {selected && <div className="share-selected-value" aria-live="polite"><strong>{selected.value} mg/dL</strong>
           <span>{formatTime(selected.occurredAt, share.timezone)} · {glucoseMeasurementConditionLabel(selected.condition)}</span></div>}
       </section>
-      {share.weights && <WeightTrends key={token} events={share.weights} revisions={[]} timezone={share.timezone} readOnly />}
+      <section className="panel measurement-list"><h2>측정값 목록 : {displayedSamples.length}건</h2>
+        {displayedSamples.length ? <ol>{[...displayedSamples].reverse().map((sample) => <li key={sample.id}>
+          <button type="button" className={selected?.id === sample.id ? 'sample-row active' : 'sample-row'} onClick={() => setSelectedId(sample.id)}>
+            <span><strong>{sample.value} mg/dL</strong><small>{formatTime(sample.occurredAt, share.timezone)}</small></span>
+            <span><small>{glucoseMeasurementConditionLabel(sample.condition)}{sample.revisionKind ? ' · 정정된 값' : ''}</small></span>
+          </button>
+        </li>)}</ol> : <p>표시할 실제 측정값이 없습니다.</p>}
+      </section>
       {displayMode === 'day' && careTimes.length > 0 && <section className="panel"><h2>이날의 식사·인슐린 기록</h2>
         <ol className="share-care-timeline">{careTimes.map((item, index) => <li className={`share-care-timeline-item ${item.event_type}`} key={`${item.event_type}-${item.occurred_at}-${index}`}>
           <time dateTime={item.occurred_at}><span>{formatTimelineDate(item.occurred_at, share.timezone)}</span><span>{formatClock(item.occurred_at, share.timezone)}</span></time>
@@ -153,15 +169,7 @@ export function GlucoseSharePage() {
           <div><span className="share-care-kind"><ShareCareIcon type={item.event_type} />{item.event_type === 'meal' ? '식사' : '인슐린'}</span><strong>{typeof item.amount === 'number' && Number.isFinite(item.amount) ? `${item.amount}${item.unit ? ` ${item.unit}` : ' (단위 미기록)'}` : share.include_care_values ? '수치 미기록' : '수치 미공유'}</strong></div>
         </li>)}</ol>
       </section>}
-      <section className="panel measurement-list"><h2>{displayMode === 'day' ? '이날' : '선택한 기간'} 측정값 ({displayedSamples.length}건)</h2>
-        {displayedSamples.length ? <ol>{[...displayedSamples].reverse().map((sample) => <li key={sample.id}>
-          <button type="button" className={selected?.id === sample.id ? 'sample-row active' : 'sample-row'} onClick={() => setSelectedId(sample.id)}>
-            <span><strong>{sample.value} mg/dL</strong><small>{formatTime(sample.occurredAt, share.timezone)}</small></span>
-            <span><small>{glucoseMeasurementConditionLabel(sample.condition)}{sample.revisionKind ? ' · 정정된 값' : ''}</small></span>
-          </button>
-        </li>)}</ol> : <p>표시할 실제 측정값이 없습니다.</p>}
-
-      </section>
+      {share.weights && <WeightTrends key={token} events={share.weights} revisions={[]} timezone={share.timezone} readOnly />}
       <section className="panel share-validity" aria-label="공유 기록 기간"><h2>공유 기록 기간</h2><p>{formatDate(share.from_date)} ~ {formatDate(share.to_date)}</p></section>
       <section className="panel share-guardian-contact" aria-label="보호자 연락처">
         <h2>보호자에게 연락</h2>{share.guardian_contact_phone

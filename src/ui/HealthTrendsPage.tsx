@@ -223,10 +223,18 @@ export function HealthTrendsPage({ pet, userId, online, demoEvents, refreshVersi
                 {selected.revisionKind && <div><dt>이력</dt><dd>정정 이력이 반영된 값</dd></div>}
                 {selected.note && <div><dt>메모</dt><dd>{selected.note}</dd></div>}
               </dl></details>
-              <Link className="button-link" to={`/timeline?date=${encodeURIComponent(localDateKey(selected.occurredAt, pet.timezone))}`}>하루 타임머신 열기</Link>
+              <Link className="button-link" to={`/timeline?date=${encodeURIComponent(localDateKey(selected.occurredAt, pet.timezone))}`}>하루 타임라인 열기</Link>
 
             </section>}
           </>}
+      </section>
+      <section className="panel measurement-list"><h2>측정값 목록 : {displayedSamples.length}건</h2>
+        {displayedSamples.length ? <ol>{[...displayedSamples].reverse().map((sample) => <li key={sample.id}>
+          <button type="button" className={selected?.id === sample.id ? 'sample-row active' : 'sample-row'} onClick={() => setSelectedId(sample.id)}
+            aria-label={`${dateTime(sample.occurredAt, pet.timezone)}, ${sample.value} mg/dL, 측정 상세 선택`}>
+            <strong>{sample.value} mg/dL</strong><time dateTime={sample.occurredAt}>{dateTime(sample.occurredAt, pet.timezone)}</time>
+          </button>
+        </li>)}</ol> : <p>선택한 기간에 측정값이 없습니다.</p>}
       </section>
       <WeightTrends key={pet.id} events={sourceEvents} revisions={revisions} timezone={pet.timezone} />
       {glucoseCareTools}
@@ -237,14 +245,6 @@ export function HealthTrendsPage({ pet, userId, online, demoEvents, refreshVersi
       {displayMode === 'period' && gaps.length > 0 && <section className="notice notice-warning gap-notice"><strong>기록 간격 안내</strong>
         <ul>{gaps.slice(-8).map((gap) => <li key={`${gap.from}-${gap.to}`}>{dateOnly(gap.from, pet.timezone)}부터 {dateOnly(gap.to, pet.timezone)}까지 {gap.days}일 간격 · 해당 기간의 측정값은 표시하지 않았습니다.</li>)}</ul>
       </section>}
-      <section className="panel measurement-list"><h2>측정값 목록</h2>
-        {displayedSamples.length ? <ol>{[...displayedSamples].reverse().map((sample) => <li key={sample.id}>
-          <button type="button" className={selected?.id === sample.id ? 'sample-row active' : 'sample-row'} onClick={() => setSelectedId(sample.id)}
-            aria-label={`${dateTime(sample.occurredAt, pet.timezone)}, ${sample.value} mg/dL, 측정 상세 선택`}>
-            <strong>{sample.value} mg/dL</strong><time dateTime={sample.occurredAt}>{dateTime(sample.occurredAt, pet.timezone)}</time>
-          </button>
-        </li>)}</ol> : <p>선택한 기간에 측정값이 없습니다.</p>}
-      </section>
       {excluded.length > 0 && <details className="panel excluded-panel"><summary>그래프에서 제외된 기존 기록 {excluded.length}건</summary>
         <p>저장 단위가 mg/dL인지 확인되지 않았거나 값 형식이 호환되지 않아 변환 없이 제외했습니다.</p>
         <ul>{excluded.slice(-20).reverse().map((item) => <li key={item.id}>{dateTime(item.occurredAt, pet.timezone)} · 저장 단위 {item.unit ?? '미기록'} · 그래프 미표시</li>)}</ul>
