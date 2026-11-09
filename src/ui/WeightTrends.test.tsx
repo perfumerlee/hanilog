@@ -10,6 +10,7 @@ it('uses 3 kg grid lines, switches the selected measurement, and hides writes fo
     { id:'b', event_type:'weight', occurred_at:date, value:{observed_value:9},unit:'kg' },
   ]}/></MemoryRouter>);
   expect(screen.queryByRole('link', {name:'체중 기록'})).not.toBeInTheDocument();
+  expect(screen.getByRole('button', {name:'전체'})).toHaveAttribute('aria-pressed', 'true');
   expect(container.querySelector('svg')?.textContent).toContain('30');
   expect(container.querySelectorAll('svg line').length).toBeGreaterThanOrEqual(11);
   fireEvent.click(screen.getByRole('button', {name:/8 kg/}));

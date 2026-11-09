@@ -4,7 +4,7 @@ import { weightSamples, type WeightEvent, type WeightRevision } from '../lib/wei
 
 export function WeightTrends({ events, revisions, timezone, readOnly = false }: { events: WeightEvent[]; revisions: WeightRevision[]; timezone: string; readOnly?: boolean }) {
   const { samples, excluded, target } = weightSamples(events, revisions);
-  const [days, setDays] = useState(90);
+  const [days, setDays] = useState(() => readOnly ? 0 : 90);
   const [now] = useState(() => Date.now());
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const last = samples.at(-1);
