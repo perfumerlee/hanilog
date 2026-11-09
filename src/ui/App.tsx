@@ -1798,6 +1798,7 @@ function TimelineCorrectionEditor({ event, value, revision, onSave, onCorrectTim
 }) {
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState(String(value.observed_value ?? value.administered_dose_value ?? ''));
+  const [targetWeight, setTargetWeight] = useState(String(value.target_weight_kg ?? ''));
   const [note, setNote] = useState(String(value.note ?? ''));
   const [condition, setCondition] = useState(String(value.measurement_condition ?? ''));
   const [source, setSource] = useState(String(value.measurement_source ?? ''));
@@ -1815,12 +1816,17 @@ function TimelineCorrectionEditor({ event, value, revision, onSave, onCorrectTim
     const parsed = Number(amount);
     if (numeric && (!Number.isFinite(parsed) || parsed <= 0)) { setError('기록값은 0보다 큰 숫자로 입력해 주세요.'); return; }
     if (event.event_type === 'insulin' && !insulinProduct.trim()) { setError('인슐린 제품명을 입력해 주세요.'); return; }
+    if (event.event_type === 'weight' && targetWeight.trim() && (!Number.isFinite(Number(targetWeight)) || Number(targetWeight) <= 0)) { setError('목표 체중은 0보다 큰 kg 값으로 입력해 주세요.'); return; }
     setBusy(true); setError('');
-    const patchValue = { ...value, note: note.trim(), ...(numeric ? event.event_type === 'insulin'
+    const patchValue: Record<string, unknown> = { ...value, note: note.trim(), ...(numeric ? event.event_type === 'insulin'
       ? { administered_dose_value: parsed, insulin_product_label: insulinProduct.trim() } : { observed_value: parsed } : {}),
       ...(event.event_type === 'glucose' ? { measurement_condition: condition, measurement_source: source.trim() } : {}),
       ...(event.event_type === 'meal' ? { meal_status: meal } : {}),
       ...(event.event_type === 'elimination' ? { observation_type: elimination } : {}) };
+    if (event.event_type === 'weight') {
+      if (targetWeight.trim()) patchValue.target_weight_kg = Number(targetWeight);
+      else patchValue.target_weight_kg = null;
+    }
     const success = await onSave(event.id, revision, 'CORRECT', { value: patchValue });
     setBusy(false); if (success) setOpen(false); else setError('정정을 저장하지 못했습니다. 최신 기록을 확인해 주세요.');
   }
@@ -1842,6 +1848,7 @@ function TimelineCorrectionEditor({ event, value, revision, onSave, onCorrectTim
     <button type="button" className="text-button" aria-expanded={open} onClick={() => setOpen(!open)}>수정·삭제</button>
     {open && <div className="timeline-correction-fields">
       {numeric && <label className="field-label">기록값<input type="number" inputMode="decimal" step="any" value={amount} onChange={(input) => setAmount(input.target.value)} /></label>}
+      {event.event_type === 'weight' && <label className="field-label">목표 체중 (kg)<input type="number" inputMode="decimal" min="0.01" step="any" value={targetWeight} onChange={(input) => setTargetWeight(input.target.value)} /></label>}
       {event.event_type === 'glucose' && <><label className="field-label">측정 조건<select value={condition} onChange={(input) => setCondition(input.target.value)}>
         <option value="">미기록</option>{GLUCOSE_MEASUREMENT_CONDITIONS.map((choice) => <option key={choice.value} value={choice.value}>{choice.label}</option>)}</select></label>
         <label className="field-label">측정 출처<input maxLength={120} value={source} onChange={(input) => setSource(input.target.value)} /></label></>}

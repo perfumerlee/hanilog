@@ -25,3 +25,11 @@ it('uses 3 kg grid lines, switches the selected measurement, and hides writes fo
   expect(screen.getByRole('button', {name:/8 kg/})).toHaveAttribute('aria-pressed', 'true');
   expect(screen.getByRole('button', {name:/9 kg/})).toHaveAttribute('aria-pressed', 'false');
 });
+it('shows a separately shared target when its source measurement falls outside the share range', () => {
+  const { container } = render(<MemoryRouter><WeightTrends readOnly sharedTarget={21} timezone="Asia/Seoul" revisions={[]} events={[
+    { id:'recent', event_type:'weight', occurred_at:new Date().toISOString(), value:{observed_value:17.6}, unit:'kg' },
+  ]}/></MemoryRouter>);
+  expect(screen.getByText('21 kg')).toBeInTheDocument();
+  fireEvent.click(screen.getByText('체중 흐름 보기'));
+  expect(container.querySelector('.weight-target-marker')).toHaveTextContent('목표 21 kg');
+});

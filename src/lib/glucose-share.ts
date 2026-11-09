@@ -22,6 +22,7 @@ export type GlucoseSharePayload = {
   target_range: null | { lower_mg_dl: number; upper_mg_dl: number; source_label: string; effective_on: string };
   include_care_values?: boolean;
   weights?: import('./weight-trends').WeightEvent[];
+  weight_target_kg?: number | null;
   measurements: { id: string; occurred_at: string; recorded_at: string; value: Record<string, unknown>; unit: string; revision_kind: string | null }[];
   care_times: { event_type: 'meal' | 'insulin'; occurred_at: string; amount?: number | null; unit?: string | null }[];
 };

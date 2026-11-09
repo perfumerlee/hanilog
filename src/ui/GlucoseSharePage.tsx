@@ -165,7 +165,7 @@ export function GlucoseSharePage() {
         </li>)}</ol> : <p>표시할 실제 측정값이 없습니다.</p>}
         </section>
       </section>
-      {share.weights && <WeightTrends key={token} events={share.weights} revisions={[]} timezone={share.timezone} readOnly />}
+      {share.weights && <WeightTrends key={token} events={share.weights} revisions={[]} timezone={share.timezone} sharedTarget={share.weight_target_kg} readOnly />}
       {displayMode === 'day' && careTimes.length > 0 && <section className="panel"><h2>이날의 식사·인슐린 기록</h2>
         <ol className="share-care-timeline">{careTimes.map((item, index) => <li className={`share-care-timeline-item ${item.event_type}`} key={`${item.event_type}-${item.occurred_at}-${index}`}>
           <time dateTime={item.occurred_at}><span>{formatTimelineDate(item.occurred_at, share.timezone)}</span><span>{formatClock(item.occurred_at, share.timezone)}</span></time>

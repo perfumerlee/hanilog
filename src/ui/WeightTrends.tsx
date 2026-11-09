@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { weightSamples, type WeightEvent, type WeightRevision } from '../lib/weight-trends';
 
-export function WeightTrends({ events, revisions, timezone, readOnly = false }: { events: WeightEvent[]; revisions: WeightRevision[]; timezone: string; readOnly?: boolean }) {
-  const { samples, excluded, target } = weightSamples(events, revisions);
+export function WeightTrends({ events, revisions, timezone, readOnly = false, sharedTarget = null }: { events: WeightEvent[]; revisions: WeightRevision[]; timezone: string; readOnly?: boolean; sharedTarget?: number | null }) {
+  const { samples, excluded, target: eventTarget } = weightSamples(events, revisions);
+  const target = sharedTarget ?? eventTarget;
   const [days, setDays] = useState(90);
   const [now] = useState(() => Date.now());
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -30,7 +31,8 @@ export function WeightTrends({ events, revisions, timezone, readOnly = false }: 
   const y = (value: number) => 330 - (value - low) / (high - low) * 285;
   return <section className="panel weight-trends" aria-label="체중 흐름">
     <div className="trends-heading"><div><h2>체중 흐름</h2><strong>{last ? `${last.value} kg` : '아직 체중 기록이 없어요'}</strong>{last && <small> · {date(last.occurredAt)} 측정</small>}</div>{!readOnly && <Link className="button-link" to="/record?event=weight">체중 기록</Link>}</div>
-    {target !== null && <p>목표 <strong>{target} kg</strong>{last && ` · 목표와의 차이 ${Number((last.value - target).toFixed(2)) > 0 ? '+' : ''}${Number((last.value - target).toFixed(2))} kg`}</p>}
+    {target !== null ? <p>목표 <strong>{target} kg</strong>{last && ` · 목표와의 차이 ${Number((last.value - target).toFixed(2)) > 0 ? '+' : ''}${Number((last.value - target).toFixed(2))} kg`}</p>
+      : !readOnly && last && <p className="small-note">저장된 목표 체중이 없습니다. 하루 타임라인에서 체중 기록을 수정해 목표를 입력할 수 있습니다.</p>}
     {last && previous && <p>직전 측정 대비 {Number((last.value - previous.value).toFixed(2)) > 0 ? '+' : ''}{Number((last.value - previous.value).toFixed(2))} kg</p>}
     <details><summary>체중 흐름 보기</summary>
       <div className="weight-period-picker" aria-label="체중 조회 기간">{[30,90,365,0].map(value => <button type="button" key={value} className={`period-chip${days === value ? ' selected' : ''}`} aria-pressed={days === value} onClick={() => setDays(value)}>{value === 0 ? '전체' : value === 365 ? '1년' : `${value}일`}</button>)}</div>

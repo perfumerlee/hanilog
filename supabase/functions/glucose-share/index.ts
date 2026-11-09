@@ -1,4 +1,4 @@
-import { sharedWeightEvents, type WeightEvent, type WeightRevision } from '../_shared/weight-records.ts';
+import { sharedWeightEvents, weightSamples, type WeightEvent, type WeightRevision } from '../_shared/weight-records.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const allowedOrigins = (Deno.env.get('HANILOG_ALLOWED_ORIGINS') ??
@@ -132,11 +132,12 @@ Deno.serve(async (request) => {
       }
       const weights = sharedWeightEvents(weightRows, weightRevisions, { petId: link.data.pet_id,
         from: data.from_date, to: data.to_date, timezone: data.timezone });
+      const weightTarget = weightSamples(weightRows, weightRevisions).target;
       // A link may have been revoked while the additional data was being read.
       const active = await admin.from('glucose_share_links').select('id').eq('token_hash', tokenHash)
         .is('revoked_at', null).gt('expires_at', new Date().toISOString()).maybeSingle();
       if (active.error || !active.data) return Response.json({ error: 'SHARE_LINK_INVALID_OR_EXPIRED' }, { status: 404, headers });
-      return Response.json({ share: { ...data, weights } }, { headers });
+      return Response.json({ share: { ...data, weights, weight_target_kg: weightTarget } }, { headers });
     }
 
     const authorization = request.headers.get('authorization') ?? '';
