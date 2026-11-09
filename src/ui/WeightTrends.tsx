@@ -56,8 +56,8 @@ export function WeightTrends({ events, revisions, timezone, readOnly = false, sh
   }
   return <section className="panel weight-trends" aria-label="체중 흐름">
     <div className="trends-heading"><h2>체중 흐름</h2>{!readOnly && <Link className="button-link" to="/record?event=weight">체중 기록</Link>}</div>
+    <div className="weight-current" aria-label="최근 체중 측정"><span>최근 측정</span><strong>{last ? `${last.value} kg` : '기록 없음'}</strong>{last && <small>{date(last.occurredAt)} 측정</small>}</div>
     <div className="weight-summary" aria-label="체중 요약">
-      <div className="weight-summary-item weight-summary-current"><span>최근 측정</span><strong>{last ? `${last.value} kg` : '기록 없음'}</strong>{last && <small>{date(last.occurredAt)}</small>}</div>
       <div className="weight-summary-item weight-summary-target"><span>목표 체중</span><strong>{target !== null ? `${target} kg` : '설정 전'}</strong>{!readOnly && onSaveTarget && last && <button type="button" className="weight-target-edit" onClick={() => { setTargetDraft(target === null ? '' : String(target)); setTargetError(''); setEditingTarget(current => !current); }}>{target === null ? '목표 설정' : '목표 변경'}</button>}</div>
       <div className="weight-summary-item"><span>목표와의 차이</span><strong>{targetDifference === null ? '—' : `${Math.abs(targetDifference)} kg`}</strong><small>{targetDifference === null ? '목표 설정 후 표시' : targetDifference < 0 ? '목표보다 낮음' : targetDifference > 0 ? '목표보다 높음' : '목표와 같음'}</small></div>
       <div className="weight-summary-item"><span>직전 측정 대비</span><strong>{previousDifference === null ? '—' : `${previousDifference > 0 ? '+' : ''}${previousDifference} kg`}</strong><small>{previousDifference === null ? '이전 측정 없음' : date(previous!.occurredAt)}</small></div>

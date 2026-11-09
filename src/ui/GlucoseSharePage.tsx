@@ -166,16 +166,16 @@ export function GlucoseSharePage() {
         </section>
       </section>
       {share.weights && <WeightTrends key={token} events={share.weights} revisions={[]} timezone={share.timezone} sharedTarget={share.weight_target_kg} readOnly />}
-      {displayMode === 'day' && careTimes.length > 0 && <section className="panel"><h2>이날의 식사·인슐린 기록</h2>
+      {displayMode === 'day' && careTimes.length > 0 && <section className="panel"><h2 className="share-section-heading">이날의 식사·인슐린 기록</h2>
         <ol className="share-care-timeline">{careTimes.map((item, index) => <li className={`share-care-timeline-item ${item.event_type}`} key={`${item.event_type}-${item.occurred_at}-${index}`}>
           <time dateTime={item.occurred_at}><span>{formatTimelineDate(item.occurred_at, share.timezone)}</span><span>{formatClock(item.occurred_at, share.timezone)}</span></time>
           <span className="share-care-timeline-node" aria-hidden="true" />
           <div><span className="share-care-kind"><ShareCareIcon type={item.event_type} />{item.event_type === 'meal' ? '식사' : '인슐린'}</span><strong>{typeof item.amount === 'number' && Number.isFinite(item.amount) ? `${item.amount}${item.unit ? ` ${item.unit}` : ' (단위 미기록)'}` : share.include_care_values ? '수치 미기록' : '수치 미공유'}</strong></div>
         </li>)}</ol>
       </section>}
-      <section className="panel share-validity" aria-label="공유 기록 기간"><h2>공유 기록 기간</h2><p>{formatDate(share.from_date)} ~ {formatDate(share.to_date)}</p></section>
+      <section className="panel share-validity" aria-label="공유 기록 기간"><h2 className="share-section-heading">공유 기록 기간</h2><p>{formatDate(share.from_date)} ~ {formatDate(share.to_date)}</p></section>
       <section className="panel share-guardian-contact" aria-label="보호자 연락처">
-        <h2>보호자에게 연락</h2>{share.guardian_contact_phone
+        <h2 className="share-section-heading">보호자에게 연락</h2>{share.guardian_contact_phone
           ? <><p>{share.pet_name}의 기록에 대해 보호자에게 문의할 수 있습니다.</p>
             <div className="share-guardian-actions"><a className="button-primary" href={`tel:${share.guardian_contact_phone}`}><GuardianContactIcon type="phone" /><span>전화 하기</span></a>
               <a className="button-secondary" href={`sms:${share.guardian_contact_phone}?body=${encodeURIComponent(`${share.pet_name}의 혈당 기록을 확인했습니다. 관련해 연락드립니다.`)}`}><GuardianContactIcon type="message" /><span>문자 보내기</span></a></div></>

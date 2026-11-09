@@ -10,6 +10,8 @@ it('uses 3 kg grid lines, switches the selected measurement, and hides writes fo
     { id:'b', event_type:'weight', occurred_at:date, value:{observed_value:9},unit:'kg' },
   ]}/></MemoryRouter>);
   expect(screen.queryByRole('link', {name:'체중 기록'})).not.toBeInTheDocument();
+  expect(screen.getByLabelText('최근 체중 측정')).toHaveTextContent('9 kg');
+  expect(container.querySelectorAll('.weight-summary-item')).toHaveLength(3);
   expect(screen.getByLabelText('체중 요약')).toHaveTextContent('목표와의 차이3 kg목표보다 낮음');
   expect(screen.getByLabelText('체중 요약')).toHaveTextContent('직전 측정 대비+1 kg');
   expect(container.querySelector('details')).not.toHaveAttribute('open');
