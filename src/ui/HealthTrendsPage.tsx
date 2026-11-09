@@ -187,7 +187,6 @@ export function HealthTrendsPage({ pet, userId, online, demoEvents, refreshVersi
         <div><span className="eyebrow">직전 측정 비교</span><strong>{delta === null ? '비교할 기록 없음' : `${delta > 0 ? '+' : ''}${delta} mg/dL`}</strong>
           <small>{delta === null || !previous ? '건강 상태의 개선·악화를 의미하지 않습니다' : `직전 측정 ${dateTime(previous.occurredAt, pet.timezone)} · 해석이 아닌 값 차이`}</small></div>
       </section>
-      <WeightTrends key={pet.id} events={sourceEvents} revisions={revisions} timezone={pet.timezone} />
       <section className="panel trends-panel">
         <div className="trends-heading"><div><p className="eyebrow">실제 측정값 : {displayedSamples.length}건</p><h2>{displayMode === 'day' ? `${selectedDay} 시간대별 혈당` : '시간에 따른 기록'}</h2></div>
           <Link className="button-link trends-add" to="/record?event=glucose">혈당 기록 추가</Link></div>
@@ -229,6 +228,7 @@ export function HealthTrendsPage({ pet, userId, online, demoEvents, refreshVersi
             </section>}
           </>}
       </section>
+      <WeightTrends key={pet.id} events={sourceEvents} revisions={revisions} timezone={pet.timezone} />
       {glucoseCareTools}
       {displayMode === 'period' && (period === '1y' || period === 'all') && <section className="panel monthly-panel"><h2>월별 실제 검사 횟수</h2>
         {monthly.length ? <ul className="monthly-counts">{monthly.map((item) => <li key={item.month}><span>{item.month}</span><strong>{item.count}회</strong></li>)}</ul>

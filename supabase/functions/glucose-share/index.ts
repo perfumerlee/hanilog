@@ -1,3 +1,4 @@
+import { sharedWeightEvents, type WeightEvent, type WeightRevision } from '../_shared/weight-records.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const allowedOrigins = (Deno.env.get('HANILOG_ALLOWED_ORIGINS') ??
@@ -106,7 +107,36 @@ Deno.serve(async (request) => {
         return new Response(image.data, { status: 200, headers: { ...cors(origin), 'Content-Type': 'application/octet-stream',
           'Cache-Control': 'no-store, private, max-age=0', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer' } });
       }
-      return Response.json({ share: data }, { headers });
+      // The resolver above authenticates the bearer share and enforces expiry/revocation.
+      // Never accept a Pet ID or date range from the anonymous caller.
+      const link = await admin.from('glucose_share_links').select('pet_id').eq('token_hash', tokenHash)
+        .is('revoked_at', null).gt('expires_at', new Date().toISOString()).maybeSingle();
+      if (link.error || !link.data) return Response.json({ error: 'SHARE_LINK_INVALID_OR_EXPIRED' }, { status: 404, headers });
+      const weightRows: (WeightEvent & { pet_id: string })[] = [];
+      const weightRevisions: WeightRevision[] = [];
+      for (let offset = 0; ; offset += 500) {
+        const result = await admin.from('health_events').select('id,pet_id,event_type,occurred_at,value,unit')
+          .eq('pet_id', link.data.pet_id).eq('event_type', 'weight').order('id').range(offset, offset + 499);
+        if (result.error) throw new Error('WEIGHT_QUERY_FAILED');
+        weightRows.push(...result.data);
+        if (result.data.length) {
+          for (let start = 0; ; start += 500) {
+            const history = await admin.from('health_event_revisions').select('event_id,revision_no,revision_kind,patch')
+              .in('event_id', result.data.map(row => row.id)).order('event_id').order('revision_no').range(start, start + 499);
+            if (history.error) throw new Error('WEIGHT_HISTORY_FAILED');
+            weightRevisions.push(...history.data);
+            if (history.data.length < 500) break;
+          }
+        }
+        if (result.data.length < 500) break;
+      }
+      const weights = sharedWeightEvents(weightRows, weightRevisions, { petId: link.data.pet_id,
+        from: data.from_date, to: data.to_date, timezone: data.timezone });
+      // A link may have been revoked while the additional data was being read.
+      const active = await admin.from('glucose_share_links').select('id').eq('token_hash', tokenHash)
+        .is('revoked_at', null).gt('expires_at', new Date().toISOString()).maybeSingle();
+      if (active.error || !active.data) return Response.json({ error: 'SHARE_LINK_INVALID_OR_EXPIRED' }, { status: 404, headers });
+      return Response.json({ share: { ...data, weights } }, { headers });
     }
 
     const authorization = request.headers.get('authorization') ?? '';

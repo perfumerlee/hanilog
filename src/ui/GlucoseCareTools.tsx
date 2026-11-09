@@ -185,9 +185,9 @@ export function GlucoseCareTools({ petId, petName, timezone, canEdit, demo = fal
       setShareOpen(opening);
       if (opening) void loadShares();
     }}>
-      <summary><strong>주치의와 혈당 공유</strong><span>기간을 정해 읽기 전용 링크 만들기</span></summary>
+      <summary><strong>주치의와 혈당 공유</strong><span>혈당·체중을 함께 공유</span></summary>
       <div className="glucose-tool-content">
-      {!demo && canEdit && <p className="eyebrow">읽기 전용 · 만료 및 취소 가능</p>}
+      {!demo && canEdit && <p className="eyebrow">혈당·체중 읽기 전용 · 만료 및 취소 가능</p>}
       {!demo && <p className="notice notice-warning" role="note">현재 링크는 별도의 수신자 인증 없이, 링크를 가진 사람이면 누구나 열 수 있습니다. 문자나 메신저 전달 시 재전달될 수 있어요. 수신자 확인 기능은 아직 제공하지 않습니다.</p>}
       {shareOpen && canEdit && !demo && <form className="glucose-share-form" onSubmit={(event) => void createShare(event)}>
         <div className="form-grid">
@@ -213,7 +213,7 @@ export function GlucoseCareTools({ petId, petName, timezone, canEdit, demo = fal
       </form>}
       {shares.some((item) => !item.revoked_at && Date.parse(item.expires_at) > now) && <ul className="glucose-share-list">
         {shares.filter((item) => !item.revoked_at && Date.parse(item.expires_at) > now).map((item) => <li key={item.id}>
-          <span>{item.from_date} ~ {item.to_date}<small>만료 {new Date(item.expires_at).toLocaleString('ko-KR')} · {item.include_care_values ? '식사·인슐린 수치 포함' : item.include_care_times ? '식사·인슐린 시각만' : '혈당만'}</small></span>
+          <span>{item.from_date} ~ {item.to_date}<small>만료 {new Date(item.expires_at).toLocaleString('ko-KR')} · {item.include_care_values ? '식사·인슐린 수치 포함' : item.include_care_times ? '식사·인슐린 시각만' : '혈당·체중'}</small></span>
           <div className="share-list-actions"><button type="button" className="text-button" disabled={pending} onClick={() => void copyOrRenew(item)}>{activeLinks[item.id] ? '다시 복사' : '새 링크 발급·복사'}</button>
           {activeLinks[item.id] && <button type="button" className="text-button" onClick={() => { setNewLink(activeLinks[item.id]); setMessage('아래에 받는 분 번호를 입력하고 문자 앱을 여세요.'); }}>문자로 보내기</button>}
           <button type="button" className="text-button" disabled={pending} onClick={() => void revoke(item.id)}>링크 취소</button></div>

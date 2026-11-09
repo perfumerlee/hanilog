@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { weightSamples, type WeightEvent } from './weight-trends';
+import { sharedWeightEvents } from '../../supabase/functions/_shared/weight-records';
 const event = (id: string, date: string, value = 8): WeightEvent => ({ id, event_type: 'weight', occurred_at: date, value: { observed_value: value }, unit: 'kg' });
 describe('weight trends', () => {
+  it('shares only the matching Pet and local dates without notes or actor data', () => {
+    const scope = { petId:'pet-a', from:'2026-01-02', to:'2026-01-02', timezone:'Asia/Seoul' };
+    const sample = { ...event('a','2026-01-01T15:00:00Z'),pet_id:'pet-a',value:{observed_value:8,target_weight_kg:10,note:'private'} };
+    const result = sharedWeightEvents([sample,{...sample,id:'b',pet_id:'pet-b'}, {...sample,id:'c',occurred_at:'2026-01-02T15:00:00Z'}],[],scope);
+    expect(result).toHaveLength(1);
+    expect(result[0].value).toEqual({observed_value:8,target_weight_kg:10});
+    expect(result[0]).not.toHaveProperty('pet_id');
+  });
   it('preserves irregular measurement dates, sorts and deduplicates', () => {
     const a = event('a','2026-01-01T00:00:00Z');
     const b = event('b','2026-04-01T00:00:00Z');

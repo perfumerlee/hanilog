@@ -1,3 +1,4 @@
+import { WeightTrends } from './WeightTrends';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { measuredLineSegments, localDateKey, samplesForLocalDay, shiftLocalDate, type GlucoseSample, type TrendPeriod } from '../lib/health-trends';
@@ -144,6 +145,7 @@ export function GlucoseSharePage() {
         {selected && <div className="share-selected-value" aria-live="polite"><strong>{selected.value} mg/dL</strong>
           <span>{formatTime(selected.occurredAt, share.timezone)} · {glucoseMeasurementConditionLabel(selected.condition)}</span></div>}
       </section>
+      {share.weights && <WeightTrends key={token} events={share.weights} revisions={[]} timezone={share.timezone} readOnly />}
       {displayMode === 'day' && careTimes.length > 0 && <section className="panel"><h2>이날의 식사·인슐린 기록</h2>
         <ol className="share-care-timeline">{careTimes.map((item, index) => <li className={`share-care-timeline-item ${item.event_type}`} key={`${item.event_type}-${item.occurred_at}-${index}`}>
           <time dateTime={item.occurred_at}><span>{formatTimelineDate(item.occurred_at, share.timezone)}</span><span>{formatClock(item.occurred_at, share.timezone)}</span></time>

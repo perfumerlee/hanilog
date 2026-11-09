@@ -16,6 +16,16 @@ const props = {
 };
 
 describe('QuickRecordPage', () => {
+  it('opens all types for weight links and carries the previous target into a new measurement', async () => {
+    const onSubmit = vi.fn().mockResolvedValue(false);
+    const old = { id:'weight-old',pet_id:props.pet.id,event_type:'weight' as const, occurred_at:'2026-01-01T12:00:00Z', recorded_at:'2026-01-01T12:00:00Z', actor_id:'synthetic-user', performer_id:null,occurrence_id:null,plan_version_id:null, unit:'kg',value:{observed_value:8,target_weight_kg:10} };
+    render(<QuickRecordPage {...props} demoOnly presetEventType="weight" events={[old]} onSubmit={onSubmit}/>);
+    expect(screen.getByRole('button',{name:'다른 기록 종류 접기'})).toHaveAttribute('aria-expanded','true');
+    expect(screen.getByRole('spinbutton',{name:/목표 체중/})).toHaveValue(10);
+    fireEvent.change(screen.getByLabelText('측정값'),{target:{value:'9'}});
+    fireEvent.click(screen.getByRole('button',{name:'데모 화면에만 추가 (저장 안 됨)'}));
+    await waitFor(()=>expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({numericValue:'9',targetWeight:'10'}),null));
+  });
   it('exposes the record types as accessible radio choices', () => {
     render(<QuickRecordPage {...props} />);
     expect(screen.getByRole('group', { name: '무엇을 기록할까요?' })).toBeInTheDocument();

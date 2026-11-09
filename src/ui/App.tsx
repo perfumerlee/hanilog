@@ -1,3 +1,5 @@
+import { weightSamples } from '../lib/weight-trends';
+import { loadWeightTarget } from '../lib/weight-history';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
@@ -327,7 +329,7 @@ function DemoWorkspace() {
             onRenameHousehold={async () => false}
             householdName="" setHouseholdName={() => undefined} petName="" setPetName={() => undefined}
             petTimezone={pet.timezone} setPetTimezone={() => undefined} creating={false} />} />
-          <Route path="/record" element={<QuickRecordPage key={pet.id} pet={pet}
+          <Route path="/record" element={<QuickRecordPage key={`${pet.id}:${location.search}`} pet={pet} presetEventType={new URLSearchParams(location.search).get('event') ?? undefined}
             events={petEvents} revisions={demoRevisions} online demoOnly onSubmit={addDemoEvent}
             onSaveExerciseEnd={saveDemoExerciseEnd} />} />
           <Route path="/timeline" element={<TimelinePage pet={pet} events={petEvents} revisions={demoRevisions} userId={demoUserId}
@@ -1380,7 +1382,19 @@ export function QuickRecordPage(props: {
     return () => window.clearInterval(timer);
   }, []);
   const [numericValue, setNumericValue] = useState('');
-  const [targetWeight, setTargetWeight] = useState('');
+  const [targetOverride, setTargetWeight] = useState<string | null>(null);
+  const [savedWeightTarget, setSavedWeightTarget] = useState<{ petId: string; target: number | null; error?: boolean } | null>(null);
+  const demoTarget = weightSamples(props.events, props.revisions).target;
+  const previousWeightTarget = props.demoOnly ? demoTarget : savedWeightTarget?.petId === pet.id ? savedWeightTarget.target : null;
+  const targetWeight = targetOverride ?? (previousWeightTarget === null ? '' : String(previousWeightTarget));
+  useEffect(() => {
+    if (props.demoOnly || !supabase || !online || eventType !== 'weight') return;
+    let active = true;
+    void loadWeightTarget(supabase, pet.id).then(target => {
+      if (active) setSavedWeightTarget({ petId: pet.id, target });
+    }).catch(() => { if (active) setSavedWeightTarget({ petId: pet.id, target: null, error: true }); });
+    return () => { active = false; };
+  }, [pet.id, online, props.demoOnly, props.events, props.revisions, eventType]);
   const [unit, setUnit] = useState(initialEventType === 'meal' ? 'g' : '');
   const [note, setNote] = useState('');
   const [mealStatus, setMealStatus] = useState('');
@@ -1393,7 +1407,7 @@ export function QuickRecordPage(props: {
   const insulinProductDefaultRef = useRef({ petId: pet.id, value: pet.default_insulin_product?.trim() ?? '' });
   const [savingInsulinDefault, setSavingInsulinDefault] = useState(false);
   const [insulinDefaultMessage, setInsulinDefaultMessage] = useState('');
-  const [showAllRecordTypes, setShowAllRecordTypes] = useState(false);
+  const [showAllRecordTypes, setShowAllRecordTypes] = useState(!primaryRecordTypes.includes(initialEventType));
   const visibleEventOptions = showAllRecordTypes
     ? eventOptions
     : eventOptions.filter((option) => primaryRecordTypes.includes(option.type) || option.type === eventType);
@@ -1570,8 +1584,9 @@ export function QuickRecordPage(props: {
           {eventType === 'weight' && <>
             <label className="field-label">측정값<input type="number" inputMode="decimal" step="any" value={numericValue} onChange={(event) => setNumericValue(event.target.value)} required /></label>
             <div className="field-label glucose-unit-field" role="group" aria-label="측정 단위"><span>측정 단위</span><output className="unit-fixed">kg</output></div>
-            <label className="field-label">목표 체중 (선택 · kg)<input type="number" min="0.01" step="any" inputMode="decimal" value={targetWeight} onChange={(event) => setTargetWeight(event.target.value)} /><small>이 기록과 함께 저장합니다. 비워 두면 이전 목표를 유지합니다.</small></label>
+            <label className="field-label">목표 체중 (선택 · kg)<input type="number" min="0.01" step="any" inputMode="decimal" value={targetWeight} onChange={(event) => setTargetWeight(event.target.value)} /><small>이전 목표를 불러와 이번 측정값과 함께 저장합니다. 변경하면 이번 기록부터 새 목표가 적용됩니다.</small></label>
           </>}
+          {eventType === 'weight' && savedWeightTarget?.error && <p role="status">이전 목표를 불러오지 못했습니다. 연결을 확인하거나 목표를 직접 입력해 주세요.</p>}
           {eventType === 'meal' && <>
             <RecordChoices label="관찰한 식사 상태" value={mealStatus} onChange={setMealStatus}
               options={[{ value: 'ATE', label: '섭취 확인' }, { value: 'PARTIAL', label: '일부 섭취' }, { value: 'REFUSED', label: '식사 거부' }]} />
