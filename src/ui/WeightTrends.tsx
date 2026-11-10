@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { weightSamples, type WeightEvent, type WeightRevision } from '../lib/weight-trends';
 
-export function WeightTrends({ events, revisions, timezone, readOnly = false, sharedTarget = null, onSaveTarget }: { events: WeightEvent[]; revisions: WeightRevision[]; timezone: string; readOnly?: boolean; sharedTarget?: number | null; onSaveTarget?: (eventId: string, expectedRevision: number, value: Record<string, unknown>) => Promise<boolean> }) {
+export function WeightTrends({ events, revisions, timezone, readOnly = false, sharedTarget = null, onSaveTarget, onReviseWeight }: { events: WeightEvent[]; revisions: WeightRevision[]; timezone: string; readOnly?: boolean; sharedTarget?: number | null; onSaveTarget?: (eventId: string, expectedRevision: number, value: Record<string, unknown>) => Promise<boolean>; onReviseWeight?: (eventId: string, expectedRevision: number, kind: 'CORRECT' | 'VOID', patch: Record<string, unknown>) => Promise<boolean> }) {
   const { samples, excluded, target: eventTarget } = weightSamples(events, revisions);
   const target = sharedTarget ?? eventTarget;
   const [days, setDays] = useState(90);
@@ -12,6 +12,10 @@ export function WeightTrends({ events, revisions, timezone, readOnly = false, sh
   const [targetDraft, setTargetDraft] = useState('');
   const [targetSaving, setTargetSaving] = useState(false);
   const [targetError, setTargetError] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [weightDraft, setWeightDraft] = useState('');
+  const [weightBusy, setWeightBusy] = useState(false);
+  const [weightError, setWeightError] = useState('');
   const chartRef = useRef<SVGSVGElement>(null);
   const [chartWidth, setChartWidth] = useState(550);
   useEffect(() => {
@@ -54,6 +58,32 @@ export function WeightTrends({ events, revisions, timezone, readOnly = false, sh
     } catch { setTargetError('목표 체중을 저장하지 못했습니다. 연결을 확인해 주세요.'); }
     finally { setTargetSaving(false); }
   }
+  async function reviseWeight(event: FormEvent<HTMLFormElement>, sampleId: string) {
+    event.preventDefault();
+    const amount = Number(weightDraft);
+    if (!weightDraft.trim() || !Number.isFinite(amount) || amount <= 0) { setWeightError('0보다 큰 체중을 kg으로 입력해 주세요.'); return; }
+    const original = events.find(item => item.id === sampleId);
+    const latest = revisions.filter(item => item.event_id === sampleId).sort((a, b) => b.revision_no - a.revision_no)[0];
+    if (!original || !onReviseWeight) { setWeightError('체중 기록을 다시 불러온 뒤 시도해 주세요.'); return; }
+    const revisedValue = latest?.patch.value;
+    const value = { ...original.value, ...(revisedValue && typeof revisedValue === 'object' && !Array.isArray(revisedValue) ? revisedValue : {}), observed_value: amount };
+    setWeightBusy(true); setWeightError('');
+    try {
+      if (await onReviseWeight(sampleId, latest?.revision_no ?? 0, 'CORRECT', { value })) setEditingId(null);
+      else setWeightError('수정하지 못했습니다. 최신 기록을 확인해 주세요.');
+    } catch { setWeightError('수정하지 못했습니다. 연결을 확인해 주세요.'); }
+    finally { setWeightBusy(false); }
+  }
+  async function deleteWeight(sampleId: string) {
+    if (!onReviseWeight || !window.confirm('이 체중 기록을 삭제할까요? 원본과 감사 이력은 보존됩니다.')) return;
+    const latest = revisions.filter(item => item.event_id === sampleId).sort((a, b) => b.revision_no - a.revision_no)[0];
+    setWeightBusy(true); setWeightError(''); setEditingId(null);
+    try {
+      if (await onReviseWeight(sampleId, latest?.revision_no ?? 0, 'VOID', {})) setEditingId(null);
+      else setWeightError('삭제하지 못했습니다. 최신 기록을 확인해 주세요.');
+    } catch { setWeightError('삭제하지 못했습니다. 연결을 확인해 주세요.'); }
+    finally { setWeightBusy(false); }
+  }
   return <section className="panel weight-trends" aria-label="체중 흐름">
     <div className="trends-heading"><h2>체중 흐름</h2>{!readOnly && <Link className="button-link" to="/record?event=weight">체중 기록</Link>}</div>
     <div className="weight-current" aria-label="최근 체중 측정"><span>최근 측정</span><strong>{last ? `${last.value} kg` : '기록 없음'}</strong>{last && <small>{date(last.occurredAt)} 측정</small>}</div>
@@ -82,7 +112,19 @@ export function WeightTrends({ events, revisions, timezone, readOnly = false, sh
           <text x="55" y="365" fontSize="12">{date(shown[0].occurredAt)}</text><text x={chartWidth - 55} y="365" textAnchor="end" fontSize="12">{date(shown.at(-1)!.occurredAt)}</text>
         </svg>
         <h3 className="weight-list-heading">측정값 목록 : {shown.length}건</h3>
-        <ul className="weight-measurements">{[...shown].reverse().map(sample => <li key={sample.id}><button type="button" className={sample.id === selected?.id ? 'sample-row active' : 'sample-row'} onClick={() => setSelectedId(sample.id)} aria-pressed={sample.id === selected?.id}><strong>{sample.value} kg</strong><span>{date(sample.occurredAt)}</span></button></li>)}</ul>
+        <ul className="weight-measurements">{[...shown].reverse().map(sample => <li key={sample.id}>
+          <button type="button" className={sample.id === selected?.id ? 'sample-row active' : 'sample-row'} onClick={() => setSelectedId(sample.id)} aria-pressed={sample.id === selected?.id}><strong>{sample.value} kg</strong><span>{date(sample.occurredAt)}</span></button>
+          {!readOnly && onReviseWeight && <div className="weight-measurement-actions">
+            <button type="button" className="text-button" aria-label={`${date(sample.occurredAt)} 체중 수정`} aria-expanded={editingId === sample.id} onClick={() => { setEditingId(editingId === sample.id ? null : sample.id); setWeightDraft(String(sample.value)); setWeightError(''); }}>수정</button>
+            <button type="button" className="text-button" aria-label={`${date(sample.occurredAt)} 체중 삭제`} disabled={weightBusy} onClick={() => void deleteWeight(sample.id)}>삭제</button>
+          </div>}
+          {editingId === sample.id && <form className="weight-measurement-editor" onSubmit={(event) => void reviseWeight(event, sample.id)}>
+            <label className="field-label">체중 (kg)<input type="number" inputMode="decimal" min="0.01" step="any" value={weightDraft} onChange={(event) => setWeightDraft(event.target.value)} required /></label>
+            <button type="submit" disabled={weightBusy}>{weightBusy ? '저장 중…' : '수정 저장'}</button>
+            {weightError && <p role="alert">{weightError}</p>}
+          </form>}
+        </li>)}</ul>
+        {weightError && editingId === null && <p role="alert" className="inline-error">{weightError}</p>}
       </> : <><h3 className="weight-list-heading">측정값 목록 : 0건</h3><p>이 기간에는 측정한 체중이 없습니다. 전체 기간을 선택하거나 새 기록을 남겨 주세요.</p></>}
       {excluded > 0 && <p>단위 또는 값 확인이 필요한 기존 기록 {excluded}건은 그래프에서 제외했습니다.</p>}
     </details>

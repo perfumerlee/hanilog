@@ -49,3 +49,19 @@ it('lets the guardian set a target from the weight panel without altering the me
   fireEvent.click(screen.getByRole('button', { name:'목표 저장' }));
   await waitFor(() => expect(save).toHaveBeenCalledWith('recent', 0, expect.objectContaining({ observed_value:17.6, target_weight_kg:21 })));
 });
+it('corrects and voids a weight directly from the measurement list', async () => {
+  const revise = vi.fn().mockResolvedValue(true);
+  const date = new Date().toISOString();
+  render(<MemoryRouter><WeightTrends timezone="Asia/Seoul" revisions={[]} onReviseWeight={revise} events={[
+    { id:'sample', event_type:'weight', occurred_at:date, value:{observed_value:17.6,target_weight_kg:21}, unit:'kg' },
+  ]}/></MemoryRouter>);
+  fireEvent.click(screen.getByText('체중 흐름 보기'));
+  fireEvent.click(screen.getByRole('button', { name:/체중 수정/ }));
+  fireEvent.change(screen.getByRole('spinbutton', { name:'체중 (kg)' }), { target:{ value:'17.8' } });
+  fireEvent.click(screen.getByRole('button', { name:'수정 저장' }));
+  await waitFor(() => expect(revise).toHaveBeenCalledWith('sample', 0, 'CORRECT', { value: { observed_value:17.8, target_weight_kg:21 } }));
+  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+  fireEvent.click(screen.getByRole('button', { name:/체중 삭제/ }));
+  await waitFor(() => expect(revise).toHaveBeenCalledWith('sample', 0, 'VOID', {}));
+  confirm.mockRestore();
+});

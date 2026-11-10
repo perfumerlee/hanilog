@@ -1277,6 +1277,12 @@ button.period-chip.selected:focus-visible {
 .timeline-link svg { flex: none; }
 .weight-measurements { list-style: none; padding: 0; }
 .weight-measurements button { width: 100%; display: flex; justify-content: space-between; gap: 12px; margin-block: 0; }
+.weight-measurement-actions { display: flex; justify-content: flex-end; gap: .35rem; padding: .1rem .2rem .45rem; }
+.weight-measurements .weight-measurement-actions button { width: auto; min-height: 44px; padding: .45rem .65rem; }
+.weight-measurement-editor { display: flex; flex-wrap: wrap; align-items: end; gap: .65rem; padding: .5rem 0 1rem; }
+.weight-measurement-editor .field-label { flex: 1 1 160px; min-width: 0; }
+.weight-measurements .weight-measurement-editor button { width: auto; min-height: 44px; }
+.weight-measurement-editor [role="alert"] { flex-basis: 100%; margin: 0; }
 .weight-period-picker { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-block: 12px; }
 .weight-period-picker button { min-width: 0; width: 100%; min-height: 44px; padding-inline: 4px; white-space: nowrap; }
 

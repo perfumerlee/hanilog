@@ -77,7 +77,7 @@ const eventOptions: { type: EventType; label: string; icon: string; short: strin
   { type: 'symptom', label: '증상·컨디션', icon: '♡', short: '관찰한 상태' },
 ];
 const primaryRecordTypes: EventType[] = ['glucose', 'insulin', 'elimination', 'meal'];
-const coreTimelineTypes: EventType[] = [...primaryRecordTypes, 'weight'];
+const coreTimelineTypes: EventType[] = primaryRecordTypes;
 const rememberedLoginEmailKey = 'hanilog:remembered-login-email';
 const commonInsulinProductLabels = ['캐니슐린', '프로진크', 'NPH', '글라진', '디터미르'];
 const eventLabels = Object.fromEntries(eventOptions.map((option) => [option.type, option.label])) as Record<EventType, string>;
@@ -1053,7 +1053,7 @@ function Workspace({ userId, online }: { userId: string; online: boolean }) {
           : <TimelinePage pet={selectedPet} events={dataReady ? events : []} revisions={dataReady ? revisions : []} userId={userId}
             dateFilter={dateFilter} setDateFilter={setDateFilter} loading={loadingEvents} onSaveExerciseEnd={saveExerciseEnd} onReviseEvent={reviseTimelineEvent} onCorrectTime={correctTimelineTime} />} />
         <Route path="/trends" element={!selectedPet ? <SetupPrompt loading={loadingPets} accessMessage={accessMessage} />
-          : online && !dataReady ? <DataLoadingPage title="혈당 기록을 불러오고 있어요" /> : <HealthTrendsPage key={selectedPet.id} pet={selectedPet} userId={userId} online={online && dataReady} refreshVersion={healthRefreshVersion} onSaveWeightTarget={(eventId, expectedRevision, value) => reviseTimelineEvent(eventId, expectedRevision, 'CORRECT', { value })} />} />
+          : online && !dataReady ? <DataLoadingPage title="혈당 기록을 불러오고 있어요" /> : <HealthTrendsPage key={selectedPet.id} pet={selectedPet} userId={userId} online={online && dataReady} refreshVersion={healthRefreshVersion} onSaveWeightTarget={(eventId, expectedRevision, value) => reviseTimelineEvent(eventId, expectedRevision, 'CORRECT', { value })} onReviseWeight={reviseTimelineEvent} />} />
         <Route path="/care" element={<Navigate to="/timeline" replace />} />
         <Route path="/shared" element={<SharedCarePage key={households.map((item) => item.id).join(':')} households={households} pets={pets} userId={userId} onRenameHousehold={renameHousehold} />} />
         <Route path="/notifications" element={<NotificationsPage key={`${userId}:${selectedPetId}:${pets.map((pet) => pet.id).join(':')}`} pets={pets} userId={userId} online={online} />} />
