@@ -708,6 +708,39 @@ function Workspace({ userId, online }: { userId: string; online: boolean }) {
     return true;
   }, []);
 
+  // The shared recent-events cache is capped at 120 rows. A timeline date must
+  // be read separately so older, sparsely measured weights remain visible.
+  const loadTimelineDay = useCallback(async (petId: string, day: string, timezone: string) => {
+    const client = supabase;
+    if (!client || !/^\d{4}-\d{2}-\d{2}$/.test(day)) throw new Error('INVALID_TIMELINE_DATE');
+    const utcMidnight = Date.parse(`${day}T00:00:00Z`);
+    if (!Number.isFinite(utcMidnight)) throw new Error('INVALID_TIMELINE_DATE');
+    // Every IANA local day falls inside this wider UTC window. Filter with the
+    // pet timezone after fetching; this also handles daylight-saving days.
+    const from = new Date(utcMidnight - 86_400_000).toISOString();
+    const to = new Date(utcMidnight + 2 * 86_400_000).toISOString();
+    const matchingEvents: HealthEvent[] = [];
+    for (let offset = 0; ; offset += 500) {
+      const result = await client.from('health_events')
+        .select('id,pet_id,actor_id,performer_id,event_type,occurred_at,recorded_at,occurrence_id,plan_version_id,value,unit')
+        .eq('pet_id', petId).gte('occurred_at', from).lt('occurred_at', to)
+        .order('occurred_at', { ascending: false }).range(offset, offset + 499);
+      if (result.error) throw result.error;
+      const page = (result.data ?? []) as HealthEvent[];
+      matchingEvents.push(...page.filter((event) => localDateKey(event.occurred_at, timezone) === day));
+      if (page.length < 500) break;
+    }
+    const matchingRevisions: EventRevision[] = [];
+    for (let offset = 0; offset < matchingEvents.length; offset += 100) {
+      const ids = matchingEvents.slice(offset, offset + 100).map((event) => event.id);
+      const result = await client.from('health_event_revisions')
+        .select('id,event_id,revision_no,revision_kind,patch,reason_code,actor_id,recorded_at').in('event_id', ids);
+      if (result.error) throw result.error;
+      matchingRevisions.push(...(result.data ?? []) as EventRevision[]);
+    }
+    return { events: matchingEvents, revisions: matchingRevisions };
+  }, []);
+
   const refreshAll = useCallback(async () => {
     const petRefreshSucceeded = await refreshPets();
     if (petRefreshSucceeded && selectedPetId) await refreshPetData(selectedPetId);
@@ -1051,7 +1084,9 @@ function Workspace({ userId, online }: { userId: string; online: boolean }) {
         <Route path="/timeline" element={!selectedPet
           ? <SetupPrompt loading={loadingPets} accessMessage={accessMessage} />
           : <TimelinePage pet={selectedPet} events={dataReady ? events : []} revisions={dataReady ? revisions : []} userId={userId}
-            dateFilter={dateFilter} setDateFilter={setDateFilter} loading={loadingEvents} onSaveExerciseEnd={saveExerciseEnd} onReviseEvent={reviseTimelineEvent} onCorrectTime={correctTimelineTime} />} />
+            dateFilter={dateFilter} setDateFilter={setDateFilter} loading={loadingEvents}
+            loadDayEvents={online && dataReady ? loadTimelineDay : undefined} refreshVersion={healthRefreshVersion}
+            onSaveExerciseEnd={saveExerciseEnd} onReviseEvent={reviseTimelineEvent} onCorrectTime={correctTimelineTime} />} />
         <Route path="/trends" element={!selectedPet ? <SetupPrompt loading={loadingPets} accessMessage={accessMessage} />
           : online && !dataReady ? <DataLoadingPage title="혈당 기록을 불러오고 있어요" /> : <HealthTrendsPage key={selectedPet.id} pet={selectedPet} userId={userId} online={online && dataReady} refreshVersion={healthRefreshVersion} onSaveWeightTarget={(eventId, expectedRevision, value) => reviseTimelineEvent(eventId, expectedRevision, 'CORRECT', { value })} onReviseWeight={reviseTimelineEvent} />} />
         <Route path="/care" element={<Navigate to="/timeline" replace />} />
@@ -1705,21 +1740,41 @@ export function QuickRecordPage(props: {
 export function TimelinePage(props: {
   pet: Pet; events: HealthEvent[]; revisions: EventRevision[]; userId: string;
   dateFilter: string; setDateFilter: (value: string) => void; loading: boolean;
+  loadDayEvents?: (petId: string, day: string, timezone: string) => Promise<{ events: HealthEvent[]; revisions: EventRevision[] }>;
+  refreshVersion?: number;
   onSaveExerciseEnd?: (eventId: string, endedAt: string, expectedRevision: number, durationSeconds: number) => Promise<boolean>;
   onReviseEvent?: (eventId: string, expectedRevision: number, kind: 'CORRECT' | 'VOID', patch: Record<string, unknown>) => Promise<boolean>;
   onCorrectTime?: (eventId: string, expectedRevision: number, occurredAt: string) => Promise<boolean>;
 }) {
-  const { pet, events, revisions, userId, dateFilter, setDateFilter, loading, onSaveExerciseEnd, onReviseEvent, onCorrectTime } = props;
+  const { pet, events, revisions, userId, dateFilter, setDateFilter, loadDayEvents, refreshVersion, onSaveExerciseEnd, onReviseEvent, onCorrectTime } = props;
   const [searchParams, setSearchParams] = useSearchParams();
+  const [dayResult, setDayResult] = useState<{ key: string; events: HealthEvent[]; revisions: EventRevision[]; error: boolean }>({
+    key: '', events: [], revisions: [], error: false,
+  });
+  const dayKey = `${pet.id}:${dateFilter}:${refreshVersion ?? 0}`;
+  useEffect(() => {
+    if (!loadDayEvents) return;
+    let active = true;
+    void loadDayEvents(pet.id, dateFilter, pet.timezone).then((result) => {
+      if (active) setDayResult({ key: dayKey, ...result, error: false });
+    }).catch(() => {
+      if (active) setDayResult({ key: dayKey, events: [], revisions: [], error: true });
+    });
+    return () => { active = false; };
+  }, [loadDayEvents, pet.id, pet.timezone, dateFilter, dayKey]);
+  const loading = props.loading || (Boolean(loadDayEvents) && dayResult.key !== dayKey);
+  const loadError = Boolean(loadDayEvents) && dayResult.key === dayKey && dayResult.error;
+  const sourceEvents = loadDayEvents ? dayResult.key === dayKey ? dayResult.events : [] : events;
+  const sourceRevisions = loadDayEvents ? dayResult.key === dayKey ? dayResult.revisions : [] : revisions;
   const visibleTypes = useMemo(() => {
     const serialized = searchParams.get('types');
     if (serialized === null) return new Set(coreTimelineTypes);
     const allowed = new Set(eventOptions.map((item) => item.type));
     return new Set(serialized.split(',').filter((type): type is EventType => allowed.has(type as EventType)));
   }, [searchParams]);
-  const dailyEvents = useMemo(() => events
+  const dailyEvents = sourceEvents
     .filter((event) => localDateKey(event.occurred_at, pet.timezone) === dateFilter)
-    .sort((a, b) => Date.parse(b.occurred_at) - Date.parse(a.occurred_at)), [events, pet.timezone, dateFilter]);
+    .sort((a, b) => Date.parse(b.occurred_at) - Date.parse(a.occurred_at));
   const filteredEvents = dailyEvents.filter((event) => visibleTypes.has(event.event_type));
 
   return <main className="page-container timeline-page">
@@ -1749,17 +1804,18 @@ export function TimelinePage(props: {
             return next;
           })}><RecordTypeIllustration type={option.type} className="timeline-chip-icon" /> {option.label}</button>)}
       </div>
-      <small>{filteredEvents.length} / {dailyEvents.length}개 기록 표시</small>
+      {!loading && !loadError && <small>{filteredEvents.length} / {dailyEvents.length}개 기록 표시</small>}
     </section>
     {loading && <p role="status" className="load-state">서버에서 기록을 확인하고 있습니다…</p>}
-    {!loading && dailyEvents.length === 0 && <section className="panel empty-panel">
+    {!loading && loadError && <p role="alert" className="inline-error">이 날짜의 서버 기록을 불러오지 못했습니다. 새로고침 후 다시 확인해 주세요.</p>}
+    {!loading && !loadError && dailyEvents.length === 0 && <section className="panel empty-panel">
       <span className="empty-illustration" aria-hidden="true">◷</span><h2>이 날짜에 서버 기록이 없습니다</h2>
       <p>기록이 없다는 사실은 실제 미실시를 뜻하지 않습니다.</p>
       <Link to="/record" className="button-link">실제 발생한 일 기록하기</Link>
     </section>}
-    {!loading && dailyEvents.length > 0 && filteredEvents.length === 0 && <section className="panel empty-panel"><h2>선택한 종류의 기록이 없습니다</h2><p>필터를 바꾸면 다른 기록을 볼 수 있어요.</p></section>}
-    {filteredEvents.length > 0 && <ol className="timeline-list">{filteredEvents.map((event) => {
-      const itemRevisions = revisions.filter((revision) => revision.event_id === event.id).sort((a, b) => a.revision_no - b.revision_no);
+    {!loading && !loadError && dailyEvents.length > 0 && filteredEvents.length === 0 && <section className="panel empty-panel"><h2>선택한 종류의 기록이 없습니다</h2><p>필터를 바꾸면 다른 기록을 볼 수 있어요.</p></section>}
+    {!loading && !loadError && filteredEvents.length > 0 && <ol className="timeline-list">{filteredEvents.map((event) => {
+      const itemRevisions = sourceRevisions.filter((revision) => revision.event_id === event.id).sort((a, b) => a.revision_no - b.revision_no);
       const latest = itemRevisions[itemRevisions.length - 1];
       const effectiveValue = effectiveEventValue(event.value, itemRevisions);
       return <li className="timeline-item" key={event.id}>

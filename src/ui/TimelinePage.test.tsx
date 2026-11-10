@@ -62,4 +62,25 @@ describe('TimelinePage filters', () => {
     await waitFor(() => expect(onReviseEvent).toHaveBeenCalledWith('w1', 0, 'VOID', {}));
     confirm.mockRestore();
   });
+
+  it('loads an older weight by its measurement date when it is outside the recent-events cache', async () => {
+    const olderWeight = {
+      id: 'older-weight', pet_id: 'pet-1', actor_id: 'user-1', performer_id: 'user-1', event_type: 'weight' as const,
+      occurred_at: '2026-11-05T08:40:00.000Z', recorded_at: '2026-11-06T01:00:00.000Z',
+      occurrence_id: null, plan_version_id: null, value: { observed_value: 17.6 }, unit: 'kg',
+    };
+    const loadDayEvents = vi.fn().mockResolvedValue({ events: [olderWeight], revisions: [] });
+    render(<MemoryRouter initialEntries={['/timeline?date=2026-11-05']}>
+      <TimelinePage pet={{ id: 'pet-1', household_id: 'house-1', name: '합성 반려견', timezone: 'Asia/Seoul' }}
+        events={[]} revisions={[]} userId="user-1" dateFilter="2026-11-05" setDateFilter={vi.fn()} loading={false}
+        loadDayEvents={loadDayEvents} />
+    </MemoryRouter>);
+
+    await waitFor(() => expect(loadDayEvents).toHaveBeenCalledWith('pet-1', '2026-11-05', 'Asia/Seoul'));
+    expect(screen.queryByRole('heading', { name: '체중' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '체중' }));
+    expect(await screen.findByRole('heading', { name: '체중' })).toBeInTheDocument();
+    expect(screen.getByText('17.6 kg')).toBeInTheDocument();
+    expect(screen.getByText('오후 05:40')).toBeInTheDocument();
+  });
 });
