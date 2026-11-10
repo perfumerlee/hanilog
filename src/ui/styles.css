@@ -435,7 +435,10 @@ button, a, input, select, textarea, summary { scroll-margin: 1rem; }
 .share-guardian-contact .share-guardian-actions > .button-primary { border-color: var(--green); background: var(--green); color: #fff; }
 .share-guardian-contact .share-guardian-actions > .button-secondary { background: #f1f4ed; color: var(--green-dark); }
 .guardian-contact-icon { flex: 0 0 1.15rem; width: 1.15rem; height: 1.15rem; }
-.public-glucose-share { padding-bottom: calc(1.5rem + env(safe-area-inset-bottom)); }
+.app-shell.public-share-shell { padding-bottom: 0; }
+.public-share-shell > .page-container { flex: none; margin-bottom: .5rem; }
+.public-share-shell > footer { margin-top: 0; padding-block: .65rem calc(.65rem + env(safe-area-inset-bottom)); }
+.public-glucose-share { padding-bottom: 0; }
 .share-target-summary strong { color: #356d47; font-size: 1.35rem; font-variant-numeric: tabular-nums; }
 .share-target-summary p, .share-target-summary small { display: block; color: var(--muted); line-height: 1.5; }
 .share-chart-wrap { width: 100%; min-width: 0; }
@@ -1246,7 +1249,7 @@ button.period-chip.selected:focus-visible {
 .trends-panel > .measurement-list h2 { font-weight: 750; }
 .measurement-list li { border-bottom: 0; }
 .measurement-list ol, .weight-measurements { display: grid; gap: .25rem; }
-.timeline-link { display: inline-flex; align-items: center; justify-content: center; gap: .55rem; min-height: 48px; margin: 0 0 var(--space-section); padding-inline: 1.1rem; }
+.timeline-link { display: flex; grid-column: 1 / -1; width: 100%; align-items: center; justify-content: center; gap: .55rem; min-height: 48px; margin: 0 0 var(--space-section); padding-inline: 1.1rem; }
 .timeline-link svg { flex: none; }
 .weight-measurements { list-style: none; padding: 0; }
 .weight-measurements button { width: 100%; display: flex; justify-content: space-between; gap: 12px; margin-block: 0; }

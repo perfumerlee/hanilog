@@ -207,7 +207,7 @@ export function App() {
   const postLoginPath = typeof requestedInvitePath === 'string' && requestedInvitePath.startsWith('/invite') ? requestedInvitePath : '/';
 
   return (
-    <div className="app-shell">
+    <div className={publicShareRoute ? 'app-shell public-share-shell' : 'app-shell'}>
       <header className="topbar">
         <Link to="/" className="brand"><img src={`${import.meta.env.BASE_URL}paw.svg`} alt="" /> HaniLog</Link>
         {location.pathname.startsWith('/glucose-share/') && <span className="environment-badge">읽기 전용</span>}

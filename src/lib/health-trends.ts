@@ -37,10 +37,6 @@ export function shiftLocalDate(day: string, offsetDays: number): string {
   return new Date(Date.UTC(year, month - 1, date + offsetDays)).toISOString().slice(0, 10);
 }
 
-// Daily measurements just over six hours apart still form one observed sequence.
-// Longer intervals remain visibly unmeasured.
-export const DAILY_GLUCOSE_CONNECTION_GAP_DAYS = 8 / 24;
-
 /** Connect only observed values no more than the chosen elapsed gap apart. */
 export function measuredLineSegments<T extends GlucoseSample>(samples: T[], maximumGapDays = 7): T[][] {
   const sorted = sortSamples(samples);

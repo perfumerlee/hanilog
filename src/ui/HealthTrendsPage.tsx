@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState, useRef, type PointerEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { glucoseMeasurementConditionLabel } from '../lib/event-entry';
 import {
-  DAILY_GLUCOSE_CONNECTION_GAP_DAYS, effectiveGlucoseValue, inPeriod, localDateKey, localMinuteOfDay, longGaps, measuredLineSegments, mgDlSamples, monthlyCounts, samplesForLocalDay,
+  effectiveGlucoseValue, inPeriod, localDateKey, localMinuteOfDay, longGaps, measuredLineSegments, mgDlSamples, monthlyCounts, samplesForLocalDay,
   shiftLocalDate, sortSamples,
   type GlucoseSample, type NumericGlucoseSample, type TrendPeriod, type TrendPoint,
 } from '../lib/health-trends';
@@ -156,7 +156,7 @@ export function HealthTrendsPage({ pet, userId, online, demoEvents, refreshVersi
   const dailySamples = useMemo(() => samplesForLocalDay(allSamples, selectedDay, pet.timezone), [allSamples, selectedDay, pet.timezone]);
   const displayedSamples = displayMode === 'day' ? dailySamples : custom ? allSamples.filter(item => { const day=localDateKey(item.occurredAt,pet.timezone); return from && to && from <= to && day >= from && day <= to; }) : samples;
   const actualSegments = useMemo(() => displayMode === 'day'
-    ? measuredLineSegments(displayedSamples, DAILY_GLUCOSE_CONNECTION_GAP_DAYS) : measuredLineSegments(displayedSamples), [displayMode, displayedSamples]);
+    ? measuredLineSegments(displayedSamples, Number.POSITIVE_INFINITY) : measuredLineSegments(displayedSamples), [displayMode, displayedSamples]);
   const newest = allSamples.at(-1);
   const previous = allSamples.at(-2);
   const average = displayedSamples.length >= 3 ? displayedSamples.reduce((sum, item) => sum + item.value, 0) / displayedSamples.length : null;

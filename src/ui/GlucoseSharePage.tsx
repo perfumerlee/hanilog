@@ -1,7 +1,7 @@
 import { WeightTrends } from './WeightTrends';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { DAILY_GLUCOSE_CONNECTION_GAP_DAYS, measuredLineSegments, localDateKey, samplesForLocalDay, shiftLocalDate, type GlucoseSample, type TrendPeriod } from '../lib/health-trends';
+import { measuredLineSegments, localDateKey, samplesForLocalDay, shiftLocalDate, type GlucoseSample, type TrendPeriod } from '../lib/health-trends';
 import { callGlucoseShare, GlucoseShareRequestError, type GlucoseSharePayload } from '../lib/glucose-share';
 import { supabase } from '../lib/supabase';
 import { PET_AVATARS } from '../lib/pet-profile';
@@ -115,7 +115,7 @@ export function GlucoseSharePage() {
   const displayedSamples = displayMode === 'day' ? daily : custom ? samples.filter(item => { const day=localDateKey(item.occurredAt,share?.timezone ?? 'UTC'); return from && to && from <= to && day >= from && day <= to; }) : periodSamples;
   const average = displayedSamples.length >= 3 ? displayedSamples.reduce((sum, item) => sum + item.value, 0) / displayedSamples.length : null;
   const selected = displayedSamples.find((item) => item.id === selectedId) ?? displayedSamples.at(-1) ?? null;
-  const actualSegments = measuredLineSegments(displayedSamples, displayMode === 'day' ? DAILY_GLUCOSE_CONNECTION_GAP_DAYS : 7);
+  const actualSegments = measuredLineSegments(displayedSamples, displayMode === 'day' ? Number.POSITIVE_INFINITY : 7);
 
   if (loading) return <main className="page-container trends-loading-page public-glucose-share" role="status" aria-live="polite" aria-busy="true">
     <div className="loading-spinner" aria-hidden="true" /><h1>공유 기록을 불러오고 있어요</h1>
