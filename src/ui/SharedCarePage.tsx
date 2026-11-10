@@ -150,13 +150,13 @@ export function SharedCarePage({ households, pets, userId, onRenameHousehold }: 
     setBusy(false);
   }
 
-  return <main className="page-container">
+  return <main className="page-container shared-care-page">
     <section className="page-heading"><p className="eyebrow">가족 공간</p><h1>가족 공간과 보호자</h1></section>
     {notice && <div role="status" className="notice notice-warning">{notice}</div>}
     {inviteUrl && <section className="panel"><h2>초대 링크</h2><label className="field-label">한 번 표시되는 링크<input readOnly value={inviteUrl} onFocus={(event) => event.currentTarget.select()} /></label>
       <p className="small-note">이 링크는 초대 대상 이메일로 로그인한 사용자만 수락할 수 있고, 만료 또는 사용 후 재사용할 수 없습니다. 링크 전달 채널의 안전성은 보호자가 확인하세요.</p></section>}
     {!households.length ? <section className="panel empty-panel"><h2>가족 공간이 없습니다</h2><p>먼저 오늘 화면에서 가족 공간과 반려동물을 등록해 주세요.</p><Link className="button-link" to="/">오늘 화면으로 이동</Link></section> : <>
-      <section className="panel"><label className="field-label">가족 공간<select value={householdId} onChange={(event) => { setSelectedHouseholdId(event.target.value); setPetIds([]); setInviteUrl(''); }}>
+      <section className="panel shared-care-overview"><p className="eyebrow">함께 돌보는 공간</p><h2>가족 공간 개요</h2><label className="field-label">가족 공간<select value={householdId} onChange={(event) => { setSelectedHouseholdId(event.target.value); setPetIds([]); setInviteUrl(''); }}>
         {households.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}
       </select></label><ul className="household-pet-list">{householdPets.map((pet) => <li key={pet.id}><PetProfilePortrait pet={pet} className="household-pet-portrait" /><strong>{pet.name}</strong></li>)}</ul></section>
       <details className="panel shared-care-detail" id="household-settings"><summary>가족 공간 이름 수정</summary>
@@ -166,7 +166,7 @@ export function SharedCarePage({ households, pets, userId, onRenameHousehold }: 
           <button type="submit" disabled={busy || !householdName.trim() || householdName.trim() === selectedHousehold?.name}>{busy ? '저장 중…' : '가족 공간 이름 저장'}</button>
         </form> : <p className="small-note">현재 가족 공간 이름: {selectedHousehold?.name ?? '확인 중'} · 이름 변경은 주 보호자만 할 수 있습니다.</p>}
       </details>
-      <details className="panel shared-care-detail"><summary>보호자 초대</summary>
+      <details className="panel shared-care-detail shared-care-invite"><summary>새로운 보호자 초대</summary>
         <form className="stack" onSubmit={(event) => void createInvite(event)}>
           <label className="field-label">초대받을 이메일<input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></label>
           <label className="field-label">역할<select value={role} onChange={(event) => setRole(event.target.value as typeof role)}><option value="CAREGIVER">공동 보호자 · 기록 가능</option><option value="READ_ONLY">읽기 전용</option></select></label>
@@ -177,7 +177,7 @@ export function SharedCarePage({ households, pets, userId, onRenameHousehold }: 
           {!canManage && <p className="small-note">초대·권한 변경은 주 보호자만 할 수 있습니다. 현재 로그인한 역할에서 확인되지 않았습니다.</p>}
         </form>
       </details>
-      <details className="panel shared-care-detail"><summary>보호자 {members.length}명 · 권한 관리</summary><button type="button" className="secondary-action" onClick={() => void refresh()} disabled={loading}>새로 확인</button>
+      <details className="panel shared-care-detail shared-care-members" open><summary>함께하는 사람들 · {members.length}명</summary><button type="button" className="secondary-action" onClick={() => void refresh()} disabled={loading}>새로 확인</button>
         <p className="small-note" role="status">권한 변경 실시간 {realtimeStatus === 'connected' ? '연결됨' : realtimeStatus === 'connecting' ? '연결 확인 중' : '끊김 · 주기적으로 서버 재확인'}</p>
         {loading ? <p role="status">서버에서 권한을 확인하고 있습니다…</p> : <ul className="member-list">{members.map((member) => <li key={member.id}>
           <div className="member-heading"><strong>{member.role === 'PRIMARY_CAREGIVER' ? '주 보호자' : member.role === 'READ_ONLY' ? '읽기 전용' : '공동 보호자'}</strong><code>{member.user_id === userId ? '나' : member.user_id.slice(0, 8)}</code></div>

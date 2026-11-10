@@ -1,6 +1,6 @@
 import { weightSamples } from '../lib/weight-trends';
 import { loadWeightTarget } from '../lib/weight-history';
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import {
@@ -305,7 +305,11 @@ function DemoWorkspace() {
   const noOpForm = (event: FormEvent<HTMLFormElement>) => event.preventDefault();
   return <>
     <div className="workspace-layout">
-      <SessionNavigation key={`${location.pathname}${location.search}`} pathname={location.pathname} search={location.search} />
+      <SessionNavigation key={`${location.pathname}${location.search}`} pathname={location.pathname} search={location.search}
+        petSelector={<div className="pet-switcher"><label htmlFor="demo-nav-pet-switch">예시 반려동물</label>
+          <select id="demo-nav-pet-switch" value={pet.id} onChange={(event) => setSelectedPetId(event.target.value)}>
+            {demoPetList.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+          </select></div>} />
       <div className="workspace-content">
         <div className="notice notice-warning demo-banner" role="status">
           <strong>DEMO 모드 · 합성 정보만 사용</strong>
@@ -996,7 +1000,13 @@ function Workspace({ userId, online }: { userId: string; online: boolean }) {
 
   return (
     <div className="workspace-layout">
-      <SessionNavigation key={`${location.pathname}${location.search}`} pathname={location.pathname} search={location.search} />
+      <SessionNavigation key={`${location.pathname}${location.search}`} pathname={location.pathname} search={location.search}
+        petSelector={pets.length > 0 ? <div className="pet-switcher"><label htmlFor="nav-pet-switch">현재 반려동물</label>
+          <select id="nav-pet-switch" value={selectedPetId} onChange={(event) => {
+            pendingCommand.current = null; setRecordNotice(null); setSelectedPetId(event.target.value);
+          }}>{pets.map((pet) => <option value={pet.id} key={pet.id}>{pet.name}</option>)}</select>
+          {selectedPet && <PetProfilePortrait pet={selectedPet} className="nav-pet-portrait" />}
+        </div> : undefined} />
       <div className="workspace-content">
       <div className="workspace-bar">
         {pets.length > 0 ? <div className="pet-switcher">
@@ -1069,7 +1079,7 @@ function DataLoadingPage({ title }: { title: string }) {
   </main>;
 }
 
-function SessionNavigation({ pathname, search }: { pathname: string; search: string }) {
+function SessionNavigation({ pathname, search, petSelector }: { pathname: string; search: string; petSelector?: ReactNode }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const desktopItems = [
     { to: '/trends', label: '혈당 기록', icon: 'glucose' },
@@ -1118,6 +1128,7 @@ function SessionNavigation({ pathname, search }: { pathname: string; search: str
   return <>
     {moreOpen && <button type="button" className="nav-menu-backdrop" aria-label="메뉴 닫기" onClick={() => setMoreOpen(false)} />}
     <nav className={`app-nav${moreOpen ? ' is-open' : ''}`} aria-label="주요 메뉴">
+      {petSelector && <div className="nav-pet-selector">{petSelector}</div>}
       <div className="nav-desktop-list">{desktopItems.map(linkFor)}</div>
       <div className="nav-primary">{primaryItems.map(linkFor)}
         <button type="button" className={`nav-more-toggle${activeSecondary ? ' active' : ''}`} aria-expanded={moreOpen}

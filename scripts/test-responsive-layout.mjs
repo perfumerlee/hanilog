@@ -193,7 +193,7 @@ try {
       assert.equal(await page.locator('.app-nav .nav-item:visible').count(), 6,
         'Desktop sidebar must expose every supported route.');
       assert.deepEqual(await page.locator('.nav-desktop-list .nav-item:visible').allTextContents(),
-        ['⌁혈당 기록', '◷하루 타임머신', '+빠른 기록', '🐾반려동물 설정', '♡가족 공간과 보호자', '♧알림 및 전달 설정'],
+        ['혈당 기록', '◷하루 타임라인', '+빠른 기록', '🐾반려동물 설정', '♡가족 공간과 보호자', '♧알림 및 전달 설정'],
         'Desktop sidebar order must match the caregiver workflow.');
       await page.goto(`${origin}/#/record`, { waitUntil: 'domcontentloaded' });
       const quickRecordColors = await page.locator('.nav-desktop-list .nav-record').evaluate((node) => ({
