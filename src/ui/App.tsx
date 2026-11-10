@@ -77,7 +77,7 @@ const eventOptions: { type: EventType; label: string; icon: string; short: strin
   { type: 'symptom', label: '증상·컨디션', icon: '♡', short: '관찰한 상태' },
 ];
 const primaryRecordTypes: EventType[] = ['glucose', 'insulin', 'elimination', 'meal'];
-const coreTimelineTypes: EventType[] = primaryRecordTypes;
+const coreTimelineTypes: EventType[] = [...primaryRecordTypes, 'weight'];
 const rememberedLoginEmailKey = 'hanilog:remembered-login-email';
 const commonInsulinProductLabels = ['캐니슐린', '프로진크', 'NPH', '글라진', '디터미르'];
 const eventLabels = Object.fromEntries(eventOptions.map((option) => [option.type, option.label])) as Record<EventType, string>;
@@ -1771,6 +1771,9 @@ export function TimelinePage(props: {
               {latest.revision_kind === 'VOID' ? '무효 처리' : '정정 이력 있음'}
             </span>}</div>
           <p className="event-value">{formatEventValue(event, effectiveValue)}</p>
+          {event.event_type === 'weight' && onReviseEvent && latest?.revision_kind !== 'VOID' &&
+            <TimelineCorrectionEditor event={event} value={effectiveValue} revision={latest?.revision_no ?? 0}
+              onSave={onReviseEvent} onCorrectTime={onCorrectTime} direct />}
           <details><summary>상세 정보·수정</summary>
             <p className="event-timestamp">실제 발생 {dateTimeInTimezone(event.occurred_at, pet.timezone)}</p>
             {event.event_type === 'exercise' && typeof effectiveValue.activity_ended_at === 'string' &&
@@ -1778,7 +1781,7 @@ export function TimelinePage(props: {
             {event.event_type === 'exercise' && onSaveExerciseEnd && latest?.revision_kind !== 'VOID' &&
               <ExerciseEndEditor event={event} value={effectiveValue} revision={latest?.revision_no ?? 0}
                 onSave={onSaveExerciseEnd} />}
-            {onReviseEvent && latest?.revision_kind !== 'VOID' && <TimelineCorrectionEditor event={event} value={effectiveValue}
+            {event.event_type !== 'weight' && onReviseEvent && latest?.revision_kind !== 'VOID' && <TimelineCorrectionEditor event={event} value={effectiveValue}
               revision={latest?.revision_no ?? 0} onSave={onReviseEvent} onCorrectTime={onCorrectTime} />}
             <p className="event-timestamp">기록자 {actorLabel(event.actor_id, userId)} · 서버 입력 {dateTimeInTimezone(event.recorded_at, pet.timezone)}</p>
             <dl className="detail-list"><div><dt>기록 ID</dt><dd>{event.id}</dd></div>
@@ -1802,10 +1805,11 @@ export function TimelinePage(props: {
   </main>;
 }
 
-function TimelineCorrectionEditor({ event, value, revision, onSave, onCorrectTime }: {
+function TimelineCorrectionEditor({ event, value, revision, onSave, onCorrectTime, direct = false }: {
   event: HealthEvent; value: Record<string, unknown>; revision: number;
   onSave: (eventId: string, revision: number, kind: 'CORRECT' | 'VOID', patch: Record<string, unknown>) => Promise<boolean>;
   onCorrectTime?: (eventId: string, revision: number, occurredAt: string) => Promise<boolean>;
+  direct?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState(String(value.observed_value ?? value.administered_dose_value ?? ''));
@@ -1856,7 +1860,10 @@ function TimelineCorrectionEditor({ event, value, revision, onSave, onCorrectTim
     setBusy(false); if (success) setOpen(false); else setError('시각을 수정하지 못했습니다. 서버 적용 상태와 최신 기록을 확인해 주세요.');
   }
   return <div className="timeline-correction">
-    <button type="button" className="text-button" aria-expanded={open} onClick={() => setOpen(!open)}>수정·삭제</button>
+    <div className="timeline-correction-actions">
+      <button type="button" className="text-button" aria-expanded={open} onClick={() => setOpen(!open)}>{direct ? '수정' : '수정·삭제'}</button>
+      {direct && <button type="button" className="text-button" disabled={busy} onClick={() => void voidEvent()}>삭제</button>}
+    </div>
     {open && <div className="timeline-correction-fields">
       {numeric && <label className="field-label">기록값<input type="number" inputMode="decimal" step="any" value={amount} onChange={(input) => setAmount(input.target.value)} /></label>}
       {event.event_type === 'weight' && <label className="field-label">목표 체중 (kg)<input type="number" inputMode="decimal" min="0.01" step="any" value={targetWeight} onChange={(input) => setTargetWeight(input.target.value)} /></label>}
@@ -1872,7 +1879,7 @@ function TimelineCorrectionEditor({ event, value, revision, onSave, onCorrectTim
       {error && <p role="alert" className="inline-error">{error}</p>}
       <div className="timeline-correction-actions"><button type="button" className="button-secondary" disabled={busy} onClick={() => void save()}>값·메모 저장</button>
         {onCorrectTime && <button type="button" className="button-secondary" disabled={busy} onClick={() => void saveTime()}>시각 저장</button>}
-        <button type="button" className="text-button" disabled={busy} onClick={() => void voidEvent()}>기록 무효화</button></div>
+        {!direct && <button type="button" className="text-button" disabled={busy} onClick={() => void voidEvent()}>기록 무효화</button>}</div>
     </div>}
   </div>;
 }

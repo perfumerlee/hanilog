@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, useSearchParams } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TimelinePage } from './App';
@@ -22,6 +22,9 @@ describe('TimelinePage filters', () => {
       { id: 'm1', pet_id: 'pet-1', actor_id: 'user-1', performer_id: 'user-1', event_type: 'meal' as const,
         occurred_at: '2026-11-04T04:00:00.000Z', recorded_at: '2026-11-04T04:01:00.000Z', occurrence_id: null, plan_version_id: null,
         value: { food: '합성 예시' }, unit: null },
+      { id: 'w1', pet_id: 'pet-1', actor_id: 'user-1', performer_id: 'user-1', event_type: 'weight' as const,
+        occurred_at: '2026-11-04T05:00:00.000Z', recorded_at: '2026-11-04T05:01:00.000Z', occurrence_id: null, plan_version_id: null,
+        value: { observed_value: 17.6 }, unit: 'kg' },
     ];
     render(<MemoryRouter initialEntries={['/timeline?date=2026-11-04']}>
       <TimelinePage pet={{ id: 'pet-1', household_id: 'house-1', name: '합성 반려견', timezone: 'Asia/Seoul' }}
@@ -33,8 +36,29 @@ describe('TimelinePage filters', () => {
     expect(screen.getByRole('heading', { name: '혈당' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '인슐린' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '식사' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '체중' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /주요 기록/ }));
     expect(screen.getByLabelText('현재 필터')).toHaveTextContent('date=2026-11-04');
-    expect(screen.getByLabelText('현재 필터')).toHaveTextContent('types=glucose%2Cinsulin%2Celimination%2Cmeal');
+    expect(screen.getByLabelText('현재 필터')).toHaveTextContent('types=glucose%2Cinsulin%2Celimination%2Cmeal%2Cweight');
+  });
+
+  it('shows direct weight correction and deletion with an audit-preserving void request', async () => {
+    const onReviseEvent = vi.fn().mockResolvedValue(true);
+    render(<MemoryRouter initialEntries={['/timeline?date=2026-11-04']}>
+      <TimelinePage pet={{ id: 'pet-1', household_id: 'house-1', name: '합성 반려견', timezone: 'Asia/Seoul' }}
+        events={[{ id: 'w1', pet_id: 'pet-1', actor_id: 'user-1', performer_id: 'user-1', event_type: 'weight',
+          occurred_at: '2026-11-04T05:00:00.000Z', recorded_at: '2026-11-04T05:01:00.000Z', occurrence_id: null, plan_version_id: null,
+          value: { observed_value: 17.6 }, unit: 'kg' }]}
+        revisions={[]} userId="user-1" dateFilter="2026-11-04" setDateFilter={vi.fn()} loading={false}
+        onReviseEvent={onReviseEvent} />
+    </MemoryRouter>);
+    fireEvent.click(screen.getByRole('button', { name: '수정' }));
+    fireEvent.change(screen.getByLabelText('기록값'), { target: { value: '17.8' } });
+    fireEvent.click(screen.getByRole('button', { name: '값·메모 저장' }));
+    await waitFor(() => expect(onReviseEvent).toHaveBeenCalledWith('w1', 0, 'CORRECT', expect.objectContaining({ value: expect.objectContaining({ observed_value: 17.8 }) })));
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    fireEvent.click(screen.getByRole('button', { name: '삭제' }));
+    await waitFor(() => expect(onReviseEvent).toHaveBeenCalledWith('w1', 0, 'VOID', {}));
+    confirm.mockRestore();
   });
 });
