@@ -768,7 +768,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .topbar { background: var(--surface-raised); border-bottom-color: var(--border-subtle); backdrop-filter: none; }
 .brand { color: var(--green-dark); letter-spacing: -.035em; }
 .quiet-button { color: var(--text-secondary); }
-.workspace-bar { align-items: center; }
+.workspace-bar { align-items: flex-end; }
 .pet-switcher label, .timeline-filter label { color: var(--text-secondary); }
 .pet-switcher select { box-shadow: none; border: 1px solid var(--border-subtle); }
 .page-container { margin-top: .8rem; margin-bottom: 1.4rem; }
@@ -1246,7 +1246,8 @@ button.period-chip.selected:focus-visible {
 .trends-panel > .measurement-list h2 { font-weight: 750; }
 .measurement-list li { border-bottom: 0; }
 .measurement-list ol, .weight-measurements { display: grid; gap: .25rem; }
-.timeline-link-panel .button-link { display: flex; justify-content: center; }
+.timeline-link { display: inline-flex; align-items: center; justify-content: center; gap: .55rem; min-height: 48px; margin: 0 0 var(--space-section); padding-inline: 1.1rem; }
+.timeline-link svg { flex: none; }
 .weight-measurements { list-style: none; padding: 0; }
 .weight-measurements button { width: 100%; display: flex; justify-content: space-between; gap: 12px; margin-block: 0; }
 .weight-period-picker { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-block: 12px; }

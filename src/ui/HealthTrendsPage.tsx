@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState, useRef, type PointerEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { glucoseMeasurementConditionLabel } from '../lib/event-entry';
 import {
-  effectiveGlucoseValue, inPeriod, localDateKey, localMinuteOfDay, longGaps, measuredLineSegments, mgDlSamples, monthlyCounts, samplesForLocalDay,
+  DAILY_GLUCOSE_CONNECTION_GAP_DAYS, effectiveGlucoseValue, inPeriod, localDateKey, localMinuteOfDay, longGaps, measuredLineSegments, mgDlSamples, monthlyCounts, samplesForLocalDay,
   shiftLocalDate, sortSamples,
   type GlucoseSample, type NumericGlucoseSample, type TrendPeriod, type TrendPoint,
 } from '../lib/health-trends';
@@ -156,7 +156,7 @@ export function HealthTrendsPage({ pet, userId, online, demoEvents, refreshVersi
   const dailySamples = useMemo(() => samplesForLocalDay(allSamples, selectedDay, pet.timezone), [allSamples, selectedDay, pet.timezone]);
   const displayedSamples = displayMode === 'day' ? dailySamples : custom ? allSamples.filter(item => { const day=localDateKey(item.occurredAt,pet.timezone); return from && to && from <= to && day >= from && day <= to; }) : samples;
   const actualSegments = useMemo(() => displayMode === 'day'
-    ? measuredLineSegments(displayedSamples, 6 / 24) : measuredLineSegments(displayedSamples), [displayMode, displayedSamples]);
+    ? measuredLineSegments(displayedSamples, DAILY_GLUCOSE_CONNECTION_GAP_DAYS) : measuredLineSegments(displayedSamples), [displayMode, displayedSamples]);
   const newest = allSamples.at(-1);
   const previous = allSamples.at(-2);
   const average = displayedSamples.length >= 3 ? displayedSamples.reduce((sum, item) => sum + item.value, 0) / displayedSamples.length : null;
@@ -236,7 +236,10 @@ export function HealthTrendsPage({ pet, userId, online, demoEvents, refreshVersi
       </section>
       <WeightTrends key={pet.id} events={sourceEvents} revisions={revisions} timezone={pet.timezone} onSaveTarget={onSaveWeightTarget} />
       {glucoseCareTools}
-      <section className="panel timeline-link-panel"><Link className="button-link" to={`/timeline?date=${encodeURIComponent(selected ? localDateKey(selected.occurredAt, pet.timezone) : selectedDay)}`}>하루 타임라인 열기</Link></section>
+      <Link className="button-link timeline-link" to={`/timeline?date=${encodeURIComponent(selected ? localDateKey(selected.occurredAt, pet.timezone) : selectedDay)}`}>
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+        하루 타임라인 열기
+      </Link>
       {displayMode === 'period' && (period === '1y' || period === 'all') && <section className="panel monthly-panel"><h2>월별 실제 검사 횟수</h2>
         {monthly.length ? <ul className="monthly-counts">{monthly.map((item) => <li key={item.month}><span>{item.month}</span><strong>{item.count}회</strong></li>)}</ul>
           : <p>선택한 기간의 월별 기록이 없습니다.</p>}

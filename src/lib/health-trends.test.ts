@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { effectiveGlucoseValue, inPeriod, localDateKey, longGaps, measuredLineSegments, mgDlSamples, monthlyCounts,
+import { DAILY_GLUCOSE_CONNECTION_GAP_DAYS, effectiveGlucoseValue, inPeriod, localDateKey, longGaps, measuredLineSegments, mgDlSamples, monthlyCounts,
   sortSamples, trendLineSegments, trendPoints, type GlucoseSample } from './health-trends';
 
 function sample(id: string, occurredAt: string, value = 150, unit: string | null = 'mg/dL'): GlucoseSample {
@@ -69,6 +69,15 @@ describe('health trend data handling', () => {
     expect(segments.some((segment) => segment.some((item) => item.id === 'd29')
       && segment.some((item) => item.id === 'd38'))).toBe(false);
     expect(measuredLineSegments(daily).every((segment) => segment.length > 1)).toBe(true);
+  });
+
+  it('connects same-day measurements just beyond six hours but leaves long gaps open', () => {
+    const first = sample('first', '2026-11-10T00:38:00Z');
+    const second = sample('second', '2026-11-10T06:44:00Z');
+    const third = sample('third', '2026-11-10T12:38:00Z');
+    const late = sample('late', '2026-11-10T22:38:00Z');
+    expect(measuredLineSegments([first, second, third, late], DAILY_GLUCOSE_CONNECTION_GAP_DAYS)
+      .map((segment) => segment.map((item) => item.id))).toEqual([['first', 'second', 'third'], ['late']]);
   });
 
   it('keeps fortnightly and monthly measurements as independent observed points', () => {

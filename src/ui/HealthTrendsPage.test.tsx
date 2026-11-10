@@ -20,7 +20,9 @@ describe('HealthTrendsPage', () => {
     expect(screen.getByRole('img', { name: /기간별 실제 측정 기록 21건과 mg\/dL 값/ })).toBeInTheDocument();
     const measurementDetails = screen.getByText('측정 상세 정보').closest('details');
     expect(document.querySelector('.trends-panel > .measurement-list')).toBeInTheDocument();
-    expect(document.querySelector('.timeline-link-panel')).toHaveTextContent('하루 타임라인 열기');
+    expect(screen.getByRole('link', { name: '하루 타임라인 열기' })).toHaveClass('timeline-link');
+    expect(screen.getByRole('link', { name: '하루 타임라인 열기' }).querySelector('svg')).toBeInTheDocument();
+    expect(document.querySelector('.timeline-link-panel')).not.toBeInTheDocument();
     expect(measurementDetails).not.toHaveAttribute('open');
     fireEvent.click(measurementDetails!.querySelector('summary')!);
     expect(screen.getByText('측정 출처')).toBeInTheDocument();
