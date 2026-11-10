@@ -1268,21 +1268,27 @@ button.period-chip.selected:focus-visible {
 }
 .weight-trends summary { cursor: pointer; min-height: 44px; padding-block: 12px; }
 .weight-chart { display: block; width: 100%; height: 375px; max-width: none; }
-.weight-list-heading { margin: 1rem 0 .45rem; padding-top: 1rem; border-top: 1px solid var(--line); font-size: 1.05rem; font-weight: 750; }
+.weight-list-heading { display: flex; align-items: center; gap: .5rem; margin: 1rem 0 .55rem; padding-top: 1rem; border-top: 1px solid var(--line); color: var(--ink); font-size: 1rem; font-weight: 750; letter-spacing: -.015em; }
 .trends-panel > .measurement-list { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--line); }
 .trends-panel > .measurement-list h2 { font-weight: 750; }
 .measurement-list li { border-bottom: 0; }
 .measurement-list ol, .weight-measurements { display: grid; gap: .25rem; }
 .timeline-link { display: flex; grid-column: 1 / -1; width: 100%; align-items: center; justify-content: center; gap: .55rem; min-height: 48px; margin: 0 0 var(--space-section); padding-inline: 1.1rem; }
 .timeline-link svg { flex: none; }
-.weight-measurements { list-style: none; padding: 0; }
-.weight-measurements button { width: 100%; display: flex; justify-content: space-between; gap: 12px; margin-block: 0; }
-.weight-measurement-actions { display: flex; justify-content: flex-end; gap: .35rem; padding: .1rem .2rem .45rem; }
+.weight-measurements { display: grid; gap: .35rem; list-style: none; margin: 0; padding: 0; }
+.weight-measurements > li { min-width: 0; padding: .3rem .65rem; border: 1px solid transparent; border-radius: .7rem; transition: background-color .15s ease, border-color .15s ease; }
+.weight-measurements > li:has(.sample-row.active) { border-color: #d3e1d8; background: #f4f7f2; }
+.weight-measurements button.sample-row { width: 100%; min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0; padding: .35rem 0; border: 0; border-radius: 0; background: transparent; color: var(--ink); text-align: left; }
+.weight-measurements .sample-row strong { font-size: .98rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.weight-measurements .sample-row span { color: var(--muted); font-size: .84rem; font-variant-numeric: tabular-nums; text-align: right; }
+.weight-measurement-actions { display: flex; justify-content: flex-end; gap: .25rem; padding: 0 0 .15rem; }
 .weight-measurements .weight-measurement-actions button { width: auto; min-height: 44px; padding: .45rem .65rem; }
 .weight-measurement-editor { display: flex; flex-wrap: wrap; align-items: end; gap: .65rem; padding: .5rem 0 1rem; }
 .weight-measurement-editor .field-label { flex: 1 1 160px; min-width: 0; }
 .weight-measurements .weight-measurement-editor button { width: auto; min-height: 44px; }
 .weight-measurement-editor [role="alert"] { flex-basis: 100%; margin: 0; }
+.weight-trends details > p { margin: .6rem 0; color: var(--muted); font-size: .84rem; }
+@media (max-width: 420px) { .weight-measurements > li { padding-inline: .45rem; } .weight-measurements .sample-row strong { font-size: .9rem; } .weight-measurements .sample-row span { font-size: .76rem; } }
 .weight-period-picker { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-block: 12px; }
 .weight-period-picker button { min-width: 0; width: 100%; min-height: 44px; padding-inline: 4px; white-space: nowrap; }
 
