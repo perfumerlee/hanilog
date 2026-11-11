@@ -812,6 +812,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .event-icon { position: relative; z-index: 1; width: 30px; height: 30px; border: 3px solid var(--surface-page); border-radius: 50%; background: #dce5d8; color: #485f4b; }
 .timeline-card { padding: .68rem .15rem .8rem .3rem; border: 0; border-bottom: 1px solid #e8e5dc; border-radius: 0; background: transparent; }
 .timeline-card-heading h2 { font-weight: 700; }
+.timeline-title-group { display: inline-flex; align-items: center; gap: .55rem; min-width: 0; }
 .glucose-condition-badge { display: inline-flex; align-items: center; flex: 0 0 auto; min-height: 1.45rem; padding: .16rem .55rem; border: 1px solid transparent; border-radius: 999px; font-size: .72rem; font-weight: 700; line-height: 1.2; }
 .glucose-condition-before_meal { color: #315f48; background: #e5f1e8; border-color: #c7dfce; }
 .glucose-condition-after_meal { color: #81531d; background: #fff1d8; border-color: #ead4ad; }
