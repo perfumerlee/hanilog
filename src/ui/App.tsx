@@ -12,7 +12,7 @@ import {
   type EventType,
   type HealthEventCommand,
 } from '../lib/event-command';
-import { formatGlucoseValue, GLUCOSE_MEASUREMENT_CONDITIONS, GLUCOSE_UNIT, validateEventEntry, type EventEntryFields } from '../lib/event-entry';
+import { formatGlucoseValue, glucoseMeasurementConditionLabel, GLUCOSE_MEASUREMENT_CONDITIONS, GLUCOSE_UNIT, validateEventEntry, type EventEntryFields } from '../lib/event-entry';
 import { isSupabaseConfigured, supabase, supabaseConfigurationError, userFacingError } from '../lib/supabase';
 import { petInvalidationChannel, userAccessChannel } from '../lib/realtime';
 import { InvitationAcceptPage, SharedCarePage } from './SharedCarePage';
@@ -1823,6 +1823,10 @@ export function TimelinePage(props: {
         <RecordTypeIllustration type={event.event_type} className="event-icon" />
         <article className="timeline-card">
           <div className="timeline-card-heading"><h2>{eventLabels[event.event_type] ?? event.event_type}</h2>
+            {event.event_type === 'glucose' && typeof effectiveValue.measurement_condition === 'string' &&
+              <span className={`glucose-condition-badge glucose-condition-${effectiveValue.measurement_condition.toLowerCase()}`}>
+                {glucoseMeasurementConditionLabel(effectiveValue.measurement_condition)}
+              </span>}
             {latest && <span className={latest.revision_kind === 'VOID' ? 'event-status void' : 'event-status corrected'}>
               {latest.revision_kind === 'VOID' ? '무효 처리' : '정정 이력 있음'}
             </span>}</div>
