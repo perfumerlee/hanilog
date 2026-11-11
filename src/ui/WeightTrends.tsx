@@ -32,6 +32,7 @@ export function WeightTrends({ events, revisions, timezone, readOnly = false, sh
   const shown = samples.filter(sample => !days || Date.parse(sample.occurredAt) >= now - days * 86400000);
   const selected = shown.find(sample => sample.id === selectedId) ?? shown.at(-1);
   const date = (instant: string) => new Intl.DateTimeFormat('ko-KR', { timeZone: timezone, dateStyle: 'medium' }).format(new Date(instant));
+  const dateTime = (instant: string) => new Intl.DateTimeFormat('ko-KR', { timeZone: timezone, dateStyle: 'medium', timeStyle: 'short' }).format(new Date(instant));
   const low = 0;
   // Keep 0–30 kg as baseline, extend in 3 kg steps rather than clipping larger pets.
   const high = Math.ceil(Math.max(30, ...shown.map(sample => sample.value), target ?? 0) / 3) * 3;
@@ -113,11 +114,12 @@ export function WeightTrends({ events, revisions, timezone, readOnly = false, sh
         </svg>
         <h3 className="weight-list-heading">측정값 목록 : {shown.length}건</h3>
         <ul className="weight-measurements">{[...shown].reverse().map(sample => <li key={sample.id}>
-          <button type="button" className={sample.id === selected?.id ? 'sample-row active' : 'sample-row'} onClick={() => setSelectedId(sample.id)} aria-pressed={sample.id === selected?.id}><strong>{sample.value} kg</strong><span>{date(sample.occurredAt)}</span></button>
+          <div className="weight-measurement-row"><button type="button" className={sample.id === selected?.id ? 'sample-row active' : 'sample-row'} onClick={() => setSelectedId(sample.id)} aria-pressed={sample.id === selected?.id}>
+            <strong>{sample.value} kg</strong><span>{dateTime(sample.occurredAt)}</span></button>
           {!readOnly && onReviseWeight && <div className="weight-measurement-actions">
             <button type="button" className="text-button" aria-label={`${date(sample.occurredAt)} 체중 수정`} aria-expanded={editingId === sample.id} onClick={() => { setEditingId(editingId === sample.id ? null : sample.id); setWeightDraft(String(sample.value)); setWeightError(''); }}>수정</button>
             <button type="button" className="text-button" aria-label={`${date(sample.occurredAt)} 체중 삭제`} disabled={weightBusy} onClick={() => void deleteWeight(sample.id)}>삭제</button>
-          </div>}
+          </div>}</div>
           {editingId === sample.id && <form className="weight-measurement-editor" onSubmit={(event) => void reviseWeight(event, sample.id)}>
             <label className="field-label">체중 (kg)<input type="number" inputMode="decimal" min="0.01" step="any" value={weightDraft} onChange={(event) => setWeightDraft(event.target.value)} required /></label>
             <button type="submit" disabled={weightBusy}>{weightBusy ? '저장 중…' : '수정 저장'}</button>

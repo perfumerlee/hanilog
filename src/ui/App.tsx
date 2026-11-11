@@ -1766,16 +1766,21 @@ export function TimelinePage(props: {
   const loadError = Boolean(loadDayEvents) && dayResult.key === dayKey && dayResult.error;
   const sourceEvents = loadDayEvents ? dayResult.key === dayKey ? dayResult.events : [] : events;
   const sourceRevisions = loadDayEvents ? dayResult.key === dayKey ? dayResult.revisions : [] : revisions;
-  const visibleTypes = useMemo(() => {
-    const serialized = searchParams.get('types');
-    if (serialized === null) return new Set(coreTimelineTypes);
-    const allowed = new Set(eventOptions.map((item) => item.type));
-    return new Set(serialized.split(',').filter((type): type is EventType => allowed.has(type as EventType)));
-  }, [searchParams]);
   const dailyEvents = sourceEvents
     .filter((event) => localDateKey(event.occurred_at, pet.timezone) === dateFilter)
     .sort((a, b) => Date.parse(b.occurred_at) - Date.parse(a.occurred_at));
-  const filteredEvents = dailyEvents.filter((event) => visibleTypes.has(event.event_type));
+  const visibleTypes = useMemo(() => {
+    const serialized = searchParams.get('types');
+    const allowed = new Set(eventOptions.map((item) => item.type));
+    if (serialized === null) {
+      // Keep the familiar primary types selected, and automatically reveal any
+      // additional type that actually has a record on this day.
+      return new Set<EventType>([...coreTimelineTypes, ...dailyEvents.map((event) => event.event_type)]);
+    }
+    return new Set(serialized.split(',').filter((type): type is EventType => allowed.has(type as EventType)));
+  }, [dailyEvents, searchParams]);
+  const symptomEvents = dailyEvents.filter((event) => event.event_type === 'symptom' && visibleTypes.has('symptom'));
+  const filteredEvents = dailyEvents.filter((event) => event.event_type !== 'symptom' && visibleTypes.has(event.event_type));
 
   return <main className="page-container timeline-page">
     <section className="page-heading pet-photo-heading"><PetProfilePortrait pet={pet} /><div><p className="eyebrow">건강 기록</p><h1>하루 타임라인</h1>
@@ -1813,7 +1818,7 @@ export function TimelinePage(props: {
       <p>기록이 없다는 사실은 실제 미실시를 뜻하지 않습니다.</p>
       <Link to="/record" className="button-link">실제 발생한 일 기록하기</Link>
     </section>}
-    {!loading && !loadError && dailyEvents.length > 0 && filteredEvents.length === 0 && <section className="panel empty-panel"><h2>선택한 종류의 기록이 없습니다</h2><p>필터를 바꾸면 다른 기록을 볼 수 있어요.</p></section>}
+    {!loading && !loadError && dailyEvents.length > 0 && filteredEvents.length === 0 && symptomEvents.length === 0 && <section className="panel empty-panel"><h2>선택한 종류의 기록이 없습니다</h2><p>필터를 바꾸면 다른 기록을 볼 수 있어요.</p></section>}
     {!loading && !loadError && filteredEvents.length > 0 && <ol className="timeline-list">{filteredEvents.map((event) => {
       const itemRevisions = sourceRevisions.filter((revision) => revision.event_id === event.id).sort((a, b) => a.revision_no - b.revision_no);
       const latest = itemRevisions[itemRevisions.length - 1];
@@ -1861,6 +1866,27 @@ export function TimelinePage(props: {
         </article>
       </li>;
     })}</ol>}
+    {!loading && !loadError && symptomEvents.length > 0 && <section className="panel timeline-symptom-section" aria-labelledby="timeline-symptom-heading">
+      <div className="section-heading"><div><p className="eyebrow">하루 타임라인</p><h2 id="timeline-symptom-heading">증상·컨디션 기록 <small>{symptomEvents.length}건</small></h2></div></div>
+      <p className="small-note">관찰해 기록한 내용입니다. 앱이 진단하거나 상태를 분류하지 않습니다.</p>
+      <ul className="timeline-symptom-list">{symptomEvents.map((event) => {
+        const itemRevisions = sourceRevisions.filter((revision) => revision.event_id === event.id).sort((a, b) => a.revision_no - b.revision_no);
+        const latest = itemRevisions.at(-1);
+        const effectiveValue = effectiveEventValue(event.value, itemRevisions);
+        const observation = typeof effectiveValue.note === 'string' && effectiveValue.note.trim() ? effectiveValue.note : '상세 내용 미기록';
+        return <li key={event.id}>
+          <time dateTime={event.occurred_at}>{timeInTimezone(event.occurred_at, pet.timezone)}</time>
+          <div><strong>증상·컨디션</strong><p>{observation}</p>
+            {latest?.revision_kind === 'VOID' && <small className="event-status void">무효 처리</small>}
+            {onReviseEvent && latest?.revision_kind !== 'VOID' && <details><summary>상세 정보·수정</summary>
+              <p className="event-timestamp">실제 발생 {dateTimeInTimezone(event.occurred_at, pet.timezone)}</p>
+              <TimelineCorrectionEditor event={event} value={effectiveValue} revision={latest?.revision_no ?? 0} onSave={onReviseEvent} onCorrectTime={onCorrectTime} />
+              <p className="event-timestamp">기록자 {actorLabel(event.actor_id, userId)} · 서버 입력 {dateTimeInTimezone(event.recorded_at, pet.timezone)}</p>
+            </details>}
+          </div>
+        </li>;
+      })}</ul>
+    </section>}
 
   </main>;
 }

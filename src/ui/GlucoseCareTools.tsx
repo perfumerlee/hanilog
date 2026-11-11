@@ -23,6 +23,7 @@ export function GlucoseCareTools({ petId, petName, timezone, canEdit, demo = fal
   const [toDate, setToDate] = useState(() => today(timezone));
   const [includeCareTimes, setIncludeCareTimes] = useState(false);
   const [includeCareValues, setIncludeCareValues] = useState(false);
+  const [includeSymptoms, setIncludeSymptoms] = useState(false);
   const [acknowledgeBearerLink, setAcknowledgeBearerLink] = useState(false);
   const [expiresDays, setExpiresDays] = useState('1');
   const [shares, setShares] = useState<GlucoseShareRange[]>([]);
@@ -85,7 +86,7 @@ export function GlucoseCareTools({ petId, petName, timezone, canEdit, demo = fal
       const result = await callGlucoseShare<{ share: GlucoseShareRange }>(supabase, {
         action: 'create', pet_id: petId, token_hash: await tokenHash, from_date: fromDate, to_date: toDate < today(timezone) ? today(timezone) : toDate,
         expires_days: Number(expiresDays), include_care_times: includeCareTimes, include_care_values: includeCareTimes && includeCareValues,
-        guardian_contact_phone: guardianPhone,
+        guardian_contact_phone: guardianPhone, include_symptoms: includeSymptoms,
       });
       if (!result.share?.id) throw new Error('SHARE_CREATE_FAILED');
       const link = glucoseShareUrl(token);
@@ -131,7 +132,7 @@ export function GlucoseCareTools({ petId, petName, timezone, canEdit, demo = fal
         action: 'create', pet_id: petId, token_hash: await tokenHash, from_date: item.from_date,
         to_date: item.to_date < today(timezone) ? today(timezone) : item.to_date,
           expires_days: 1, include_care_times: item.include_care_times, include_care_values: item.include_care_values === true,
-        guardian_contact_phone: item.guardian_contact_phone ?? null,
+        guardian_contact_phone: item.guardian_contact_phone ?? null, include_symptoms: item.include_symptoms === true,
       });
       const link = glucoseShareUrl(token);
       setActiveLinks((current) => ({ ...current, [result.share.id]: link }));
@@ -198,7 +199,9 @@ export function GlucoseCareTools({ petId, petName, timezone, canEdit, demo = fal
           </select></label>
         </div>
         <label className="check-row"><input type="checkbox" checked={includeCareTimes} onChange={(event) => { setIncludeCareTimes(event.target.checked); if (!event.target.checked) setIncludeCareValues(false); }} />같은 기간의 식사·인슐린 기록 시각도 포함</label>
-        {includeCareTimes && <label className="check-row"><input type="checkbox" checked={includeCareValues} onChange={(event) => setIncludeCareValues(event.target.checked)} />식사량과 인슐린 투여량·단위도 공유 (민감정보)</label>}
+        {includeCareTimes && <label className="check-row"><input type="checkbox" checked={includeCareValues} onChange={(event) => setIncludeCareValues(event.target.checked)} />식사 내용·섭취량과 인슐린 제품·투여량을 함께 공유 (민감정보)</label>}
+        <label className="check-row"><input type="checkbox" checked={includeSymptoms} onChange={(event) => setIncludeSymptoms(event.target.checked)} />증상·컨디션 기록 전체 이력도 공유 (선택한 날짜 범위와 별개)</label>
+        {includeSymptoms && <small className="share-contact-disclosure">이 링크가 열려 있는 동안 날짜 범위 밖의 증상·컨디션 메모도 모두 표시됩니다. 민감한 내용이 포함될 수 있으니 공유 대상을 확인해 주세요.</small>}
         <label className="check-row share-access-ack"><input type="checkbox" checked={acknowledgeBearerLink} required onChange={(event) => setAcknowledgeBearerLink(event.target.checked)} />링크만 가진 사람도 만료 전까지 열람할 수 있음을 확인했습니다.</label>
         <label className="check-row"><input type="checkbox" checked={shareGuardianContact} onChange={(event) => setShareGuardianContact(event.target.checked)} />공유 페이지에 보호자 연락 버튼 표시</label>
         {shareGuardianContact && <><label className="field-label full-field">보호자 전화번호<input type="tel" inputMode="tel" autoComplete="tel" value={guardianPhoneInput} onChange={(event) => setGuardianPhoneInput(event.target.value)} placeholder="예: 010-1234-5678" required /></label>
@@ -213,7 +216,7 @@ export function GlucoseCareTools({ petId, petName, timezone, canEdit, demo = fal
       </form>}
       {shares.some((item) => !item.revoked_at && Date.parse(item.expires_at) > now) && <ul className="glucose-share-list">
         {shares.filter((item) => !item.revoked_at && Date.parse(item.expires_at) > now).map((item) => <li key={item.id}>
-          <span>{item.from_date} ~ {item.to_date}<small>만료 {new Date(item.expires_at).toLocaleString('ko-KR')} · {item.include_care_values ? '식사·인슐린 수치 포함' : item.include_care_times ? '식사·인슐린 시각만' : '혈당·체중'}</small></span>
+          <span>{item.from_date} ~ {item.to_date}<small>만료 {new Date(item.expires_at).toLocaleString('ko-KR')} · {item.include_care_values ? '식사 내용·인슐린 제품·수치 포함' : item.include_care_times ? '식사·인슐린 시각만' : '혈당·체중'}{item.include_symptoms ? ' · 증상·컨디션 전체 이력' : ''}</small></span>
           <div className="share-list-actions"><button type="button" className="text-button" disabled={pending} onClick={() => void copyOrRenew(item)}>{activeLinks[item.id] ? '다시 복사' : '새 링크 발급·복사'}</button>
           {activeLinks[item.id] && <button type="button" className="text-button" onClick={() => { setNewLink(activeLinks[item.id]); setMessage('아래에 받는 분 번호를 입력하고 문자 앱을 여세요.'); }}>문자로 보내기</button>}
           <button type="button" className="text-button" disabled={pending} onClick={() => void revoke(item.id)}>링크 취소</button></div>

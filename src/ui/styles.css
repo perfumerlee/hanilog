@@ -818,6 +818,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .glucose-condition-after_meal { color: #81531d; background: #fff1d8; border-color: #ead4ad; }
 .glucose-condition-unrelated_to_meal { color: #59656a; background: #edf0f0; border-color: #d8dfdf; }
 .glucose-condition-before_exercise, .glucose-condition-after_exercise { color: #564681; background: #eee9f8; border-color: #d8ccef; }
+.glucose-condition-unrecorded { color: #59656a; background: #edf0f0; border-color: #d8dfdf; }
 .event-value { margin-block: .35rem; font-variant-numeric: tabular-nums; }
 .timeline-card details { border-top-color: #e8e5dc; }
 .timeline-card summary { color: #536b57; }
@@ -1284,17 +1285,34 @@ button.period-chip.selected:focus-visible {
 .weight-measurements { display: grid; gap: .35rem; list-style: none; margin: 0; padding: 0; }
 .weight-measurements > li { min-width: 0; padding: .3rem .65rem; border: 1px solid transparent; border-radius: .7rem; transition: background-color .15s ease, border-color .15s ease; }
 .weight-measurements > li:has(.sample-row.active) { border-color: #d3e1d8; background: #f4f7f2; }
-.weight-measurements button.sample-row { width: 100%; min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0; padding: .35rem 0; border: 0; border-radius: 0; background: transparent; color: var(--ink); text-align: left; }
+.weight-measurement-row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; min-width: 0; }
+.weight-measurements button.sample-row { width: auto; min-width: 0; flex: 1; min-height: 52px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: .2rem; margin: 0; padding: .35rem 0; border: 0; border-radius: 0; background: transparent; color: var(--ink); text-align: left; }
 .weight-measurements .sample-row strong { font-size: .98rem; font-weight: 700; font-variant-numeric: tabular-nums; }
-.weight-measurements .sample-row span { color: var(--muted); font-size: .84rem; font-variant-numeric: tabular-nums; text-align: right; }
-.weight-measurement-actions { display: flex; justify-content: flex-end; gap: .25rem; padding: 0 0 .15rem; }
+.weight-measurements .sample-row span { color: var(--muted); font-size: .84rem; font-variant-numeric: tabular-nums; text-align: left; }
+.weight-measurement-actions { display: flex; flex: 0 0 auto; align-items: center; justify-content: flex-end; gap: .25rem; padding: 0; }
 .weight-measurements .weight-measurement-actions button { width: auto; min-height: 44px; padding: .45rem .65rem; }
 .weight-measurement-editor { display: flex; flex-wrap: wrap; align-items: end; gap: .65rem; padding: .5rem 0 1rem; }
 .weight-measurement-editor .field-label { flex: 1 1 160px; min-width: 0; }
 .weight-measurements .weight-measurement-editor button { width: auto; min-height: 44px; }
 .weight-measurement-editor [role="alert"] { flex-basis: 100%; margin: 0; }
 .weight-trends details > p { margin: .6rem 0; color: var(--muted); font-size: .84rem; }
-@media (max-width: 420px) { .weight-measurements > li { padding-inline: .45rem; } .weight-measurements .sample-row strong { font-size: .9rem; } .weight-measurements .sample-row span { font-size: .76rem; } }
+@media (max-width: 420px) { .weight-measurements > li { padding-inline: .45rem; } .weight-measurements .sample-row strong { font-size: .9rem; } .weight-measurements .sample-row span { font-size: .76rem; } .weight-measurement-actions { gap: 0; } .weight-measurements .weight-measurement-actions button { padding-inline: .45rem; } }
+
+.timeline-symptom-section h2 { margin: 0; font-weight: 700; }
+.timeline-symptom-section h2 small { margin-left: .35rem; color: var(--muted); font-size: .78em; font-weight: 500; }
+.timeline-symptom-list { display: grid; gap: .55rem; margin: .8rem 0 0; padding: 0; list-style: none; }
+.timeline-symptom-list > li { display: grid; grid-template-columns: minmax(4.5rem, 5.5rem) minmax(0, 1fr); gap: .75rem; padding: .75rem; border-radius: .75rem; background: var(--surface-subtle, #f4f7f2); }
+.timeline-symptom-list time { color: var(--muted); font-size: .84rem; font-variant-numeric: tabular-nums; }
+.timeline-symptom-list p { margin: .3rem 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.timeline-symptom-list details { margin-top: .5rem; }
+.share-symptom-list { display: grid; gap: .5rem; margin: .8rem 0 0; padding: 0; list-style: none; }
+.share-symptom-list li { display: grid; grid-template-columns: minmax(9rem, 12rem) minmax(0, 1fr); gap: .8rem; padding: .7rem .85rem; border-radius: .75rem; background: var(--surface-subtle, #f4f7f2); }
+.share-symptom-list time { color: var(--muted); font-size: .86rem; }
+.share-symptom-list p, .share-care-detail { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.share-care-detail { margin-top: .3rem; color: var(--muted); font-size: .9rem; }
+.public-glucose-share .measurement-list .sample-row > span:last-child { display: flex; align-items: flex-end; gap: .25rem; }
+.public-glucose-share .glucose-condition-badge { display: inline-flex; width: fit-content; padding: .14rem .42rem; border-radius: 999px; font-size: .72rem; line-height: 1.35; font-weight: 600; white-space: nowrap; }
+@media (max-width: 599px) { .share-symptom-list li { grid-template-columns: 1fr; gap: .25rem; } }
 .weight-period-picker { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-block: 12px; }
 .weight-period-picker button { min-width: 0; width: 100%; min-height: 44px; padding-inline: 4px; white-space: nowrap; }
 

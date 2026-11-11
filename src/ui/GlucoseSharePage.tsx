@@ -42,6 +42,10 @@ function GuardianContactIcon({ type }: { type: 'phone' | 'message' }) {
   </svg>;
 }
 
+function conditionBadgeClass(condition: string | undefined) {
+  return `glucose-condition-badge glucose-condition-${(condition ?? 'unrecorded').toLowerCase()}`;
+}
+
 export function GlucoseSharePage() {
   const { token = '' } = useParams();
   const [result, setResult] = useState<{ token: string; share?: GlucoseSharePayload; error?: string } | null>(null);
@@ -155,22 +159,34 @@ export function GlucoseSharePage() {
         <GlucoseScatterChart samples={displayedSamples} actualSegments={actualSegments} trendSegments={[]} timezone={share.timezone} targetRange={share.target_range} onSelect={setSelectedId} selectedId={selected?.id ?? null} mode={displayMode} />
         {!displayedSamples.length && <p className="trend-empty">{displayMode === 'day' ? '이 날짜에' : '선택한 기간에'} 기록된 혈당 측정값이 없습니다.</p>}
         {selected && <div className="share-selected-value" aria-live="polite"><strong>{selected.value} mg/dL</strong>
-          <span>{formatTime(selected.occurredAt, share.timezone)} · {glucoseMeasurementConditionLabel(selected.condition)}</span></div>}
+          <span>{formatTime(selected.occurredAt, share.timezone)} <span className={conditionBadgeClass(selected.condition)}>{glucoseMeasurementConditionLabel(selected.condition)}</span></span></div>}
         <section className="measurement-list"><h2>측정값 목록 : {displayedSamples.length}건</h2>
         {displayedSamples.length ? <ol>{[...displayedSamples].reverse().map((sample) => <li key={sample.id}>
           <button type="button" className={selected?.id === sample.id ? 'sample-row active' : 'sample-row'} onClick={() => setSelectedId(sample.id)}>
             <span><strong>{sample.value} mg/dL</strong><small>{formatTime(sample.occurredAt, share.timezone)}</small></span>
-            <span><small>{glucoseMeasurementConditionLabel(sample.condition)}{sample.revisionKind ? ' · 정정된 값' : ''}</small></span>
+            <span><span className={conditionBadgeClass(sample.condition)}>{glucoseMeasurementConditionLabel(sample.condition)}</span>{sample.revisionKind ? <small>정정된 값</small> : null}</span>
           </button>
         </li>)}</ol> : <p>표시할 실제 측정값이 없습니다.</p>}
         </section>
       </section>
+      {share.include_symptoms && <section className="panel share-symptom-history" aria-labelledby="share-symptom-heading">
+        <div className="section-heading"><div><p className="eyebrow">전체 기간</p><h2 id="share-symptom-heading" className="share-section-heading">증상·컨디션 기록</h2></div>
+          <span>{share.symptom_records?.length ?? 0}건</span></div>
+        {share.symptom_records?.length ? <ol className="share-symptom-list">{[...share.symptom_records].sort((a, b) => Date.parse(b.occurred_at) - Date.parse(a.occurred_at)).map((item) => <li key={item.id}>
+          <time dateTime={item.occurred_at}>{formatTime(item.occurred_at, share.timezone)}</time>
+          <p>{item.note?.trim() || '상세 내용 미기록'}</p>
+        </li>)}</ol> : <p>공유된 증상·컨디션 기록이 없습니다.</p>}
+      </section>}
       {share.weights && <WeightTrends key={token} events={share.weights} revisions={[]} timezone={share.timezone} sharedTarget={share.weight_target_kg} readOnly />}
       {displayMode === 'day' && careTimes.length > 0 && <section className="panel"><h2 className="share-section-heading">이날의 식사·인슐린 기록</h2>
         <ol className="share-care-timeline">{careTimes.map((item, index) => <li className={`share-care-timeline-item ${item.event_type}`} key={`${item.event_type}-${item.occurred_at}-${index}`}>
           <time dateTime={item.occurred_at}><span>{formatTimelineDate(item.occurred_at, share.timezone)}</span><span>{formatClock(item.occurred_at, share.timezone)}</span></time>
           <span className="share-care-timeline-node" aria-hidden="true" />
-          <div><span className="share-care-kind"><ShareCareIcon type={item.event_type} />{item.event_type === 'meal' ? '식사' : '인슐린'}</span><strong>{typeof item.amount === 'number' && Number.isFinite(item.amount) ? `${item.amount}${item.unit ? ` ${item.unit}` : ' (단위 미기록)'}` : share.include_care_values ? '수치 미기록' : '수치 미공유'}</strong></div>
+          <div><span className="share-care-kind"><ShareCareIcon type={item.event_type} />{item.event_type === 'meal' ? '식사' : '인슐린'}</span>
+            <strong>{typeof item.amount === 'number' && Number.isFinite(item.amount) ? `${item.amount}${item.unit ? ` ${item.unit}` : ' (단위 미기록)'}` : share.include_care_values ? '수치 미기록' : '수치 미공유'}</strong>
+            {share.include_care_values && item.event_type === 'meal' && item.detail && <p className="share-care-detail">{item.detail}</p>}
+            {share.include_care_values && item.event_type === 'insulin' && item.product_label && <p className="share-care-detail">제품 · {item.product_label}</p>}
+          </div>
         </li>)}</ol>
       </section>}
       <section className="panel share-validity" aria-label="공유 기록 기간"><h2 className="share-section-heading">공유 기록 기간</h2><p>{formatDate(share.from_date)} ~ {formatDate(share.to_date)}</p></section>

@@ -149,7 +149,7 @@ Deno.serve(async (request) => {
     if (authError || !authData.user) return Response.json({ error: 'UNAUTHENTICATED' }, { status: 401, headers });
 
     if (payload.action === 'create') {
-      const { pet_id, token_hash, from_date, to_date, include_care_times, include_care_values, guardian_contact_phone } = payload;
+      const { pet_id, token_hash, from_date, to_date, include_care_times, include_care_values, guardian_contact_phone, include_symptoms } = payload;
       // Server time avoids device clock skew at the maximum expiry boundary.
       const days = payload.expires_days;
       const expires_at = typeof days === 'number' && [1, 3, 7].includes(days)
@@ -157,14 +157,15 @@ Deno.serve(async (request) => {
         : payload.expires_at;
       if (typeof pet_id !== 'string' || !/^[0-9a-f-]{36}$/i.test(pet_id) || typeof token_hash !== 'string' || !/^[a-f0-9]{64}$/.test(token_hash) ||
           typeof from_date !== 'string' || typeof to_date !== 'string' || typeof expires_at !== 'string' || typeof include_care_times !== 'boolean' ||
+          (include_symptoms !== undefined && typeof include_symptoms !== 'boolean') ||
           (guardian_contact_phone !== null && guardian_contact_phone !== undefined && (typeof guardian_contact_phone !== 'string' || !/^\+[1-9]\d{7,14}$/.test(guardian_contact_phone))) ||
           (include_care_values !== undefined && typeof include_care_values !== 'boolean') || (include_care_values === true && !include_care_times)) {
         return Response.json({ error: 'INVALID_REQUEST' }, { status: 400, headers });
       }
-      const { data, error } = await client.rpc('create_glucose_share_link_v3', {
+      const { data, error } = await client.rpc('create_glucose_share_link_v4', {
         p_pet_id: pet_id, p_token_hash: token_hash, p_from_date: from_date, p_to_date: to_date,
         p_expires_at: expires_at, p_include_care_times: include_care_times, p_include_care_values: include_care_values === true,
-        p_guardian_contact_phone: guardian_contact_phone ?? null,
+        p_guardian_contact_phone: guardian_contact_phone ?? null, p_include_symptoms: include_symptoms === true,
       });
       if (error) return Response.json({ error: schemaUnavailable(error) ? 'SHARE_SCHEMA_UNAVAILABLE' : error.code === '42501' ? 'ACCESS_DENIED' : 'SHARE_CREATE_FAILED' },
         { status: schemaUnavailable(error) ? 503 : error.code === '42501' ? 403 : 400, headers });
@@ -172,7 +173,7 @@ Deno.serve(async (request) => {
     }
     if (payload.action === 'list') {
       if (typeof payload.pet_id !== 'string' || !/^[0-9a-f-]{36}$/i.test(payload.pet_id)) return Response.json({ error: 'INVALID_REQUEST' }, { status: 400, headers });
-      const { data, error } = await client.rpc('list_my_glucose_share_links_v3', { p_pet_id: payload.pet_id });
+      const { data, error } = await client.rpc('list_my_glucose_share_links_v4', { p_pet_id: payload.pet_id });
       if (error) return Response.json({ error: schemaUnavailable(error) ? 'SHARE_SCHEMA_UNAVAILABLE' : error.code === '42501' ? 'ACCESS_DENIED' : 'SHARE_LIST_FAILED' },
         { status: schemaUnavailable(error) ? 503 : error.code === '42501' ? 403 : 400, headers });
       return Response.json({ shares: data ?? [] }, { headers });
