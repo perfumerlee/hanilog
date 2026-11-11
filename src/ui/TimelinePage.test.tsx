@@ -11,7 +11,7 @@ function SearchProbe() {
 describe('TimelinePage filters', () => {
   afterEach(() => cleanup());
 
-  it('defaults to key records and keeps date and chosen types in the URL', () => {
+  it('automatically includes recorded types and preserves explicit filters in the URL', async () => {
     const events = [
       { id: 'g1', pet_id: 'pet-1', actor_id: 'user-1', performer_id: 'user-1', event_type: 'glucose' as const,
         occurred_at: '2026-11-04T02:00:00.000Z', recorded_at: '2026-11-04T02:01:00.000Z', occurrence_id: null, plan_version_id: null,
@@ -36,7 +36,7 @@ describe('TimelinePage filters', () => {
     expect(screen.getByRole('heading', { name: '혈당' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '인슐린' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '식사' })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: '체중' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: '체중' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /주요 기록/ }));
     expect(screen.getByLabelText('현재 필터')).toHaveTextContent('date=2026-11-04');
     expect(screen.getByLabelText('현재 필터')).toHaveTextContent('types=glucose%2Cinsulin%2Celimination%2Cmeal');
@@ -52,7 +52,7 @@ describe('TimelinePage filters', () => {
         revisions={[]} userId="user-1" dateFilter="2026-11-04" setDateFilter={vi.fn()} loading={false}
         onReviseEvent={onReviseEvent} />
     </MemoryRouter>);
-    fireEvent.click(screen.getByRole('button', { name: '체중' }));
+    expect(screen.getByRole('button', { name: '체중' })).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(screen.getByRole('button', { name: '수정' }));
     fireEvent.change(screen.getByLabelText('기록값'), { target: { value: '17.8' } });
     fireEvent.click(screen.getByRole('button', { name: '값·메모 저장' }));
@@ -77,8 +77,8 @@ describe('TimelinePage filters', () => {
     </MemoryRouter>);
 
     await waitFor(() => expect(loadDayEvents).toHaveBeenCalledWith('pet-1', '2026-11-05', 'Asia/Seoul'));
-    expect(screen.queryByRole('heading', { name: '체중' })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '체중' }));
+    expect(await screen.findByRole('heading', { name: '체중' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '체중' })).toHaveAttribute('aria-pressed', 'true');
     expect(await screen.findByRole('heading', { name: '체중' })).toBeInTheDocument();
     expect(screen.getByText('17.6 kg')).toBeInTheDocument();
     expect(screen.getByText('오후 05:40')).toBeInTheDocument();
