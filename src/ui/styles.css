@@ -1108,8 +1108,7 @@ button.sample-row.active, button.sample-row.active:hover:not(:disabled) {
 .share-care-timeline-item > time { padding-top: .1rem; color: var(--text-secondary); font-size: .76rem; font-variant-numeric: tabular-nums; }
 .share-care-timeline-node { position: relative; z-index: 1; width: 12px; height: 12px; margin: .23rem auto 0; border: 2px solid var(--surface-raised); border-radius: 50%; background: #d5a350; box-shadow: 0 0 0 1px #d5a350; }
 .share-care-timeline-item.insulin .share-care-timeline-node { background: #7868b3; box-shadow: 0 0 0 1px #7868b3; }
-.share-care-content { display: grid; align-content: start; gap: .25rem; min-width: 0; padding: 0 0 .65rem; border-bottom: 1px solid var(--line); }
-.share-care-timeline-item:last-child .share-care-content { border-bottom: 0; }
+.share-care-content { display: grid; align-content: start; gap: .25rem; min-width: 0; padding: 0 0 .65rem; }
 .share-care-summary { display: flex; align-items: center; justify-content: space-between; gap: .6rem; min-width: 0; }
 .share-care-kind { color: var(--text-primary); font-size: .86rem; font-weight: 700; }
 .share-care-summary > strong { min-width: 0; color: var(--text-primary); font-size: .9rem; font-variant-numeric: tabular-nums; text-align: right; overflow-wrap: anywhere; }
@@ -1335,6 +1334,16 @@ button.period-chip.selected:focus-visible {
 @media (max-width: 599px) { .share-symptom-list li { grid-template-columns: 1fr; gap: .25rem; } }
 .weight-period-picker { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-block: 12px; }
 .weight-period-picker button { min-width: 0; width: 100%; min-height: 44px; padding-inline: 4px; white-space: nowrap; }
+
+/* Blocking notice for glucose sharing actions and server errors. */
+.glucose-message-backdrop { position: fixed; inset: 0; z-index: 5000; display: grid; place-items: center; padding: 1rem; background: rgb(24 35 31 / 52%); backdrop-filter: blur(2px); }
+.glucose-message-dialog { display: grid; gap: .8rem; width: min(100%, 28rem); padding: 1.25rem; border: 1px solid var(--line); border-radius: 18px; background: var(--surface-raised, #fffefa); box-shadow: 0 24px 80px rgb(0 0 0 / 24%); }
+.glucose-message-dialog h3, .glucose-message-dialog p { margin: 0; }
+.glucose-message-dialog p { line-height: 1.55; overflow-wrap: anywhere; }
+.glucose-message-dialog .button-primary { width: 100%; min-height: 48px; }
+.share-symptom-details > summary { display: flex; align-items: center; justify-content: space-between; gap: .75rem; min-height: 44px; cursor: pointer; list-style-position: inside; }
+.share-symptom-details > summary > span:first-child { display: grid; gap: .12rem; }
+.share-symptom-details > summary small, .share-details-hint { color: var(--muted); font-size: .82rem; }
 
 /* Editorial layout uses the existing route and selection state. */
 .nav-pet-selector { display: none; }

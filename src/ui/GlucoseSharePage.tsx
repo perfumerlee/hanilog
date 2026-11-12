@@ -111,6 +111,9 @@ export function GlucoseSharePage() {
   const careTimes = (share?.care_times.filter((item) => localDateKey(item.occurred_at, share.timezone) === day) ?? [])
     .sort((a, b) => Date.parse(a.occurred_at) - Date.parse(b.occurred_at)
       || (a.event_type === 'meal' ? -1 : 1) - (b.event_type === 'meal' ? -1 : 1));
+  const dailySymptoms = (share?.include_symptoms ? share.symptom_records ?? [] : [])
+    .filter((item) => localDateKey(item.occurred_at, share?.timezone ?? 'UTC') === day)
+    .sort((a, b) => Date.parse(a.occurred_at) - Date.parse(b.occurred_at));
   const anchorDay = share && todayInPetTimezone < share.to_date ? todayInPetTimezone : share?.to_date ?? '';
   const periodDays = periods.find((item) => item.id === period)?.days;
   const cutoffDay = periodDays && anchorDay ? shiftLocalDate(anchorDay, 1 - periodDays) : share?.from_date ?? '';
@@ -169,14 +172,6 @@ export function GlucoseSharePage() {
         </li>)}</ol> : <p>표시할 실제 측정값이 없습니다.</p>}
         </section>
       </section>
-      {share.include_symptoms && <section className="panel share-symptom-history" aria-labelledby="share-symptom-heading">
-        <div className="section-heading"><div><p className="eyebrow">전체 기간</p><h2 id="share-symptom-heading" className="share-section-heading">증상·컨디션 기록</h2></div>
-          <span>{share.symptom_records?.length ?? 0}건</span></div>
-        {share.symptom_records?.length ? <ol className="share-symptom-list">{[...share.symptom_records].sort((a, b) => Date.parse(b.occurred_at) - Date.parse(a.occurred_at)).map((item) => <li key={item.id}>
-          <time dateTime={item.occurred_at}>{formatTime(item.occurred_at, share.timezone)}</time>
-          <p>{item.note?.trim() || '상세 내용 미기록'}</p>
-        </li>)}</ol> : <p>공유된 증상·컨디션 기록이 없습니다.</p>}
-      </section>}
       {share.weights && <WeightTrends key={token} events={share.weights} revisions={[]} timezone={share.timezone} sharedTarget={share.weight_target_kg} readOnly />}
       {displayMode === 'day' && careTimes.length > 0 && <section className="panel"><h2 className="share-section-heading">이날의 식사·인슐린 기록</h2>
         <ol className="share-care-timeline">{careTimes.map((item, index) => <li className={`share-care-timeline-item ${item.event_type}`} key={`${item.event_type}-${item.occurred_at}-${index}`}>
@@ -190,6 +185,15 @@ export function GlucoseSharePage() {
             {share.include_care_values && item.event_type === 'insulin' && item.product_label && <p className="share-care-detail">제품 · {item.product_label}</p>}
           </div>
         </li>)}</ol>
+      </section>}
+      {displayMode === 'day' && dailySymptoms.length > 0 && <section className="panel share-symptom-history" aria-labelledby="share-symptom-heading">
+        <details className="share-symptom-details">
+          <summary><span><strong id="share-symptom-heading">증상·컨디션 기록</strong><small>{day} · {dailySymptoms.length}건</small></span><span className="share-details-hint">눌러서 보기</span></summary>
+          <ol className="share-symptom-list">{dailySymptoms.map((item) => <li key={item.id}>
+            <time dateTime={item.occurred_at}>{formatClock(item.occurred_at, share.timezone)}</time>
+            <p>{item.note?.trim() || '상세 내용 미기록'}</p>
+          </li>)}</ol>
+        </details>
       </section>}
       <section className="panel share-validity" aria-label="공유 기록 기간"><h2 className="share-section-heading">공유 기록 기간</h2><p>{formatDate(share.from_date)} ~ {formatDate(share.to_date)}</p></section>
       <section className="panel share-guardian-contact" aria-label="보호자 연락처">

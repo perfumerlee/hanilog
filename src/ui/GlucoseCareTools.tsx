@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { callGlucoseShare, createShareToken, glucoseShareUrl, GlucoseShareRequestError, normalizeGuardianPhone, type GlucoseShareRange } from '../lib/glucose-share';
 import { supabase } from '../lib/supabase';
 import { localDateKey } from '../lib/health-trends';
@@ -35,6 +35,26 @@ export function GlucoseCareTools({ petId, petName, timezone, canEdit, demo = fal
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState('');
   const [now] = useState(() => Date.now());
+  const dismissMessageRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!message) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    dismissMessageRef.current?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMessage('');
+      if (event.key === 'Tab') {
+        event.preventDefault();
+        dismissMessageRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [message]);
 
   async function copyNewLink() {
     if (!newLink) return;
@@ -225,6 +245,12 @@ export function GlucoseCareTools({ petId, petName, timezone, canEdit, demo = fal
       {demo && <small>DEMO에서는 공유 링크가 생성되지 않습니다.</small>}
       </div>
     </details>
-    {message && <p role="status" className="small-note glucose-tools-message">{message}</p>}
+    {message && <div className="glucose-message-backdrop">
+      <section className="glucose-message-dialog" role="alertdialog" aria-modal="true" aria-labelledby="glucose-message-title" aria-describedby="glucose-message-content">
+        <h3 id="glucose-message-title">알림</h3>
+        <p id="glucose-message-content">{message}</p>
+        <button ref={dismissMessageRef} type="button" className="button-primary" onClick={() => setMessage('')}>확인</button>
+      </section>
+    </div>}
   </section>;
 }

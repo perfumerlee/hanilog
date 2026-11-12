@@ -6,7 +6,10 @@ vi.mock('../lib/supabase', () => ({ supabase: { functions: { invoke: vi.fn(async
  data: new Blob([new Uint8Array([0xff, 0xd8, 0xff, 0xd9])], { type: 'application/octet-stream' }), error: null,
 })) } } }));
 vi.mock('../lib/glucose-share', async (original) => ({ ...await original<typeof import('../lib/glucose-share')>(), callGlucoseShare: vi.fn(async () => ({ share: {
- pet_name: '합성 반려동물', timezone: 'Asia/Seoul', from_date: '2026-11-01', to_date: '2026-11-03', expires_at: '2026-11-10T00:00:00Z', include_care_values: true, target_range: {lower_mg_dl:70,upper_mg_dl:180}, weights: [], care_times: [
+ pet_name: '합성 반려동물', timezone: 'Asia/Seoul', from_date: '2026-11-01', to_date: '2026-11-03', expires_at: '2026-11-10T00:00:00Z', include_care_values: true, include_symptoms: true, symptom_records: [
+  { id: 'symptom-today', occurred_at: '2026-11-03T02:20:00Z', note: '합성 당일 컨디션 기록' },
+  { id: 'symptom-other-day', occurred_at: '2026-11-02T02:20:00Z', note: '다른 날짜의 합성 기록' },
+ ], target_range: {lower_mg_dl:70,upper_mg_dl:180}, weights: [], care_times: [
   { event_type: 'insulin', occurred_at: '2026-11-03T00:05:00Z', amount: 2.5, unit: 'U' },
   { event_type: 'meal', occurred_at: '2026-11-03T00:05:00Z', amount: 20, unit: 'g' },
   { event_type: 'meal', occurred_at: '2026-11-03T00:15:00Z', amount: 35, unit: 'g' },
@@ -26,6 +29,15 @@ it('opens latest measured local day, preserves values above 500, and filters lis
  expect(screen.getAllByText('식사와 무관').length).toBeGreaterThan(0);
  expect(document.querySelector('.share-care-timeline-item.meal')?.textContent).toContain('식사20 g');
  expect(document.querySelector('.share-care-timeline-item.meal .share-care-icon')).toBeInTheDocument();
+ const symptomDetails = document.querySelector('.share-symptom-details') as HTMLDetailsElement;
+ expect(symptomDetails).not.toBeNull();
+ expect(symptomDetails.open).toBe(false);
+ expect(symptomDetails.textContent).toContain('2026-11-03 · 1건');
+ expect(symptomDetails.textContent).not.toContain('다른 날짜의 합성 기록');
+ expect(document.querySelector('.share-care-timeline')!.compareDocumentPosition(document.querySelector('.share-symptom-history')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+ fireEvent.click(screen.getByText('눌러서 보기'));
+ expect(symptomDetails.open).toBe(true);
+ expect(screen.getByText('합성 당일 컨디션 기록')).toBeInTheDocument();
  expect(document.querySelector('.share-care-timeline-item.meal time')?.textContent).toContain('2026. 11. 3.');
  expect(document.querySelector('.share-care-timeline-item.meal time')?.textContent).toContain('오전 9:05');
  expect(screen.getByText(/이 링크에는 보호자 연락처가 포함되지 않았습니다/)).toBeInTheDocument();
@@ -35,7 +47,7 @@ it('opens latest measured local day, preserves values above 500, and filters lis
  expect(screen.getByText('+386 mg/dL')).toBeInTheDocument();
  const sections = [...document.querySelectorAll('.public-glucose-share > section')];
  expect(sections.map((section) => section.className)).toEqual([
-  'panel trends-summary', 'panel trends-panel', 'panel weight-trends', 'panel', 'panel share-validity', 'panel share-guardian-contact',
+  'panel trends-summary', 'panel trends-panel', 'panel weight-trends', 'panel', 'panel share-symptom-history', 'panel share-validity', 'panel share-guardian-contact',
  ]);
  expect(document.querySelector('.trends-panel > .measurement-list')).toBeInTheDocument();
  expect(document.querySelector('.glucose-point-tooltip')).toHaveTextContent('550 mg/dL');
@@ -51,6 +63,7 @@ it('opens latest measured local day, preserves values above 500, and filters lis
  expect(document.querySelectorAll('.chart-axis-label').length).toBeGreaterThanOrEqual(17);
  fireEvent.click(screen.getByRole('button',{name:'이전'}));
  expect(screen.getByLabelText('날짜')).toHaveValue('2026-11-02');
+ expect(document.querySelector('.share-symptom-details')?.textContent).toContain('다른 날짜의 합성 기록');
  expect(screen.getAllByText('164 mg/dL').length).toBeGreaterThan(0);
  expect(document.querySelector('.measurement-list')).not.toHaveTextContent('550 mg/dL');
  fireEvent.click(screen.getByRole('button',{name:'이전'}));
