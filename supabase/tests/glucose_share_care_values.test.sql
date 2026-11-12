@@ -29,6 +29,7 @@ select throws_ok($$select public.create_glucose_share_link_v2(current_setting('t
 select set_config('request.jwt.claims','{"sub":"00000000-0000-4000-8000-000000000302","role":"authenticated"}',true);
 select throws_ok($$select public.create_glucose_share_link_v2(current_setting('test.share_pet')::uuid,repeat('d',64),'2026-11-03','2026-11-03',now()+interval '1 day',true,true)$$,
   '42501','PET_SHARE_ACCESS_DENIED','Unrelated user cannot create a care value share');
+select set_config('request.jwt.claims','{"sub":"00000000-0000-4000-8000-000000000301","role":"authenticated"}',true);
 select is((select guardian_contact_phone from public.list_my_glucose_share_links_v3(current_setting('test.share_pet')::uuid) where guardian_contact_phone='+821012345678'), '+821012345678',
   'Owner can see the contact number attached to their share');
 select throws_ok($$select public.create_glucose_share_link_v3(current_setting('test.share_pet')::uuid,repeat('f',64),'2026-11-03','2026-11-03',now()+interval '1 day',true,false,'010-1234-5678')$$,
