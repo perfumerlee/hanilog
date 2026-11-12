@@ -182,8 +182,10 @@ export function GlucoseSharePage() {
         <ol className="share-care-timeline">{careTimes.map((item, index) => <li className={`share-care-timeline-item ${item.event_type}`} key={`${item.event_type}-${item.occurred_at}-${index}`}>
           <time dateTime={item.occurred_at}><span>{formatTimelineDate(item.occurred_at, share.timezone)}</span><span>{formatClock(item.occurred_at, share.timezone)}</span></time>
           <span className="share-care-timeline-node" aria-hidden="true" />
-          <div><span className="share-care-kind"><ShareCareIcon type={item.event_type} />{item.event_type === 'meal' ? '식사' : '인슐린'}</span>
+          <div className="share-care-content"><div className="share-care-summary">
+            <span className="share-care-kind"><ShareCareIcon type={item.event_type} />{item.event_type === 'meal' ? '식사' : '인슐린'}</span>
             <strong>{typeof item.amount === 'number' && Number.isFinite(item.amount) ? `${item.amount}${item.unit ? ` ${item.unit}` : ' (단위 미기록)'}` : share.include_care_values ? '수치 미기록' : '수치 미공유'}</strong>
+          </div>
             {share.include_care_values && item.event_type === 'meal' && item.detail && <p className="share-care-detail">{item.detail}</p>}
             {share.include_care_values && item.event_type === 'insulin' && item.product_label && <p className="share-care-detail">제품 · {item.product_label}</p>}
           </div>

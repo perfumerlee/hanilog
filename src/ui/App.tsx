@@ -115,6 +115,12 @@ const todayForTimezone = (timezone: string) => {
   const part = (type: string) => parts.find((item) => item.type === type)?.value ?? '';
   return `${part('year')}-${part('month')}-${part('day')}`;
 };
+const shiftDateKey = (day: string, amount: number) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return day;
+  const date = new Date(`${day}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + amount);
+  return date.toISOString().slice(0, 10);
+};
 const localDateKey = (instant: string, timezone: string) => {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit',
@@ -339,6 +345,7 @@ function DemoWorkspace() {
           <Route path="/timeline" element={<TimelinePage pet={pet} events={petEvents} revisions={demoRevisions} userId={demoUserId}
             dateFilter={timelineDate} setDateFilter={(value) => setTimelineSelection({ petId: pet.id, date: value })} loading={false}
             onSaveExerciseEnd={saveDemoExerciseEnd} />} />
+          <Route path="/symptoms" element={<SymptomHistoryPage pet={pet} events={petEvents} revisions={demoRevisions} loading={false} />} />
           <Route path="/trends" element={<HealthTrendsPage pet={pet} userId={demoUserId} online demoEvents={petEvents} />} />
           <Route path="/care" element={<Navigate to="/timeline" replace />} />
           <Route path="/shared" element={<DemoSharedCarePage />} />
@@ -741,6 +748,31 @@ function Workspace({ userId, online }: { userId: string; online: boolean }) {
     return { events: matchingEvents, revisions: matchingRevisions };
   }, []);
 
+  const loadSymptomHistory = useCallback(async (petId: string) => {
+    const client = supabase;
+    if (!client || !petId) throw new Error('SYMPTOM_HISTORY_UNAVAILABLE');
+    const allEvents: HealthEvent[] = [];
+    for (let offset = 0; ; offset += 500) {
+      const result = await client.from('health_events')
+        .select('id,pet_id,actor_id,performer_id,event_type,occurred_at,recorded_at,occurrence_id,plan_version_id,value,unit')
+        .eq('pet_id', petId).eq('event_type', 'symptom')
+        .order('occurred_at', { ascending: false }).range(offset, offset + 499);
+      if (result.error) throw result.error;
+      const page = (result.data ?? []) as HealthEvent[];
+      allEvents.push(...page);
+      if (page.length < 500) break;
+    }
+    const allRevisions: EventRevision[] = [];
+    for (let offset = 0; offset < allEvents.length; offset += 100) {
+      const ids = allEvents.slice(offset, offset + 100).map((event) => event.id);
+      const result = await client.from('health_event_revisions')
+        .select('id,event_id,revision_no,revision_kind,patch,reason_code,actor_id,recorded_at').in('event_id', ids);
+      if (result.error) throw result.error;
+      allRevisions.push(...(result.data ?? []) as EventRevision[]);
+    }
+    return { events: allEvents, revisions: allRevisions };
+  }, []);
+
   const refreshAll = useCallback(async () => {
     const petRefreshSucceeded = await refreshPets();
     if (petRefreshSucceeded && selectedPetId) await refreshPetData(selectedPetId);
@@ -1087,6 +1119,10 @@ function Workspace({ userId, online }: { userId: string; online: boolean }) {
             dateFilter={dateFilter} setDateFilter={setDateFilter} loading={loadingEvents}
             loadDayEvents={online && dataReady ? loadTimelineDay : undefined} refreshVersion={healthRefreshVersion}
             onSaveExerciseEnd={saveExerciseEnd} onReviseEvent={reviseTimelineEvent} onCorrectTime={correctTimelineTime} />} />
+        <Route path="/symptoms" element={!selectedPet
+          ? <SetupPrompt loading={loadingPets} accessMessage={accessMessage} />
+          : <SymptomHistoryPage key={selectedPet.id} pet={selectedPet} events={[]} revisions={[]} loading={!dataReady}
+            loadHistory={online && dataReady ? loadSymptomHistory : undefined} />} />
         <Route path="/trends" element={!selectedPet ? <SetupPrompt loading={loadingPets} accessMessage={accessMessage} />
           : online && !dataReady ? <DataLoadingPage title="혈당 기록을 불러오고 있어요" /> : <HealthTrendsPage key={selectedPet.id} pet={selectedPet} userId={userId} online={online && dataReady} refreshVersion={healthRefreshVersion} onSaveWeightTarget={(eventId, expectedRevision, value) => reviseTimelineEvent(eventId, expectedRevision, 'CORRECT', { value })} onReviseWeight={reviseTimelineEvent} />} />
         <Route path="/care" element={<Navigate to="/timeline" replace />} />
@@ -1119,6 +1155,7 @@ function SessionNavigation({ pathname, search, petSelector }: { pathname: string
   const desktopItems = [
     { to: '/trends', label: '혈당 기록', icon: 'glucose' },
     { to: '/timeline', label: '하루 타임라인', icon: '◷' },
+    { to: '/symptoms', label: '증상·컨디션 기록', icon: 'symptom' },
     { to: '/record', label: '빠른 기록', icon: '+' },
     { to: '/?profile=1', label: '반려동물 설정', icon: '🐾' },
     { to: '/shared', label: '가족 공간과 보호자', icon: '♡' },
@@ -1127,6 +1164,7 @@ function SessionNavigation({ pathname, search, petSelector }: { pathname: string
   const secondaryItems = [
     { to: '/?profile=1', label: '반려동물 설정', icon: '🐾' },
     { to: '/timeline', label: '하루 타임라인', icon: '◷' },
+    { to: '/symptoms', label: '증상·컨디션 기록', icon: 'symptom' },
     { to: '/shared', label: '가족 공간과 보호자', icon: '♡' },
     { to: '/notifications', label: '알림 및 전달 설정', icon: '♧' },
   ];
@@ -1155,7 +1193,7 @@ function SessionNavigation({ pathname, search, petSelector }: { pathname: string
         setMoreOpen(false);
         if (item.to === '/record') window.scrollTo({ top: 0, behavior: 'smooth' });
       }} className={`${active ? 'nav-item active' : 'nav-item'}${item.to === '/record' ? ' nav-record' : ''}`} aria-current={active ? 'page' : undefined}>
-        {item.icon === 'glucose' ? <RecordTypeIllustration type="glucose" className="nav-glucose-icon" /> : <span className="nav-icon" aria-hidden="true">{item.icon}</span>}<span>{item.label}</span>
+        {item.icon === 'glucose' ? <RecordTypeIllustration type="glucose" className="nav-glucose-icon" /> : item.icon === 'symptom' ? <RecordTypeIllustration type="symptom" className="nav-glucose-icon" /> : <span className="nav-icon" aria-hidden="true">{item.icon}</span>}<span>{item.label}</span>
       </NavLink>;
   };
   const activeSecondary = secondaryItems.some((item) => item.to.startsWith('/?')
@@ -1737,6 +1775,64 @@ export function QuickRecordPage(props: {
   </main>;
 }
 
+function SymptomHistoryPage({ pet, events, revisions, loading, loadHistory }: {
+  pet: Pet;
+  events: HealthEvent[];
+  revisions: EventRevision[];
+  loading: boolean;
+  loadHistory?: (petId: string) => Promise<{ events: HealthEvent[]; revisions: EventRevision[] }>;
+}) {
+  const [result, setResult] = useState<{ petId: string; events: HealthEvent[]; revisions: EventRevision[]; error: boolean }>({
+    petId: '', events: [], revisions: [], error: false,
+  });
+  useEffect(() => {
+    if (!loadHistory) return;
+    let active = true;
+    void loadHistory(pet.id).then((history) => {
+      if (active) setResult({ petId: pet.id, ...history, error: false });
+    }).catch(() => {
+      if (active) setResult({ petId: pet.id, events: [], revisions: [], error: true });
+    });
+    return () => { active = false; };
+  }, [loadHistory, pet.id]);
+  const historyLoading = loading || (Boolean(loadHistory) && result.petId !== pet.id);
+  const failed = Boolean(loadHistory) && result.petId === pet.id && result.error;
+  const sourceEvents = loadHistory ? result.petId === pet.id ? result.events : [] : events;
+  const sourceRevisions = loadHistory ? result.petId === pet.id ? result.revisions : [] : revisions;
+  const symptomEvents = sourceEvents.filter((event) => event.event_type === 'symptom')
+    .sort((a, b) => Date.parse(b.occurred_at) - Date.parse(a.occurred_at));
+
+  return <main className="page-container symptom-history-page">
+    <section className="page-heading pet-photo-heading"><PetProfilePortrait pet={pet} /><div>
+      <p className="eyebrow">건강 기록</p><h1>증상·컨디션 기록</h1><p>{pet.name}의 관찰 기록을 날짜순으로 모아봅니다.</p>
+    </div></section>
+    <section className="panel symptom-history-panel" aria-labelledby="symptom-history-title">
+      <div className="section-heading"><div><p className="eyebrow">누적 기록</p><h2 id="symptom-history-title">증상·컨디션 <small>{historyLoading ? '확인 중' : `${symptomEvents.length}건`}</small></h2></div></div>
+      {historyLoading && <p className="load-state" role="status">증상·컨디션 기록을 불러오고 있어요…</p>}
+      {!historyLoading && failed && <p className="inline-error" role="alert">서버 기록을 불러오지 못했습니다. 연결과 접근 권한을 확인한 뒤 다시 시도해 주세요.</p>}
+      {!historyLoading && !failed && symptomEvents.length === 0 && <p className="empty-state">아직 등록된 증상·컨디션 기록이 없습니다.</p>}
+      {!historyLoading && !failed && symptomEvents.length > 0 && <ol className="symptom-history-list">
+        {symptomEvents.map((event) => {
+          const itemRevisions = sourceRevisions.filter((revision) => revision.event_id === event.id)
+            .sort((a, b) => a.revision_no - b.revision_no);
+          const latest = itemRevisions.at(-1);
+          const note = effectiveEventValue(event.value, itemRevisions).note;
+          return <li key={event.id} className={latest?.revision_kind === 'VOID' ? 'is-void' : undefined}>
+            <RecordTypeIllustration type="symptom" className="symptom-history-icon" />
+            <div className="symptom-history-entry">
+              <div className="symptom-history-entry-heading"><strong>{dateInTimezone(event.occurred_at, pet.timezone)}</strong>
+                <time dateTime={event.occurred_at}>{timeInTimezone(event.occurred_at, pet.timezone)}</time>
+              </div>
+              <p>{typeof note === 'string' && note.trim() ? note : '상세 내용 미기록'}</p>
+              {latest?.revision_kind === 'VOID' && <span className="event-status void">무효 처리</span>}
+            </div>
+          </li>;
+        })}
+      </ol>}
+    </section>
+  </main>;
+}
+
 export function TimelinePage(props: {
   pet: Pet; events: HealthEvent[]; revisions: EventRevision[]; userId: string;
   dateFilter: string; setDateFilter: (value: string) => void; loading: boolean;
@@ -1781,16 +1877,25 @@ export function TimelinePage(props: {
   }, [dailyEvents, searchParams]);
   const symptomEvents = dailyEvents.filter((event) => event.event_type === 'symptom' && visibleTypes.has('symptom'));
   const filteredEvents = dailyEvents.filter((event) => event.event_type !== 'symptom' && visibleTypes.has(event.event_type));
+  const today = todayForTimezone(pet.timezone);
+  const selectDate = (date: string) => {
+    setDateFilter(date);
+    setSearchParams((current) => { const next = new URLSearchParams(current); next.set('date', date); return next; });
+  };
 
   return <main className="page-container timeline-page">
     <section className="page-heading pet-photo-heading"><PetProfilePortrait pet={pet} /><div><p className="eyebrow">건강 기록</p><h1>하루 타임라인</h1>
       <p>{pet.name}의 기록 · {dateFilter}</p></div></section>
     <div className="timeline-filter"><label htmlFor="timeline-date">날짜 선택</label>
-      <input id="timeline-date" type="date" value={dateFilter} onChange={(event) => {
-        const date = event.target.value;
-        setDateFilter(date);
-        setSearchParams((current) => { const next = new URLSearchParams(current); next.set('date', date); return next; });
-      }} /></div>
+      <div className="timeline-date-navigation">
+        <button type="button" className="timeline-date-button" aria-label="이전 날짜" onClick={() => selectDate(shiftDateKey(dateFilter, -1))}>이전</button>
+        <input id="timeline-date" type="date" value={dateFilter} max={today} onChange={(event) => {
+          if (event.target.value) selectDate(event.target.value);
+        }} />
+        <button type="button" className="timeline-date-button" aria-label="다음 날짜" disabled={dateFilter >= today}
+          onClick={() => selectDate(shiftDateKey(dateFilter, 1))}>다음</button>
+      </div>
+    </div>
     <section className="timeline-type-filter" aria-label="표시할 기록 종류">
       <div className="timeline-filter-heading"><strong>보고 싶은 기록</strong>
         <div className="timeline-filter-actions">

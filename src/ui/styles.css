@@ -190,6 +190,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .timeline-filter { display: flex; align-items: center; gap: .65rem; margin: .3rem 0 .8rem; padding: .65rem .8rem; background: var(--paper); border-radius: 15px; border: 1px solid var(--line); }
 .timeline-filter label { white-space: nowrap; }
 .timeline-filter input { min-height: 40px; width: auto; margin-left: auto; padding: .45rem; border: 0; background: #f3f6f0; }
+.timeline-date-navigation { display: grid; grid-template-columns: 3.25rem minmax(0, 1fr) 3.25rem; align-items: center; gap: .45rem; width: min(100%, 34rem); margin-left: auto; min-width: 0; }
+.timeline-filter .timeline-date-navigation input { width: 100%; min-width: 0; margin: 0; text-align: center; }
+.timeline-date-button { min-width: 0; min-height: 40px; padding: .35rem .4rem; border: 1px solid var(--line); border-radius: 10px; background: #e8efe7; color: var(--ink); font-weight: 750; white-space: nowrap; }
+.timeline-date-button:disabled { opacity: .45; cursor: not-allowed; }
 .timeline-list { list-style: none; margin: 0; padding: 0; }
 .timeline-item { display: grid; grid-template-columns: 50px 28px minmax(0, 1fr); align-items: start; gap: .5rem; margin-bottom: .65rem; }
 .timeline-time { padding-top: .85rem; color: #5a7463; font-size: .7rem; font-weight: 800; font-variant-numeric: tabular-nums; }
@@ -805,6 +809,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .timeline-type-filter { border-color: transparent; border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle); border-radius: 0; background: transparent; padding-inline: .1rem; }
 .timeline-filter { border: 0; border-bottom: 1px solid var(--border-subtle); border-radius: 0; background: transparent; padding-inline: .1rem; }
 .timeline-filter input { background: var(--surface-raised); }
+.timeline-date-button { border-color: var(--border-subtle); background: #f6f4ee; color: var(--text-primary); }
 .timeline-list { position: relative; }
 .timeline-list::before { content: ""; position: absolute; top: .7rem; bottom: .7rem; left: 75px; width: 1px; background: #d8ddd2; }
 .timeline-item { position: relative; gap: .6rem; margin-bottom: .4rem; }
@@ -1087,6 +1092,9 @@ button.sample-row.active, button.sample-row.active:hover:not(:disabled) {
 .timeline-correction-fields .field-label > input, .timeline-correction-fields .field-label > select,
 .timeline-correction-fields .field-label > textarea { width: 100%; }
 @media (max-width: 599px) {
+  .timeline-filter { display: grid; grid-template-columns: minmax(0, 1fr); gap: .4rem; }
+  .timeline-date-navigation { width: 100%; grid-template-columns: 3rem minmax(0, 1fr) 3rem; gap: .35rem; }
+  .timeline-filter .timeline-date-navigation input { font-size: .92rem; }
   .timeline-correction-fields { width: 100%; padding-inline: 0; }
   .timeline-correction-fields .field-label { display: grid; grid-template-columns: minmax(0, 1fr); }
   .timeline-correction-actions { min-width: 0; }
@@ -1100,15 +1108,16 @@ button.sample-row.active, button.sample-row.active:hover:not(:disabled) {
 .share-care-timeline-item > time { padding-top: .1rem; color: var(--text-secondary); font-size: .76rem; font-variant-numeric: tabular-nums; }
 .share-care-timeline-node { position: relative; z-index: 1; width: 12px; height: 12px; margin: .23rem auto 0; border: 2px solid var(--surface-raised); border-radius: 50%; background: #d5a350; box-shadow: 0 0 0 1px #d5a350; }
 .share-care-timeline-item.insulin .share-care-timeline-node { background: #7868b3; box-shadow: 0 0 0 1px #7868b3; }
-.share-care-timeline-item > div { display: flex; align-items: baseline; justify-content: space-between; gap: .6rem; min-width: 0; padding: 0 0 .65rem; border-bottom: 1px solid var(--line); }
-.share-care-timeline-item:last-child > div { border-bottom: 0; }
-.share-care-timeline-item > div > span { color: var(--text-primary); font-size: .86rem; font-weight: 700; }
-.share-care-timeline-item > div > strong { min-width: 0; color: var(--text-primary); font-size: .9rem; font-variant-numeric: tabular-nums; text-align: right; overflow-wrap: anywhere; }
+.share-care-content { display: grid; align-content: start; gap: .25rem; min-width: 0; padding: 0 0 .65rem; border-bottom: 1px solid var(--line); }
+.share-care-timeline-item:last-child .share-care-content { border-bottom: 0; }
+.share-care-summary { display: flex; align-items: center; justify-content: space-between; gap: .6rem; min-width: 0; }
+.share-care-kind { color: var(--text-primary); font-size: .86rem; font-weight: 700; }
+.share-care-summary > strong { min-width: 0; color: var(--text-primary); font-size: .9rem; font-variant-numeric: tabular-nums; text-align: right; overflow-wrap: anywhere; }
 @media (max-width: 390px) {
   .share-care-timeline { --share-timeline-time: 76px; }
   .share-care-timeline-item { grid-template-columns: var(--share-timeline-time) 16px minmax(0, 1fr); gap: .35rem; }
   .share-care-timeline-item::before { left: calc(var(--share-timeline-time) + 7px); }
-  .share-care-timeline-item > div { flex-wrap: wrap; gap: .05rem .35rem; }
+  .share-care-summary { gap: .35rem; }
 }
 
 /* Make shared care entries scannable: date, time and a recognizable event icon. */
@@ -1118,6 +1127,17 @@ button.sample-row.active, button.sample-row.active:hover:not(:disabled) {
 .share-care-icon svg { display: block; width: 1rem; height: 1rem; }
 .share-care-icon--meal { color: #986124; background: #fbf0dc; }
 .share-care-icon--insulin { color: #6556a4; background: #efecfa; }
+
+.symptom-history-list { display: grid; gap: .35rem; margin: .8rem 0 0; padding: 0; list-style: none; }
+.symptom-history-list > li { display: grid; grid-template-columns: 2.25rem minmax(0, 1fr); align-items: start; gap: .75rem; padding: .85rem .25rem; border-bottom: 1px solid var(--line); }
+.symptom-history-list > li:last-child { border-bottom: 0; }
+.symptom-history-list > li.is-void .symptom-history-entry { opacity: .65; }
+.symptom-history-icon { display: grid; width: 2rem; height: 2rem; place-items: center; border-radius: 50%; color: #8b5a4a; background: #f7e9e2; }
+.symptom-history-icon svg { display: block; width: 1.2rem; height: 1.2rem; }
+.symptom-history-entry { min-width: 0; }
+.symptom-history-entry-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: .25rem .65rem; color: var(--text-secondary); font-size: .84rem; font-variant-numeric: tabular-nums; }
+.symptom-history-entry-heading strong { color: var(--text-primary); }
+.symptom-history-entry p { margin: .35rem 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 
 /* Match the main glucose page's soft selected-tab state, including touch/hover. */
 .public-glucose-share .period-chip.selected,
