@@ -1342,7 +1342,11 @@ button.period-chip.selected:focus-visible {
 .glucose-message-dialog p { line-height: 1.55; overflow-wrap: anywhere; }
 .glucose-message-dialog .button-primary { width: 100%; min-height: 48px; }
 .share-symptom-details > summary { display: flex; align-items: center; justify-content: space-between; gap: .75rem; min-height: 44px; cursor: pointer; list-style-position: inside; }
-.share-symptom-details > summary > span:first-child { display: grid; gap: .12rem; }
+.share-symptom-day-heading { display: flex; align-items: baseline; justify-content: space-between; gap: .75rem; }
+.share-symptom-day-heading h2 { margin: 0; font-size: 1rem; }
+.share-symptom-day-heading > span { color: var(--muted); font-size: .82rem; }
+.share-symptom-empty { margin: .65rem 0 0; color: var(--muted); }
+.share-symptom-details { margin-top: .65rem; border-top: 1px solid var(--line); }
 .share-symptom-details > summary small, .share-details-hint { color: var(--muted); font-size: .82rem; }
 
 /* Editorial layout uses the existing route and selection state. */

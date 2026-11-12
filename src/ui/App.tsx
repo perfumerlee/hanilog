@@ -12,7 +12,7 @@ import {
   type EventType,
   type HealthEventCommand,
 } from '../lib/event-command';
-import { formatGlucoseValue, glucoseMeasurementConditionLabel, GLUCOSE_MEASUREMENT_CONDITIONS, GLUCOSE_UNIT, validateEventEntry, type EventEntryFields } from '../lib/event-entry';
+import { formatGlucoseValue, glucoseMeasurementConditionLabel, GLUCOSE_MEASUREMENT_CONDITIONS, GLUCOSE_UNIT, normalizeInsulinProductLabel, validateEventEntry, type EventEntryFields } from '../lib/event-entry';
 import { isSupabaseConfigured, supabase, supabaseConfigurationError, userFacingError } from '../lib/supabase';
 import { petInvalidationChannel, userAccessChannel } from '../lib/realtime';
 import { InvitationAcceptPage, SharedCarePage } from './SharedCarePage';
@@ -55,7 +55,7 @@ type EventRevision = {
   revision_kind: 'CORRECT' | 'VOID';
   patch: Record<string, unknown>;
   reason_code: string;
-  actor_id: string;
+  actor_id: string | null;
   recorded_at: string;
 };
 type SafetyResponse = {
@@ -79,7 +79,7 @@ const eventOptions: { type: EventType; label: string; icon: string; short: strin
 const primaryRecordTypes: EventType[] = ['glucose', 'insulin', 'elimination', 'meal'];
 const coreTimelineTypes: EventType[] = primaryRecordTypes;
 const rememberedLoginEmailKey = 'hanilog:remembered-login-email';
-const commonInsulinProductLabels = ['캐니슐린', '프로진크', 'NPH', '글라진', '디터미르'];
+const commonInsulinProductLabels = ['캐닌슐린', '프로진크', 'NPH', '글라진', '디터미르'];
 const eventLabels = Object.fromEntries(eventOptions.map((option) => [option.type, option.label])) as Record<EventType, string>;
 function RecordTypeIllustration({ type, className = '' }: { type: EventType; className?: string }) {
   const common = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
@@ -1487,8 +1487,8 @@ export function QuickRecordPage(props: {
   const [measurementSource, setMeasurementSource] = useState('');
   const [measurementCondition, setMeasurementCondition] = useState('');
   const [doseAmount, setDoseAmount] = useState('');
-  const [insulinProductLabel, setInsulinProductLabel] = useState(() => pet.default_insulin_product?.trim() ?? '');
-  const insulinProductDefaultRef = useRef({ petId: pet.id, value: pet.default_insulin_product?.trim() ?? '' });
+  const [insulinProductLabel, setInsulinProductLabel] = useState(() => normalizeInsulinProductLabel(pet.default_insulin_product));
+  const insulinProductDefaultRef = useRef({ petId: pet.id, value: normalizeInsulinProductLabel(pet.default_insulin_product) });
   const [savingInsulinDefault, setSavingInsulinDefault] = useState(false);
   const [insulinDefaultMessage, setInsulinDefaultMessage] = useState('');
   const [showAllRecordTypes, setShowAllRecordTypes] = useState(!primaryRecordTypes.includes(initialEventType));
@@ -1527,7 +1527,7 @@ export function QuickRecordPage(props: {
     .filter((item) => item.value.activity_state === 'STARTED' && item.revision?.revision_kind !== 'VOID')
     .sort((a, b) => Date.parse(b.event.recorded_at) - Date.parse(a.event.recorded_at))[0],
   [props.events, props.revisions]);
-  const savedInsulinProduct = pet.default_insulin_product?.trim() ?? '';
+  const savedInsulinProduct = normalizeInsulinProductLabel(pet.default_insulin_product);
   const insulinProductSelection = !insulinProductLabel ? ''
     : commonInsulinProductLabels.includes(insulinProductLabel) ? insulinProductLabel : '__custom__';
 
@@ -1609,7 +1609,7 @@ export function QuickRecordPage(props: {
       setMeasurementSource('');
       setMeasurementCondition('');
       setDoseAmount('');
-      setInsulinProductLabel(pet.default_insulin_product?.trim() ?? '');
+      setInsulinProductLabel(normalizeInsulinProductLabel(pet.default_insulin_product));
       setMealStatus('');
       setEliminationType('');
     }
@@ -1695,7 +1695,7 @@ export function QuickRecordPage(props: {
               <select aria-label="인슐린 제품" value={insulinProductSelection} required
                 onChange={(event) => { if (event.target.value !== '__custom__') setInsulinProductLabel(event.target.value); setInsulinDefaultMessage(''); }}>
                 <option value="">제품 선택</option>
-                <option value="캐니슐린">캐니슐린</option>
+                <option value="캐닌슐린">캐닌슐린</option>
                 <option value="프로진크">프로진크</option>
                 <option value="NPH">NPH</option>
                 <option value="글라진">글라진</option>
@@ -2008,7 +2008,7 @@ function TimelineCorrectionEditor({ event, value, revision, onSave, onCorrectTim
   const [note, setNote] = useState(String(value.note ?? ''));
   const [condition, setCondition] = useState(String(value.measurement_condition ?? ''));
   const [source, setSource] = useState(String(value.measurement_source ?? ''));
-  const [insulinProduct, setInsulinProduct] = useState(String(value.insulin_product_label ?? ''));
+  const [insulinProduct, setInsulinProduct] = useState(normalizeInsulinProductLabel(String(value.insulin_product_label ?? '')));
   const [meal, setMeal] = useState(String(value.meal_status ?? ''));
   const [elimination, setElimination] = useState(String(value.observation_type ?? ''));
   const [occurredLocal, setOccurredLocal] = useState(() => {
@@ -2083,6 +2083,9 @@ function effectiveEventValue(value: Record<string, unknown>, revisions: EventRev
     if (patchValue && typeof patchValue === 'object' && !Array.isArray(patchValue)) {
       Object.assign(effective, patchValue);
     }
+  }
+  if (typeof effective.insulin_product_label === 'string') {
+    effective.insulin_product_label = normalizeInsulinProductLabel(effective.insulin_product_label);
   }
   return effective;
 }

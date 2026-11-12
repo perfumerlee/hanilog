@@ -73,11 +73,11 @@ describe('QuickRecordPage', () => {
     const onSubmit = vi.fn().mockResolvedValue(false);
     render(<QuickRecordPage {...props} onSubmit={onSubmit} />);
     fireEvent.click(screen.getByRole('radio', { name: /인슐린/ }));
-    fireEvent.change(screen.getByLabelText('인슐린 제품'), { target: { value: '캐니슐린' } });
+    fireEvent.change(screen.getByLabelText('인슐린 제품'), { target: { value: '캐닌슐린' } });
     fireEvent.change(screen.getByLabelText('실제 투여량'), { target: { value: '2' } });
     fireEvent.click(screen.getByRole('button', { name: '기록 저장' }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(
-      expect.objectContaining({ eventType: 'insulin', doseAmount: '2', doseUnit: 'U', insulinProductLabel: '캐니슐린' }),
+      expect.objectContaining({ eventType: 'insulin', doseAmount: '2', doseUnit: 'U', insulinProductLabel: '캐닌슐린' }),
       null,
     ));
   });
@@ -85,8 +85,8 @@ describe('QuickRecordPage', () => {
   it('applies the saved per-pet product when profile data arrives after the form mounts', () => {
     const view = render(<QuickRecordPage {...props} />);
     fireEvent.click(screen.getByRole('radio', { name: /인슐린/ }));
-    view.rerender(<QuickRecordPage {...props} pet={{ ...props.pet, default_insulin_product: '캐니슐린' }} />);
-    expect(screen.getByLabelText('인슐린 제품')).toHaveValue('캐니슐린');
+    view.rerender(<QuickRecordPage {...props} pet={{ ...props.pet, default_insulin_product: '캐닌슐린' }} />);
+    expect(screen.getByLabelText('인슐린 제품')).toHaveValue('캐닌슐린');
   });
 
   it('keeps insulin help and occurrence details collapsed until requested', () => {
@@ -131,8 +131,8 @@ it('updates the selected date without fabricating a different occurrence time', 
 it('keeps the prescribed insulin product after switching record types', () => {
   render(<QuickRecordPage {...props} />);
   fireEvent.click(screen.getByRole('radio', { name: '인슐린' }));
-  fireEvent.change(screen.getByLabelText('인슐린 제품'), { target: { value: '캐니슐린' } });
+  fireEvent.change(screen.getByLabelText('인슐린 제품'), { target: { value: '캐닌슐린' } });
   fireEvent.click(screen.getByRole('radio', { name: '혈당' }));
   fireEvent.click(screen.getByRole('radio', { name: '인슐린' }));
-  expect(screen.getByLabelText('인슐린 제품')).toHaveValue('캐니슐린');
+  expect(screen.getByLabelText('인슐린 제품')).toHaveValue('캐닌슐린');
 });

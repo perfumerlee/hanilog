@@ -9,6 +9,12 @@ export const GLUCOSE_MEASUREMENT_CONDITIONS = [
   { value: 'AFTER_EXERCISE', label: '운동 후' },
 ] as const;
 
+/** Keep legacy misspellings readable as the canonical product label. */
+export function normalizeInsulinProductLabel(value: string | null | undefined): string {
+  const label = value?.trim() ?? '';
+  return label === '캐니슐린' ? '캐닌슐린' : label;
+}
+
 export function glucoseMeasurementConditionLabel(value: string | undefined): string {
   return GLUCOSE_MEASUREMENT_CONDITIONS.find((condition) => condition.value === value)?.label ?? value ?? '미기록';
 }
@@ -64,7 +70,7 @@ export function validateEventEntry(fields: EventEntryFields): { value?: Validate
     unit = 'U';
     value.administered_dose_value = amount;
     value.administered_dose_unit = 'U';
-    const productLabel = fields.insulinProductLabel?.trim();
+    const productLabel = normalizeInsulinProductLabel(fields.insulinProductLabel);
     if (!productLabel) return { error: '처방받은 인슐린 제품을 입력해 주세요.' };
     if (productLabel.length > 120) return { error: '인슐린 제품명은 120자 이내로 입력해 주세요.' };
     value.insulin_product_label = productLabel;
