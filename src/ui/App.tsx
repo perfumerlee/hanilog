@@ -74,7 +74,7 @@ const eventOptions: { type: EventType; label: string; icon: string; short: strin
   { type: 'water', label: '음수', icon: '⌁', short: '관찰한 음수량' },
   { type: 'exercise', label: '운동 및 산책', icon: '⌁', short: '실제 활동' },
   { type: 'weight', label: '체중', icon: '◌', short: '측정값과 단위' },
-  { type: 'symptom', label: '증상·컨디션', icon: '♡', short: '관찰한 상태' },
+  { type: 'symptom', label: '증상·컨디션·특이사항', icon: '♡', short: '관찰한 상태와 평소와 다른 점' },
 ];
 const primaryRecordTypes: EventType[] = ['glucose', 'insulin', 'elimination', 'meal'];
 const coreTimelineTypes: EventType[] = primaryRecordTypes;
@@ -1807,10 +1807,10 @@ function SymptomHistoryPage({ pet, events, revisions, loading, loadHistory }: {
       <p className="eyebrow">건강 기록</p><h1>증상·컨디션·특이사항 기록</h1><p>{pet.name}의 증상과 컨디션, 평소와 다른 점을 날짜순으로 모아봅니다.</p>
     </div></section>
     <section className="panel symptom-history-panel" aria-labelledby="symptom-history-title">
-      <div className="section-heading"><div><p className="eyebrow">누적 기록</p><h2 id="symptom-history-title">증상·컨디션 <small>{historyLoading ? '확인 중' : `${symptomEvents.length}건`}</small></h2></div></div>
-      {historyLoading && <p className="load-state" role="status">증상·컨디션 기록을 불러오고 있어요…</p>}
+      <div className="section-heading"><div><p className="eyebrow">누적 기록</p><h2 id="symptom-history-title">증상·컨디션·특이사항 <small>{historyLoading ? '확인 중' : `${symptomEvents.length}건`}</small></h2></div></div>
+      {historyLoading && <p className="load-state" role="status">증상·컨디션·특이사항 기록을 불러오고 있어요…</p>}
       {!historyLoading && failed && <p className="inline-error" role="alert">서버 기록을 불러오지 못했습니다. 연결과 접근 권한을 확인한 뒤 다시 시도해 주세요.</p>}
-      {!historyLoading && !failed && symptomEvents.length === 0 && <p className="empty-state">아직 등록된 증상·컨디션 기록이 없습니다.</p>}
+      {!historyLoading && !failed && symptomEvents.length === 0 && <p className="empty-state">아직 등록된 증상·컨디션·특이사항 기록이 없습니다.</p>}
       {!historyLoading && !failed && symptomEvents.length > 0 && <ol className="symptom-history-list">
         {symptomEvents.map((event) => {
           const itemRevisions = sourceRevisions.filter((revision) => revision.event_id === event.id)
@@ -1981,7 +1981,7 @@ export function TimelinePage(props: {
         const observation = typeof effectiveValue.note === 'string' && effectiveValue.note.trim() ? effectiveValue.note : '상세 내용 미기록';
         return <li key={event.id}>
           <time dateTime={event.occurred_at}>{timeInTimezone(event.occurred_at, pet.timezone)}</time>
-          <div><strong>증상·컨디션</strong><p>{observation}</p>
+          <div><strong>증상·컨디션·특이사항</strong><p>{observation}</p>
             {latest?.revision_kind === 'VOID' && <small className="event-status void">무효 처리</small>}
             {onReviseEvent && latest?.revision_kind !== 'VOID' && <details><summary>상세 정보·수정</summary>
               <p className="event-timestamp">실제 발생 {dateTimeInTimezone(event.occurred_at, pet.timezone)}</p>
