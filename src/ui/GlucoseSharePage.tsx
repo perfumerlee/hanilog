@@ -164,7 +164,7 @@ export function GlucoseSharePage() {
         <GlucoseScatterChart samples={displayedSamples} actualSegments={actualSegments} trendSegments={[]} timezone={share.timezone} targetRange={share.target_range} onSelect={setSelectedId} selectedId={selected?.id ?? null} mode={displayMode} />
         {!displayedSamples.length && <p className="trend-empty">{displayMode === 'day' ? '이 날짜에' : '선택한 기간에'} 기록된 혈당 측정값이 없습니다.</p>}
         {selected && <div className="share-selected-value" aria-live="polite"><strong>{selected.value} mg/dL</strong>
-          <span>{formatTime(selected.occurredAt, share.timezone)} <span className={conditionBadgeClass(selected.condition)}>{glucoseMeasurementConditionLabel(selected.condition)}</span></span></div>}
+          <span>{formatTime(selected.occurredAt, share.timezone)} {selected.condition && <span className={conditionBadgeClass(selected.condition)}>{glucoseMeasurementConditionLabel(selected.condition)}</span>}</span></div>}
         <section className="measurement-list"><h2>측정값 목록 : {displayedSamples.length}건</h2>
         {displayedSamples.length ? <ol>{[...displayedSamples].reverse().map((sample) => <li key={sample.id}>
           <button type="button" className={selected?.id === sample.id ? 'sample-row active' : 'sample-row'} onClick={() => setSelectedId(sample.id)}>
@@ -197,7 +197,7 @@ export function GlucoseSharePage() {
           </li>)}</ol> : <p className="share-symptom-empty">선택한 날짜에 증상·컨디션 기록이 없습니다.</p>}
         </div>
         {otherDaySymptoms.length > 0 && <details key={day} className="share-symptom-details">
-          <summary><span>다른 날짜 기록 보기</span><span className="share-details-hint">{otherDaySymptoms.length}건</span></summary>
+          <summary><span className="share-symptom-disclosure-label">다른 날짜 기록 보기</span><span className="share-details-hint">{otherDaySymptoms.length}건</span></summary>
           <ol className="share-symptom-list">{otherDaySymptoms.map((item) => <li key={item.id}>
             <time dateTime={item.occurred_at}>{formatTime(item.occurred_at, share.timezone)}</time>
             <p>{item.note?.trim() || '상세 내용 미기록'}</p>

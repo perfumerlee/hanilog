@@ -415,7 +415,12 @@ button, a, input, select, textarea, summary { scroll-margin: 1rem; }
 .timeline-filter-chip.selected { border-color: #6b9477; background: #e7f0e6; color: #205843; font-weight: 800; }
 .timeline-type-filter > small { display: block; margin-top: .35rem; color: var(--muted); }
 .glucose-care-tools { display: grid; gap: .9rem; }
-.glucose-care-tools > h2 { margin: 0; font-size: 1.05rem; }
+.glucose-care-tools > h2 { margin: 0; font-size: 1.05rem; font-weight: 750; }
+.glucose-care-tools > details { padding-inline: .85rem; border: 1px solid var(--line); border-radius: 12px; background: #f8f9f5; }
+.glucose-care-tools .share-list-heading { margin: .65rem 0 0; font-size: .9rem; font-weight: 750; }
+.glucose-share-list li { align-items: flex-start; flex-wrap: wrap; }
+.share-list-actions { display: flex; align-items: end; justify-content: flex-end; flex-wrap: wrap; gap: .4rem; }
+.share-list-actions .field-label { width: min(100%, 13rem); }
 .glucose-target-tools, .glucose-share-tools { display: grid; gap: .55rem; padding-top: .7rem; border-top: 1px solid var(--line); }
 .glucose-target-tools > summary, .glucose-share-tools > summary { display: flex; min-height: 44px; align-items: center; justify-content: space-between; gap: .75rem; cursor: pointer; list-style-position: inside; }
 .glucose-target-tools > summary span, .glucose-share-tools > summary span { color: var(--muted); font-size: .78rem; text-align: right; }
@@ -1341,9 +1346,12 @@ button.period-chip.selected:focus-visible {
 .glucose-message-dialog h3, .glucose-message-dialog p { margin: 0; }
 .glucose-message-dialog p { line-height: 1.55; overflow-wrap: anywhere; }
 .glucose-message-dialog .button-primary { width: 100%; min-height: 48px; }
-.share-symptom-details > summary { display: flex; align-items: center; justify-content: space-between; gap: .75rem; min-height: 44px; cursor: pointer; list-style-position: inside; }
+.share-symptom-details > summary { display: flex; align-items: center; justify-content: space-between; gap: .75rem; min-height: 44px; cursor: pointer; list-style: none; }
+.share-symptom-details > summary::-webkit-details-marker { display: none; }
+.share-symptom-disclosure-label::before { content: '▶'; display: inline-block; margin-right: .45rem; font-size: .78em; transition: transform .15s ease; }
+.share-symptom-details[open] .share-symptom-disclosure-label::before { transform: rotate(90deg); }
 .share-symptom-day-heading { display: flex; align-items: baseline; justify-content: space-between; gap: .75rem; }
-.share-symptom-day-heading h2 { margin: 0; font-size: 1rem; }
+.share-symptom-day-heading h2 { margin: 0; font-size: 1rem; font-weight: 750; }
 .share-symptom-day-heading > span { color: var(--muted); font-size: .82rem; }
 .share-symptom-empty { margin: .65rem 0 0; color: var(--muted); }
 .share-symptom-details { margin-top: .65rem; border-top: 1px solid var(--line); }
