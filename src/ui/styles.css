@@ -421,6 +421,8 @@ button, a, input, select, textarea, summary { scroll-margin: 1rem; }
 .glucose-share-list li { align-items: flex-start; flex-wrap: wrap; }
 .share-list-actions { display: flex; align-items: end; justify-content: flex-end; flex-wrap: wrap; gap: .4rem; }
 .share-list-actions .field-label { width: min(100%, 13rem); }
+.share-list-actions .share-list-link { width: 100%; }
+.share-list-link input { width: 100%; min-width: 0; }
 .glucose-target-tools, .glucose-share-tools { display: grid; gap: .55rem; padding-top: .7rem; border-top: 1px solid var(--line); }
 .glucose-target-tools > summary, .glucose-share-tools > summary { display: flex; min-height: 44px; align-items: center; justify-content: space-between; gap: .75rem; cursor: pointer; list-style-position: inside; }
 .glucose-target-tools > summary span, .glucose-share-tools > summary span { color: var(--muted); font-size: .78rem; text-align: right; }

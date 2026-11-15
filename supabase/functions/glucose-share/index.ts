@@ -12,6 +12,26 @@ const cors = (origin: string | null) => ({
 const jsonHeaders = (origin: string | null) => ({ ...cors(origin), 'Content-Type': 'application/json',
   'Cache-Control': 'no-store, private', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer' });
 const hex = (bytes: Uint8Array) => [...bytes].map((value) => value.toString(16).padStart(2, '0')).join('');
+const base64url = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+async function shareCipherKey(serviceKey: string) {
+  const material = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`hanilog:share-link:v1:${serviceKey}`));
+  return crypto.subtle.importKey('raw', material, 'AES-GCM', false, ['encrypt', 'decrypt']);
+}
+async function encryptShareToken(token: string, serviceKey: string) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await shareCipherKey(serviceKey), new TextEncoder().encode(token));
+  return `${base64url(iv)}.${base64url(new Uint8Array(encrypted))}`;
+}
+async function decryptShareToken(value: string | null, serviceKey: string): Promise<string | null> {
+  if (!value) return null;
+  try {
+    const [ivPart, dataPart] = value.split('.');
+    const decode = (part: string) => Uint8Array.from(atob(part.replace(/-/g, '+').replace(/_/g, '/')), (character) => character.charCodeAt(0));
+    const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: decode(ivPart) }, await shareCipherKey(serviceKey), decode(dataPart));
+    const token = new TextDecoder().decode(plain);
+    return /^[A-Za-z0-9_-]{43}$/.test(token) ? token : null;
+  } catch { return null; }
+}
 const schemaUnavailable = (error: { code?: string } | null) => Boolean(error && ['42883', '42P01', '42703'].includes(error.code ?? ''));
 
 async function readBoundedJson(request: Request, maxBytes = 4096) {
@@ -149,17 +169,22 @@ Deno.serve(async (request) => {
     if (authError || !authData.user) return Response.json({ error: 'UNAUTHENTICATED' }, { status: 401, headers });
 
     if (payload.action === 'create') {
-      const { pet_id, token_hash, from_date, to_date, include_care_times, include_care_values, guardian_contact_phone, include_symptoms } = payload;
+      const { pet_id, token_hash, token, from_date, to_date, include_care_times, include_care_values, guardian_contact_phone, include_symptoms } = payload;
       // Server time avoids device clock skew at the maximum expiry boundary.
       const days = payload.expires_days;
       const expires_at = typeof days === 'number' && [1, 3, 7].includes(days)
         ? new Date(Date.now() + days * 86_400_000 - 60_000).toISOString()
         : payload.expires_at;
       if (typeof pet_id !== 'string' || !/^[0-9a-f-]{36}$/i.test(pet_id) || typeof token_hash !== 'string' || !/^[a-f0-9]{64}$/.test(token_hash) ||
+          typeof token !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(token) ||
           typeof from_date !== 'string' || typeof to_date !== 'string' || typeof expires_at !== 'string' || typeof include_care_times !== 'boolean' ||
           (include_symptoms !== undefined && typeof include_symptoms !== 'boolean') ||
           (guardian_contact_phone !== null && guardian_contact_phone !== undefined && (typeof guardian_contact_phone !== 'string' || !/^\+[1-9]\d{7,14}$/.test(guardian_contact_phone))) ||
           (include_care_values !== undefined && typeof include_care_values !== 'boolean') || (include_care_values === true && !include_care_times)) {
+        return Response.json({ error: 'INVALID_REQUEST' }, { status: 400, headers });
+      }
+      const tokenBytes = Uint8Array.from(atob(token.replace(/-/g, '+').replace(/_/g, '/') + '='), (character) => character.charCodeAt(0));
+      if (hex(new Uint8Array(await crypto.subtle.digest('SHA-256', tokenBytes))) !== token_hash) {
         return Response.json({ error: 'INVALID_REQUEST' }, { status: 400, headers });
       }
       const { data, error } = await client.rpc('create_glucose_share_link_v4', {
@@ -169,14 +194,54 @@ Deno.serve(async (request) => {
       });
       if (error) return Response.json({ error: schemaUnavailable(error) ? 'SHARE_SCHEMA_UNAVAILABLE' : error.code === '42501' ? 'ACCESS_DENIED' : 'SHARE_CREATE_FAILED' },
         { status: schemaUnavailable(error) ? 503 : error.code === '42501' ? 403 : 400, headers });
-      return Response.json({ share: Array.isArray(data) ? data[0] : data }, { headers });
+      const share = Array.isArray(data) ? data[0] : data;
+      const admin = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
+      const stored = await admin.from('glucose_share_links').update({ share_token_ciphertext: await encryptShareToken(token, serviceKey) }).eq('id', share.id).eq('pet_id', pet_id);
+      if (stored.error) {
+        await client.rpc('revoke_glucose_share_link', { p_share_id: share.id });
+        return Response.json({ error: 'SHARE_SCHEMA_UNAVAILABLE' }, { status: 503, headers });
+      }
+      return Response.json({ share }, { headers });
     }
     if (payload.action === 'list') {
       if (typeof payload.pet_id !== 'string' || !/^[0-9a-f-]{36}$/i.test(payload.pet_id)) return Response.json({ error: 'INVALID_REQUEST' }, { status: 400, headers });
       const { data, error } = await client.rpc('list_my_glucose_share_links_v4', { p_pet_id: payload.pet_id });
       if (error) return Response.json({ error: schemaUnavailable(error) ? 'SHARE_SCHEMA_UNAVAILABLE' : error.code === '42501' ? 'ACCESS_DENIED' : 'SHARE_LIST_FAILED' },
         { status: schemaUnavailable(error) ? 503 : error.code === '42501' ? 403 : 400, headers });
-      return Response.json({ shares: data ?? [] }, { headers });
+      const shares = data ?? [];
+      const activeIds = shares.filter((share: { id: string; revoked_at: string | null; expires_at: string }) => !share.revoked_at && Date.parse(share.expires_at) > Date.now()).map((share: { id: string }) => share.id);
+      if (!activeIds.length) return Response.json({ shares }, { headers });
+      const admin = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
+      const stored = await admin.from('glucose_share_links').select('id,share_token_ciphertext,recipient_phone').eq('pet_id', payload.pet_id).in('id', activeIds);
+      if (stored.error) return Response.json({ error: 'SHARE_SCHEMA_UNAVAILABLE' }, { status: 503, headers });
+      const byId = new Map((stored.data ?? []).map((item) => [item.id, item]));
+      return Response.json({ shares: await Promise.all(shares.map(async (share: { id: string }) => ({ ...share,
+        share_token: await decryptShareToken(byId.get(share.id)?.share_token_ciphertext ?? null, serviceKey),
+        recipient_phone: byId.get(share.id)?.recipient_phone ?? null }))) }, { headers });
+    }
+    if (payload.action === 'save_contact' || payload.action === 'recover_link') {
+      const { pet_id, share_id, recipient_phone, token } = payload;
+      if (typeof pet_id !== 'string' || !/^[0-9a-f-]{36}$/i.test(pet_id) || typeof share_id !== 'string' || !/^[0-9a-f-]{36}$/i.test(share_id) ||
+          (payload.action === 'save_contact' && recipient_phone !== null && (typeof recipient_phone !== 'string' || !/^\+?[0-9]{8,15}$/.test(recipient_phone))) ||
+          (payload.action === 'recover_link' && (typeof token !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(token)))) {
+        return Response.json({ error: 'INVALID_REQUEST' }, { status: 400, headers });
+      }
+      const allowed = await client.rpc('list_my_glucose_share_links_v4', { p_pet_id: pet_id });
+      if (allowed.error) return Response.json({ error: 'ACCESS_DENIED' }, { status: 403, headers });
+      if (!(allowed.data ?? []).some((share: { id: string; revoked_at: string | null; expires_at: string }) => share.id === share_id && !share.revoked_at && Date.parse(share.expires_at) > Date.now())) {
+        return Response.json({ error: 'ACCESS_DENIED' }, { status: 403, headers });
+      }
+      const admin = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
+      if (payload.action === 'recover_link') {
+        const bytes = Uint8Array.from(atob((token as string).replace(/-/g, '+').replace(/_/g, '/') + '='), (character) => character.charCodeAt(0));
+        const hash = hex(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)));
+        const stored = await admin.from('glucose_share_links').update({ share_token_ciphertext: await encryptShareToken(token as string, serviceKey) }).eq('id', share_id).eq('pet_id', pet_id).eq('token_hash', hash);
+        if (stored.error) return Response.json({ error: 'SHARE_SCHEMA_UNAVAILABLE' }, { status: 503, headers });
+      } else {
+        const stored = await admin.from('glucose_share_links').update({ recipient_phone }).eq('id', share_id).eq('pet_id', pet_id);
+        if (stored.error) return Response.json({ error: 'SHARE_SCHEMA_UNAVAILABLE' }, { status: 503, headers });
+      }
+      return Response.json({ saved: true }, { headers });
     }
     if (payload.action === 'revoke') {
       if (typeof payload.share_id !== 'string' || !/^[0-9a-f-]{36}$/i.test(payload.share_id)) return Response.json({ error: 'INVALID_REQUEST' }, { status: 400, headers });

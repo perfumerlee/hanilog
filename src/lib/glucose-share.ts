@@ -11,6 +11,8 @@ export type GlucoseShareRange = {
   include_care_values?: boolean;
   include_symptoms?: boolean;
   guardian_contact_phone?: string | null;
+  share_token?: string | null;
+  recipient_phone?: string | null;
 };
 export type GlucoseSharePayload = {
   pet_name: string;
