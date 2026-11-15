@@ -190,7 +190,7 @@ export function GlucoseSharePage() {
       </section>}
       {displayMode === 'day' && sharedSymptoms.length > 0 && <section className="panel share-symptom-history" aria-labelledby="share-symptom-heading">
         <div className="share-symptom-day">
-          <div className="share-symptom-day-heading"><h2 id="share-symptom-heading">증상·컨디션 기록</h2><span>{day} · {dailySymptoms.length}건</span></div>
+          <div className="share-symptom-day-heading"><h2 id="share-symptom-heading">증상·컨디션·특이사항 기록</h2><span>{day} · {dailySymptoms.length}건</span></div>
           {dailySymptoms.length > 0 ? <ol className="share-symptom-list">{dailySymptoms.map((item) => <li key={item.id}>
             <time dateTime={item.occurred_at}>{formatClock(item.occurred_at, share.timezone)}</time>
             <p>{item.note?.trim() || '상세 내용 미기록'}</p>

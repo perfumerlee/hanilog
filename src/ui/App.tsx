@@ -1155,7 +1155,7 @@ function SessionNavigation({ pathname, search, petSelector }: { pathname: string
   const desktopItems = [
     { to: '/trends', label: '혈당 기록', icon: 'glucose' },
     { to: '/timeline', label: '하루 타임라인', icon: '◷' },
-    { to: '/symptoms', label: '증상·컨디션 기록', icon: 'symptom' },
+    { to: '/symptoms', label: '증상·컨디션·특이사항 기록', icon: 'symptom' },
     { to: '/record', label: '빠른 기록', icon: '+' },
     { to: '/?profile=1', label: '반려동물 설정', icon: '🐾' },
     { to: '/shared', label: '가족 공간과 보호자', icon: '♡' },
@@ -1164,7 +1164,7 @@ function SessionNavigation({ pathname, search, petSelector }: { pathname: string
   const secondaryItems = [
     { to: '/?profile=1', label: '반려동물 설정', icon: '🐾' },
     { to: '/timeline', label: '하루 타임라인', icon: '◷' },
-    { to: '/symptoms', label: '증상·컨디션 기록', icon: 'symptom' },
+    { to: '/symptoms', label: '증상·컨디션·특이사항 기록', icon: 'symptom' },
     { to: '/shared', label: '가족 공간과 보호자', icon: '♡' },
     { to: '/notifications', label: '알림 및 전달 설정', icon: '♧' },
   ];
@@ -1804,7 +1804,7 @@ function SymptomHistoryPage({ pet, events, revisions, loading, loadHistory }: {
 
   return <main className="page-container symptom-history-page">
     <section className="page-heading pet-photo-heading"><PetProfilePortrait pet={pet} /><div>
-      <p className="eyebrow">건강 기록</p><h1>증상·컨디션 기록</h1><p>{pet.name}의 관찰 기록을 날짜순으로 모아봅니다.</p>
+      <p className="eyebrow">건강 기록</p><h1>증상·컨디션·특이사항 기록</h1><p>{pet.name}의 증상과 컨디션, 평소와 다른 점을 날짜순으로 모아봅니다.</p>
     </div></section>
     <section className="panel symptom-history-panel" aria-labelledby="symptom-history-title">
       <div className="section-heading"><div><p className="eyebrow">누적 기록</p><h2 id="symptom-history-title">증상·컨디션 <small>{historyLoading ? '확인 중' : `${symptomEvents.length}건`}</small></h2></div></div>
@@ -1972,7 +1972,7 @@ export function TimelinePage(props: {
       </li>;
     })}</ol>}
     {!loading && !loadError && symptomEvents.length > 0 && <section className="panel timeline-symptom-section" aria-labelledby="timeline-symptom-heading">
-      <div className="section-heading"><div><p className="eyebrow">하루 타임라인</p><h2 id="timeline-symptom-heading">증상·컨디션 기록 <small>{symptomEvents.length}건</small></h2></div></div>
+      <div className="section-heading"><div><p className="eyebrow">하루 타임라인</p><h2 id="timeline-symptom-heading">증상·컨디션·특이사항 기록 <small>{symptomEvents.length}건</small></h2></div></div>
       <p className="small-note">관찰해 기록한 내용입니다. 앱이 진단하거나 상태를 분류하지 않습니다.</p>
       <ul className="timeline-symptom-list">{symptomEvents.map((event) => {
         const itemRevisions = sourceRevisions.filter((revision) => revision.event_id === event.id).sort((a, b) => a.revision_no - b.revision_no);
