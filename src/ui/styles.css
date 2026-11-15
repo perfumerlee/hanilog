@@ -1359,6 +1359,97 @@ button.period-chip.selected:focus-visible {
 .share-symptom-details { margin-top: .65rem; border-top: 1px solid var(--line); }
 .share-symptom-details > summary small, .share-details-hint { color: var(--muted); font-size: .82rem; }
 
+/* Main app button feedback: keep each control in its own color family. */
+.button-secondary { border: 1px solid #b7cbb9; background: #eff4ed; color: #275346; }
+.timeline-page .timeline-date-button:hover:not(:disabled),
+.timeline-page .timeline-date-button:focus-visible,
+.daily-graph-date > button.button-secondary:hover:not(:disabled),
+.daily-graph-date > button.button-secondary:focus-visible,
+.button-secondary:hover:not(:disabled),
+.button-secondary:focus-visible {
+  background: #e3eee6;
+  color: #205447;
+  border-color: #9fbea9;
+}
+.timeline-page .timeline-date-button:active:not(:disabled),
+.daily-graph-date > button.button-secondary:active:not(:disabled),
+.button-secondary:active:not(:disabled) {
+  background: #d2e4d8;
+  color: #17483d;
+  border-color: #82a590;
+}
+.timeline-filter-chip:hover:not(:disabled),
+.timeline-filter-chip:focus-visible,
+.period-chip:hover:not(:disabled),
+.period-chip:focus-visible,
+.weight-period-picker button:hover:not(:disabled),
+.weight-period-picker button:focus-visible {
+  background: #e8f0e8;
+  color: #295445;
+  border-color: #a7bfaa;
+}
+.timeline-filter-chip:active:not(:disabled),
+.period-chip:active:not(:disabled),
+.weight-period-picker button:active:not(:disabled) {
+  background: #dce9dd;
+  color: #214c3f;
+  border-color: #8eae98;
+}
+.timeline-filter-chip.selected,
+.timeline-filter-chip.selected:hover:not(:disabled),
+.timeline-filter-chip.selected:active:not(:disabled),
+.timeline-filter-chip.selected:focus-visible {
+  background: #e7ebe1;
+  color: #3f5744;
+  border-color: #83947b;
+}
+.nav-item.active:hover:not(:disabled),
+.nav-item.active:active:not(:disabled),
+.nav-more-toggle.active:hover:not(:disabled),
+.nav-more-toggle.active:active:not(:disabled) {
+  background: #e7ebe1;
+  color: #3f5744;
+}
+.nav-record.active:hover:not(:disabled),
+.nav-record.active:active:not(:disabled) {
+  background: #22685f;
+  color: white;
+}
+.record-page .type-choice.selected:hover:not(:disabled),
+.record-page .type-choice.selected:active:not(:disabled) {
+  background: #e3f1eb;
+  color: #1e5e56;
+  border-color: #398a77;
+}
+.text-button:hover:not(:disabled),
+.text-button:active:not(:disabled),
+.text-button:focus-visible,
+.weight-target-edit:hover:not(:disabled),
+.weight-target-edit:active:not(:disabled),
+.weight-target-edit:focus-visible {
+  background: transparent;
+  color: #174f46;
+}
+.quiet-button:hover:not(:disabled),
+.quiet-button:focus-visible { background: #e9f0e9; color: #205447; }
+.quiet-button:active:not(:disabled) { background: #dce9e2; color: #174f46; }
+.danger-button:hover:not(:disabled),
+.danger-button:focus-visible { background: #fae7e1; color: #793c32; border-color: #dbafa4; }
+.danger-button:active:not(:disabled) { background: #f3d9d1; color: #6f352d; }
+.record-week button:not([aria-pressed="true"]):hover:not(:disabled),
+.record-week button:not([aria-pressed="true"]):active:not(:disabled),
+.record-week button:not([aria-pressed="true"]):focus-visible {
+  background: #e8f1eb;
+  color: #244e43;
+}
+.record-week button[aria-pressed="true"],
+.record-week button[aria-pressed="true"]:hover:not(:disabled),
+.record-week button[aria-pressed="true"]:active:not(:disabled) {
+  background: var(--green);
+  color: white;
+  border-color: var(--green);
+}
+
 /* Editorial layout uses the existing route and selection state. */
 .nav-pet-selector { display: none; }
 .shared-care-page { max-width: 1120px; }
