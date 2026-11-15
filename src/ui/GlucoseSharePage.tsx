@@ -194,7 +194,7 @@ export function GlucoseSharePage() {
           {dailySymptoms.length > 0 ? <ol className="share-symptom-list">{dailySymptoms.map((item) => <li key={item.id}>
             <time dateTime={item.occurred_at}>{formatClock(item.occurred_at, share.timezone)}</time>
             <p>{item.note?.trim() || '상세 내용 미기록'}</p>
-          </li>)}</ol> : <p className="share-symptom-empty">선택한 날짜에 증상·컨디션 기록이 없습니다.</p>}
+          </li>)}</ol> : <p className="share-symptom-empty">선택한 날짜에 증상·컨디션·특이사항 기록이 없습니다.</p>}
         </div>
         {otherDaySymptoms.length > 0 && <details key={day} className="share-symptom-details">
           <summary><span className="share-symptom-disclosure-label">다른 날짜 기록 보기</span><span className="share-details-hint">{otherDaySymptoms.length}건</span></summary>
